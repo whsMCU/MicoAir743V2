@@ -131,6 +131,24 @@
 #define FAST_CODE
 #endif // USE_FAST_DATA
 
+#ifdef USE_DMA_RAM
+#if defined(STM32H7)
+#define DMA_RAM __attribute__((section(".DMA_RAM"), aligned(32)))
+#define DMA_RW_AXI __attribute__((section(".DMA_RW_AXI"), aligned(32)))
+extern uint8_t _dmaram_start__;
+extern uint8_t _dmaram_end__;
+#elif defined(STM32G4)
+#define DMA_RAM_R __attribute__((section(".DMA_RAM_R")))
+#define DMA_RAM_W __attribute__((section(".DMA_RAM_W")))
+#define DMA_RAM_RW __attribute__((section(".DMA_RAM_RW")))
+#endif
+#else
+#define DMA_RAM
+#define DMA_RW_AXI
+#define DMA_RAM_R
+#define DMA_RAM_W
+#define DMA_RAM_RW
+#endif
 
 
 #endif /* SRC_COMMON_DEF_H_ */

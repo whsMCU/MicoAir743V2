@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "bdma.h"
 #include "dma.h"
 #include "fatfs.h"
 #include "i2c.h"
@@ -105,6 +106,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
+  MX_BDMA_Init();
   MX_USART1_UART_Init();
   MX_USART6_UART_Init();
   MX_USART3_UART_Init();
@@ -116,8 +118,8 @@ int main(void)
   MX_SDMMC1_SD_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
-  MX_SPI3_Init();
   MX_ADC3_Init();
+  MX_SPI3_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

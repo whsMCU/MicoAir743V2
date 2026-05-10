@@ -571,25 +571,25 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
-	spi_t  *p_spi;
-	for(uint8_t i = 0; i<SPI_MAX_CH; i++)
-	{
-		  if (hspi->Instance == spi_dev_tbl[i].dev.h_spi->Instance)
-		  {
-        if(i == MAX7456)
-        {
-          osd.spi_tx_flag = true;
-          gpioPinWrite(spi_dev_tbl[i].csTag, _DEF_HIGH);
-          osd.spi_callback_t = micros() - osd.spi_callback_t_tmp;
-        }
-			  p_spi = &spi_dev_tbl[i].dev;
-			  p_spi->is_tx_done = true;
-			    if (p_spi->func_tx != NULL)
-			    {
-			      (*p_spi->func_tx)();
-			    }
-		  }
-	}
+//	spi_t  *p_spi;
+//	for(uint8_t i = 0; i<SPI_MAX_CH; i++)
+//	{
+//		  if (hspi->Instance == spi_dev_tbl[i].dev.h_spi->Instance)
+//		  {
+//        if(i == MAX7456)
+//        {
+//          osd.spi_tx_flag = true;
+//          gpioPinWrite(spi_dev_tbl[i].csTag, _DEF_HIGH);
+//          osd.spi_callback_t = micros() - osd.spi_callback_t_tmp;
+//        }
+//			  p_spi = &spi_dev_tbl[i].dev;
+//			  p_spi->is_tx_done = true;
+//			    if (p_spi->func_tx != NULL)
+//			    {
+//			      (*p_spi->func_tx)();
+//			    }
+//		  }
+//	}
 
 }
 

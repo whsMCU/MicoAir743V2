@@ -74,6 +74,8 @@ void SDMMC1_IRQHandler(void);
 void SPI3_IRQHandler(void);
 void USART6_IRQHandler(void);
 void OTG_FS_IRQHandler(void);
+void ADC3_IRQHandler(void);
+void BDMA_Channel0_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
