@@ -50,10 +50,15 @@
 #include "rx/rx.h"
 #include "rx/crsf.h"
 
+extern uint32_t cachedRccCsrValue;
+
 //void initialiseMemorySections(void);
 
 void SystemClock_Config(void);
+void PeriphCommonClock_Config(void);
 static void MPU_Config(void);
+static void CPU_CACHE_Enable(void);
+static void HandleStuckSysTick(void);
 
 void hwInit(void);
 
@@ -72,8 +77,17 @@ int main(void)
   HAL_Init();
   SystemClock_Config();
 
+  /* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
+
   // Configure NVIC preempt/priority groups
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
+
+  cachedRccCsrValue = RCC->RSR;
+
+  __HAL_RCC_D2SRAM1_CLK_ENABLE();
+  __HAL_RCC_D2SRAM2_CLK_ENABLE();
+  __HAL_RCC_D2SRAM3_CLK_ENABLE();
 
   cycleCounterInit();
 
@@ -90,7 +104,7 @@ int main(void)
 //  TIM4->CCR4 = 10500;
 //  HAL_Delay(8000);
 
-  init();
+//  init();
 
   run();
 
@@ -100,26 +114,26 @@ int main(void)
 void FAST_CODE run(void)
 {
     while (true) {
-        scheduler();
+        //scheduler();
     }
 }
 
 void hwInit(void)
 {
   #ifdef _USE_HW_RTC
-    rtcInit();
+//    rtcInit();
   #endif
-  gpioInit();
-  flashInit();
-  ledInit();
+//  gpioInit();
+//  flashInit();
+//  ledInit();
   MX_DMA_Init();
-  usbInit();
-  uartInit();
-  cliInit();
-  i2cInit();
-  spiInit();
+//  usbInit();
+//  uartInit();
+//  cliInit();
+//  i2cInit();
+//  spiInit();
   adcInit();
-  timerInit();
+//  timerInit();
 
 //  if (sdInit() == true)
 //  {
@@ -155,25 +169,29 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_HSI
+                              |RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 19;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 480;
   RCC_OscInitStruct.PLL.PLLP = 2;
-  RCC_OscInitStruct.PLL.PLLQ = 3;
+  RCC_OscInitStruct.PLL.PLLQ = 8;
   RCC_OscInitStruct.PLL.PLLR = 2;
-  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_3;
-  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOMEDIUM;
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
+  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
   RCC_OscInitStruct.PLL.PLLFRACN = 0;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -193,7 +211,28 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
   RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  HandleStuckSysTick();
+  HAL_Delay(10);
+}
+
+/**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CKPER;
+  PeriphClkInitStruct.CkperClockSelection = RCC_CLKPSOURCE_HSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
@@ -272,4 +311,19 @@ static void CPU_CACHE_Enable(void)
 
   /* Enable D-Cache */
   SCB_EnableDCache();
+}
+
+static void HandleStuckSysTick(void)
+{
+    uint32_t tickStart = HAL_GetTick();
+    uint32_t tickEnd = 0;
+
+    // H7 at 480Mhz requires a loop count of 160000. Double this for the timeout to be safe.
+    int attemptsRemaining = 320000;
+    while (((tickEnd = HAL_GetTick()) == tickStart) && --attemptsRemaining) {
+    }
+
+    if (tickStart == tickEnd) {
+        systemResetWithoutDisablingCaches();
+    }
 }

@@ -15,9 +15,12 @@
 
 // cycles per microsecond
 static uint32_t usTicks = 0;
+static float usTicksInv = 0.0f;
 // current uptime for 1kHz systick timer. will rollover after 49 days. hopefully we won't care.
 static volatile uint32_t sysTickUptime = 0;
 static volatile uint32_t sysTickValStamp = 0;
+// cached value of RCC->CSR
+uint32_t cachedRccCsrValue;
 static uint32_t cpuClockFrequency = 0;
 
 void cycleCounterInit(void)
@@ -25,14 +28,23 @@ void cycleCounterInit(void)
   cpuClockFrequency = HAL_RCC_GetSysClockFreq();
 
   usTicks = cpuClockFrequency / 1000000;
+  usTicksInv = 1e6f / cpuClockFrequency;
 
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+
+  ITM->LAR = DWT_LAR_UNLOCK_VALUE;
 
   __O uint32_t *DWTLAR = (uint32_t *)(DWT_BASE + 0x0FB0);
   *(DWTLAR) = DWT_LAR_UNLOCK_VALUE;
 
   DWT->CYCCNT = 0;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+void systemResetWithoutDisablingCaches(void)
+{
+    __disable_irq();
+    NVIC_SystemReset();
 }
 
 static volatile int sysTickPending = 0;

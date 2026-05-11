@@ -20,6 +20,7 @@
 #endif
 
 void cycleCounterInit(void);
+void systemResetWithoutDisablingCaches(void);
 uint32_t getCycleCounter(void);
 
 int32_t clockCyclesToMicros(int32_t clockCycles);

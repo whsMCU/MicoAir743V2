@@ -159,9 +159,9 @@ bool adcInit(void)
   }
 
   // Execute calibration
-//  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK) {
-//    Error_Handler();
-//  }
+  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK) {
+    Error_Handler();
+  }
 
   multimode.Mode = ADC_MODE_INDEPENDENT;
   if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
@@ -191,8 +191,8 @@ bool adcInit(void)
   }
 
 
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[0], 0);
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[1], 1);
+  //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[0], 0);
+  //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[1], 1);
 
   hadc3.Instance = ADC3;
   hadc3.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;
@@ -216,9 +216,9 @@ bool adcInit(void)
   }
 
   // Execute calibration
-//  if (HAL_ADCEx_Calibration_Start(&hadc3, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK) {
-//    Error_Handler();
-//  }
+  if (HAL_ADCEx_Calibration_Start(&hadc3, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK) {
+    Error_Handler();
+  }
 
   /** Configure Regular Channel
   */
@@ -252,9 +252,9 @@ bool adcInit(void)
     Error_Handler();
   }
 
-  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[3], 2);
-  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[4], 3);
-  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[5], 4);
+  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[3], 3);
+  //HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[4], 3);
+  //HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[5], 4);
 
   adcVREFINTCAL = *(uint16_t *)VREFINT_CAL_ADDR;
   adcTSCAL1 = *(uint16_t *)TEMPSENSOR_CAL1_ADDR;
@@ -314,11 +314,22 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
 {
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
   if(adcHandle->Instance==ADC1)
   {
   /* USER CODE BEGIN ADC1_MspInit 0 */
 
   /* USER CODE END ADC1_MspInit 0 */
+
+	/** Initializes the peripherals clock
+	*/
+		PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+		PeriphClkInitStruct.AdcClockSelection = RCC_ADCCLKSOURCE_CLKP;
+		if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+		{
+			Error_Handler();
+		}
+
     /* ADC1 clock enable */
     __HAL_RCC_ADC12_CLK_ENABLE();
 
@@ -363,6 +374,16 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
   /* USER CODE BEGIN ADC3_MspInit 0 */
 
   /* USER CODE END ADC3_MspInit 0 */
+
+	/** Initializes the peripherals clock
+	*/
+		PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+		PeriphClkInitStruct.AdcClockSelection = RCC_ADCCLKSOURCE_CLKP;
+		if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+		{
+			Error_Handler();
+		}
+
     /* ADC3 clock enable */
     __HAL_RCC_ADC3_CLK_ENABLE();
 
@@ -436,4 +457,10 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 
   /* USER CODE END ADC3_MspDeInit 1 */
   }
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+   /* Invalidate Data Cache to get the updated content of the SRAM on the second half of the ADC converted data buffer: 32 bytes */
+  SCB_InvalidateDCache_by_Addr((uint32_t *) &adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH], ADC_BUF_CACHE_ALIGN_LENGTH);
 }
