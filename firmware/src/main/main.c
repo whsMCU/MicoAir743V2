@@ -66,6 +66,9 @@ int main(void)
 
   MPU_Config();
 
+  /* Enable the CPU Cache */
+  CPU_CACHE_Enable();
+
   HAL_Init();
   SystemClock_Config();
 
@@ -256,3 +259,17 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+/**
+  * @brief  CPU L1-Cache enable.
+  * @param  None
+  * @retval None
+  */
+static void CPU_CACHE_Enable(void)
+{
+  /* Enable I-Cache */
+  SCB_EnableICache();
+
+  /* Enable D-Cache */
+  SCB_EnableDCache();
+}
