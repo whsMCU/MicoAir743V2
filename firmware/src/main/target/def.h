@@ -51,7 +51,6 @@
 #define MAX_SUPPORTED_MOTORS 8
 
 
-#define USE_HAL_DRIVER
 
 #if !defined(ALT_HOLD_THROTTLE_NEUTRAL_ZONE)
   #define ALT_HOLD_THROTTLE_NEUTRAL_ZONE 40
@@ -83,6 +82,7 @@
 //#define USE_OSD
 //#define USE_MAX7456
 #define USE_MOTOR
+#define USE_DMA_RAM
 
 #define NAV_AUTO_MAG_DECLINATION_PRECISE
 
