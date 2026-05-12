@@ -20,9 +20,11 @@ typedef struct
 
 
 led_tbl_t led_tbl[LED_MAX_CH] =
-    {
-        {GPIOC, GPIO_PIN_8, GPIO_PIN_RESET, GPIO_PIN_SET},
-    };
+  {
+    {GPIOE, GPIO_PIN_3, GPIO_PIN_RESET, GPIO_PIN_SET},
+    {GPIOE, GPIO_PIN_2, GPIO_PIN_RESET, GPIO_PIN_SET},
+    {GPIOE, GPIO_PIN_4, GPIO_PIN_RESET, GPIO_PIN_SET},
+  };
 
 #ifdef _USE_HW_CLI
 static void cliLed(cli_args_t *args);
@@ -34,7 +36,7 @@ bool ledInit(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
 
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -46,7 +48,7 @@ bool ledInit(void)
     ledOff(i);
   }
 
-   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
 	#ifdef _USE_HW_CLI
   cliAdd("led", cliLed);

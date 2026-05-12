@@ -191,8 +191,8 @@ bool adcInit(void)
   }
 
 
-  //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[0], 0);
-  //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[1], 1);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[0], 0);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[1], 1);
 
   hadc3.Instance = ADC3;
   hadc3.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;
@@ -252,9 +252,9 @@ bool adcInit(void)
     Error_Handler();
   }
 
-  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[3], 3);
-  //HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[4], 3);
-  //HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[5], 4);
+  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[3], 2);
+  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[4], 3);
+  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[5], 4);
 
   adcVREFINTCAL = *(uint16_t *)VREFINT_CAL_ADDR;
   adcTSCAL1 = *(uint16_t *)TEMPSENSOR_CAL1_ADDR;

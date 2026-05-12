@@ -23,11 +23,11 @@ typedef struct
 
 const gpio_tbl_t gpio_tbl[GPIO_MAX_CH] =
 {
-	{GPIOA, GPIO_PIN_4,  _DEF_OUTPUT_PULLUP,   GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 0. BMI270 CS
-	{GPIOC, GPIO_PIN_4,  _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 1. BMI270 INT
-	{GPIOC, GPIO_PIN_3,  _DEF_OUTPUT,          GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 2. PINIO
-	{GPIOA, GPIO_PIN_15, _DEF_OUTPUT,          GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 3. SDCARD  CS
-	{GPIOB, GPIO_PIN_12, _DEF_OUTPUT,          GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 4. MAX7456 CS
+	{GPIOA, GPIO_PIN_15,  _DEF_OUTPUT_PULLUP,  GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 0. BMI270 CS
+	{GPIOB, GPIO_PIN_7,  _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 1. BMI270 INT
+//	{GPIOC, GPIO_PIN_2,  _DEF_OUTPUT,          GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 2. PINIO
+//	{GPIOA, GPIO_PIN_3, _DEF_OUTPUT,          GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 3. SDCARD  CS
+//	{GPIOB, GPIO_PIN_4, _DEF_OUTPUT,          GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 4. MAX7456 CS
 };
 
 
@@ -40,19 +40,18 @@ bool gpioInit(void)
   bool ret = true;
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
 
   for (int i=0; i<GPIO_MAX_CH; i++)
   {
@@ -61,8 +60,8 @@ bool gpioInit(void)
   }
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 0x0f, 0x0f);
-  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0x0f, 0x0f);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 #ifdef _USE_HW_CLI
   cliAdd("gpio", cliGpio);

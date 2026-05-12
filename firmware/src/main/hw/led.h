@@ -18,8 +18,9 @@
 
 typedef enum
 {
-  ST1 = 0u,
-  ST2,
+  RED = 0u,
+  GREEN,
+  BLUE,
 } LED_Type;
 
 #define LED0_TOGGLE              ledToggle(0)

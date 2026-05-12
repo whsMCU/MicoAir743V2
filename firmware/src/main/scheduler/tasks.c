@@ -85,7 +85,7 @@ static void ledUpdate(uint32_t currentTimeUs)
         pre_time = currentTimeUs;
         if(ARMING_FLAG(ARMED))
         {
-        	ledOn(ST1);
+        	ledOn(BLUE);
         }
         else
         {

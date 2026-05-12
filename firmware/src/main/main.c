@@ -111,9 +111,20 @@ int main(void)
   return 0;
 
 }
+
+uint32_t last_toggle_time = 0;
+
 void FAST_CODE run(void)
 {
     while (true) {
+
+      if (millis() - last_toggle_time >= 1000)
+      {
+        ledToggle(RED);
+        ledToggle(GREEN);
+        ledToggle(BLUE);
+        last_toggle_time = millis();
+      }
         //scheduler();
     }
 }
@@ -123,9 +134,9 @@ void hwInit(void)
   #ifdef _USE_HW_RTC
 //    rtcInit();
   #endif
-//  gpioInit();
+  gpioInit();
 //  flashInit();
-//  ledInit();
+  ledInit();
   MX_DMA_Init();
 //  usbInit();
 //  uartInit();
