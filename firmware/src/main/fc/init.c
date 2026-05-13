@@ -129,11 +129,11 @@ void init(void)
 {
   debugMode = DEBUG_NONE;//DEBUG_FLOW;//DEBUG_POS_EST;// DEBUG_NONE; //DEBUG_PIDLOOP
   Param_Config_Init();
-  bool existing = loadFromSDCard();
-  if(existing)
-  {
-    readSDCard();
-  }
+//  bool existing = loadFromSDCard();
+//  if(existing)
+//  {
+//    readSDCard();
+//  }
 
   activeAdjustmentRangeReset();
 
@@ -144,17 +144,17 @@ void init(void)
 	mspSerialInit();
 	//mixerInit(mixerConfig.mixerMode);
 
-	bmi270_Init();
+//	bmi270_Init();
   //Sensor_Init();
 
 #ifdef USE_MAG
-	compassInit();
+//	compassInit();
 #endif
 
 	position_Init();
 
 #ifdef USE_BARO
-	Baro_Init();
+//	Baro_Init();
 #endif
 
 #ifdef USE_ADC_INTERNAL
@@ -185,7 +185,7 @@ void init(void)
 	LED0_OFF;
 	////////////////////////////////////////
 
-	imuInit();
+//	imuInit();
 
   DISABLE_STATE(FIXED_WING_LEGACY);
   DISABLE_STATE(MULTIROTOR);
@@ -203,7 +203,7 @@ void init(void)
 
 //    failsafeInit();
 //
-    rxInit();
+//    rxInit();
 
     initRcProcessing();
 

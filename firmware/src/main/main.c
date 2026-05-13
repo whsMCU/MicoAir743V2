@@ -104,7 +104,7 @@ int main(void)
 //  TIM4->CCR4 = 10500;
 //  HAL_Delay(8000);
 
-//  init();
+  init();
 
   run();
 
@@ -112,19 +112,9 @@ int main(void)
 
 }
 
-uint32_t last_toggle_time = 0;
-
 void FAST_CODE run(void)
 {
     while (true) {
-
-      if (millis() - last_toggle_time >= 1000)
-      {
-        ledToggle(RED);
-        ledToggle(GREEN);
-        ledToggle(BLUE);
-        last_toggle_time = millis();
-      }
         scheduler();
     }
 }
