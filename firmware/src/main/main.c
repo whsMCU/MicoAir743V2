@@ -125,7 +125,7 @@ void FAST_CODE run(void)
         ledToggle(BLUE);
         last_toggle_time = millis();
       }
-        //scheduler();
+        scheduler();
     }
 }
 
@@ -142,7 +142,7 @@ void hwInit(void)
 //  uartInit();
 //  cliInit();
 //  i2cInit();
-//  spiInit();
+  spiInit();
   adcInit();
 //  timerInit();
 
