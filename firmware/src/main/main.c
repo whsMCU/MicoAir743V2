@@ -67,7 +67,7 @@ void run(void);
 int main(void)
 {
 
-  //initialiseMemorySections();
+  initialiseMemorySections();
 
   MPU_Config();
 
@@ -142,22 +142,22 @@ void hwInit(void)
 //  }
 }
 
-//void initialiseMemorySections(void)
-//{
-//  #ifdef USE_FAST_DATA
-//    /* Load FAST_DATA variable initializers into DTCM RAM */
-//    extern uint8_t _sfastram_data;
-//    extern uint8_t _efastram_data;
-//    extern uint8_t _sfastram_idata;
-//    memcpy(&_sfastram_data, &_sfastram_idata, (size_t) (&_efastram_data - &_sfastram_data));
-//
-//    extern uint32_t __fastram_bss_start__;
-//    extern uint32_t __fastram_bss_end__;
-//    uint32_t *p = &__fastram_bss_start__;
-//    while (p < &__fastram_bss_end__)
-//        *p++ = 0;
-//  #endif
-//}
+void initialiseMemorySections(void)
+{
+ #ifdef USE_FAST_DATA
+   /* Load FAST_DATA variable initializers into DTCM RAM */
+   extern uint8_t _sfastram_data;
+   extern uint8_t _efastram_data;
+   extern uint8_t _sfastram_idata;
+   memcpy(&_sfastram_data, &_sfastram_idata, (size_t) (&_efastram_data - &_sfastram_data));
+
+   extern uint32_t __fastram_bss_start__;
+   extern uint32_t __fastram_bss_end__;
+   uint32_t *p = &__fastram_bss_start__;
+   while (p < &__fastram_bss_end__)
+       *p++ = 0;
+ #endif
+}
 
 void SystemClock_Config(void)
 {

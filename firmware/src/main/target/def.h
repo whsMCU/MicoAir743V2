@@ -99,7 +99,7 @@
 //#define USE_GYRO_SLEW_LIMITER
 #define USE_LATE_TASK_STATISTICS
 
-//#define USE_FAST_DATA
+#define USE_FAST_DATA
 #define USE_DYN_NOTCH_FILTER
 
 #define USE_LED_STRIP

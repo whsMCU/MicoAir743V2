@@ -155,7 +155,50 @@ SECTIONS
     __bss_end__ = _ebss;
   } >RAM_D1
   
-    . = ALIGN(32);
+  /* Uninitialized data section */
+  . = ALIGN(4);
+  .sram2 (NOLOAD) :
+  {
+    /* This is used by the startup in order to initialize the .sram2 secion */
+    _ssram2 = .;         /* define a global symbol at sram2 start */
+    __sram2_start__ = _ssram2;
+    *(.sram2)
+    *(SORT_BY_ALIGNMENT(.sram2*))
+
+    . = ALIGN(4);
+    _esram2 = .;         /* define a global symbol at sram2 end */
+    __sram2_end__ = _esram2;
+  } >RAM_D1
+
+  /* used during startup to initialized fastram_data */
+  _sfastram_idata = LOADADDR(.fastram_data);
+
+  /* Initialized FAST_DATA section for unsuspecting developers */
+  .fastram_data :
+  {
+    . = ALIGN(4);
+    _sfastram_data = .;        /* create a global symbol at data start */
+    *(.fastram_data)           /* .data sections */
+    *(.fastram_data*)          /* .data* sections */
+
+    . = ALIGN(4);
+    _efastram_data = .;        /* define a global symbol at data end */
+  } >DTCMRAM AT >FLASH
+
+  . = ALIGN(4);
+  .fastram_bss (NOLOAD) :
+  {
+    _sfastram_bss = .;
+    __fastram_bss_start__ = _sfastram_bss;
+    *(.fastram_bss)
+    *(SORT_BY_ALIGNMENT(.fastram_bss*))
+
+    . = ALIGN(4);
+    _efastram_bss = .;
+    __fastram_bss_end__ = _efastram_bss;
+  } >DTCMRAM
+
+  . = ALIGN(32);
   .DMA_RAM (NOLOAD) :
   {
     KEEP(*(.DMA_RAM))
