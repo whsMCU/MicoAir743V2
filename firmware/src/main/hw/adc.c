@@ -37,6 +37,14 @@ volatile uint16_t adcValues[ADC_CHANNEL_COUNT_Custem];
 
 adcConfig_t adcConfig;
 
+#define ADC_SOURCE_COUNT 5
+#define ADC_BUF_LENGTH ADC_SOURCE_COUNT
+#define ADC_BUF_BYTES (ADC_BUF_LENGTH * sizeof(uint16_t))
+#define ADC_BUF_CACHE_ALIGN_BYTES  ((ADC_BUF_BYTES + 0x20) & ~0x1f)
+#define ADC_BUF_CACHE_ALIGN_LENGTH (ADC_BUF_CACHE_ALIGN_BYTES / sizeof(uint16_t))
+
+static volatile DMA_RAM uint16_t adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH] __attribute__((aligned(32)));
+
 void adcConfig_Init(void)
 {
     adcConfig.vbat.enabled = true;
@@ -93,12 +101,12 @@ void adcConfig_Init(void)
 
 uint16_t adcInternalReadVrefint(void)
 {
-    return adcValues[3];
+    return adcConversionBuffer[4];
 }
 
 uint16_t adcInternalReadTempsensor(void)
 {
-    return adcValues[2];
+    return adcConversionBuffer[3];
 }
 #endif
 
@@ -119,14 +127,6 @@ static void adcInitCalibrationValues(void)
     adcTSCAL2 = *TEMPSENSOR_CAL2_ADDR >> VREFINT_CAL_SHIFT;
     adcTSSlopeK = (TEMPSENSOR_CAL2_TEMP - TEMPSENSOR_CAL1_TEMP) * 1000 / (adcTSCAL2 - adcTSCAL1);
 }
-
-#define ADC_SOURCE_COUNT 5
-#define ADC_BUF_LENGTH ADC_SOURCE_COUNT
-#define ADC_BUF_BYTES (ADC_BUF_LENGTH * sizeof(uint16_t))
-#define ADC_BUF_CACHE_ALIGN_BYTES  ((ADC_BUF_BYTES + 0x20) & ~0x1f)
-#define ADC_BUF_CACHE_ALIGN_LENGTH (ADC_BUF_CACHE_ALIGN_BYTES / sizeof(uint16_t))
-
-static volatile DMA_RAM uint16_t adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH] __attribute__((aligned(32)));
 
 bool adcInit(void)
 {
@@ -281,7 +281,7 @@ uint16_t adcGetChannel(uint8_t channel)
         debug[3] = adcValues[adcOperatingConfig[3].dmaIndex];
     }
 #endif
-    return adcValues[channel];
+    return adcConversionBuffer[channel];
 }
 
 #ifdef USE_ADC_INTERNAL

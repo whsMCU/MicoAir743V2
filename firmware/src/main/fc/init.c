@@ -179,6 +179,7 @@ void init(void)
 			delay(25);
 			BEEP_OFF;
 		#else
+			//HAL_Delay(50);
 			delay(50);
 		#endif
 	}
@@ -208,7 +209,7 @@ void init(void)
     initRcProcessing();
 
 #ifdef USE_GPS
-    gpsInit();
+//    gpsInit();
 #endif
 
 #ifdef USE_LED_STRIP

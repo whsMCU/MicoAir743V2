@@ -52,7 +52,7 @@
 
 extern uint32_t cachedRccCsrValue;
 
-//void initialiseMemorySections(void);
+void initialiseMemorySections(void);
 
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
@@ -132,7 +132,7 @@ void hwInit(void)
 //  uartInit();
 //  cliInit();
 //  i2cInit();
-  spiInit();
+//  spiInit();
   adcInit();
 //  timerInit();
 
