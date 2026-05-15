@@ -114,7 +114,7 @@ uint32_t micros(void)
    ms = sysTickUptime;
    cycle_cnt = SysTick->VAL;
  } while (ms != sysTickUptime || cycle_cnt > sysTickValStamp);
- return (ms * 1000) + (usTicks * 1000 - cycle_cnt) / usTicks; //168
+ return (ms * 1000) + (usTicks * 1000 - cycle_cnt) / usTicks; //480
 }
 
 uint64_t micros64(void)

@@ -132,7 +132,7 @@ void hwInit(void)
 //  uartInit();
 //  cliInit();
 //  i2cInit();
-//  spiInit();
+  spiInit();
   adcInit();
 //  timerInit();
 
@@ -156,6 +156,15 @@ void initialiseMemorySections(void)
    uint32_t *p = &__fastram_bss_start__;
    while (p < &__fastram_bss_end__)
        *p++ = 0;
+
+   /* Load DMA_DATA variable intializers into D2 RAM */
+   extern uint8_t _sdmaram_bss;
+   extern uint8_t _edmaram_bss;
+   extern uint8_t _sdmaram_data;
+   extern uint8_t _edmaram_data;
+   extern uint8_t _sdmaram_idata;
+   bzero(&_sdmaram_bss, (size_t) (&_edmaram_bss - &_sdmaram_bss));
+   memcpy(&_sdmaram_data, &_sdmaram_idata, (size_t) (&_edmaram_data - &_sdmaram_data));
  #endif
 }
 

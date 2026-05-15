@@ -22,19 +22,23 @@
 
 #include "adc.h"
 
+extern adcOperatingConfig_t adcOperatingConfig[ADC_SOURCE_COUNT];
+extern volatile DMA_DATA_ZERO_INIT uint16_t adcValues[ADC_SOURCE_COUNT];
 
 #ifdef USE_ADC_INTERNAL
 extern int32_t adcVREFINTCAL;      // ADC value (12-bit) of band gap with Vref = VREFINTCAL_VREF
 extern int32_t adcTSCAL1;
 extern int32_t adcTSCAL2;
 extern int32_t adcTSSlopeK;
+
+uint16_t adcInternalRead(adcSource_e source);
 #endif
 
-#define ADC_CHANNEL_COUNT_Custem 5
+#define ADC_CHANNEL_COUNT 5
+
 //extern const adcDevice_t adcHardware[];
 //extern const adcTagMap_t adcTagMap[ADC_TAG_MAP_COUNT];
-extern adcOperatingConfig_t adcOperatingConfig[ADC_CHANNEL_COUNT];
-extern volatile uint16_t adcValues[ADC_CHANNEL_COUNT_Custem];
+
 
 //uint8_t adcChannelByTag(ioTag_t ioTag);
 //ADCDevice adcDeviceByInstance(ADC_TypeDef *instance);

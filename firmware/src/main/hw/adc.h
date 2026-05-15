@@ -69,12 +69,24 @@ extern adcConfig_t adcConfig;
 #define ADC_DEV_TO_CFG(x) ((x) + 1)
 
 typedef enum {
+    ADC_NONE = -1,
     ADC_BATTERY = 0,
-    ADC_CURRENT = 1,
-    ADC_EXTERNAL1 = 2,
-    ADC_RSSI = 3,
-    ADC_CHANNEL_COUNT
-} AdcChannel;
+    ADC_CURRENT,
+    ADC_EXTERNAL1,
+    ADC_RSSI,
+    ADC_EXTERNAL_COUNT,
+#ifdef USE_ADC_INTERNAL
+    // For certain processors internal sensors are treated in the similar fashion as regular ADC inputs
+    ADC_TEMPSENSOR = ADC_EXTERNAL_COUNT,
+    ADC_VREFINT,
+#if ADC_INTERNAL_VBAT4_ENABLED
+    ADC_VBAT4,
+#endif
+    ADC_SOURCE_COUNT
+#else
+    ADC_SOURCE_COUNT = ADC_EXTERNAL_COUNT
+#endif
+} adcSource_e;
 
 typedef struct adcOperatingConfig_s {
     uint8_t adcChannel;         // ADCy_INxx channel number for this input (XXX May be consolidated with uint32_t case)
@@ -85,13 +97,11 @@ typedef struct adcOperatingConfig_s {
 
 struct adcConfig_s;
 bool adcInit(void);
-uint16_t adcGetChannel(uint8_t channel);
+uint16_t adcGetValue(adcSource_e source);
 void adcConfig_Init(void);
 #ifdef USE_ADC_INTERNAL
-//bool adcInternalIsBusy(void);
+bool adcInternalIsBusy(void);
 //void adcInternalStartConversion(void);
-uint16_t adcInternalReadVrefint(void);
-uint16_t adcInternalReadTempsensor(void);
 uint16_t adcInternalCompensateVref(uint16_t vrefAdcValue);
 int16_t adcInternalComputeTemperature(uint16_t tempAdcValue, uint16_t vrefValue);
 #endif

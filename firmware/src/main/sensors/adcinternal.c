@@ -74,12 +74,12 @@ void adcInternalProcess(timeUs_t currentTimeUs)
 {
     UNUSED(currentTimeUs);
 
-//    if (adcInternalIsBusy()) {
-//        return;
-//    }
+    if (adcInternalIsBusy()) {
+        return;
+    }
 
-    uint16_t vrefintSample = adcInternalReadVrefint();
-    uint16_t tempsensorSample = adcInternalReadTempsensor();
+    uint16_t vrefintSample = adcGetValue(ADC_VREFINT);
+    uint16_t tempsensorSample = adcGetValue(ADC_TEMPSENSOR);
 
     adcVrefintValue = updateMovingAverageUint16(&adcVrefintAverageState, vrefintSample);
     adcTempsensorValue = updateMovingAverageUint16(&adcTempsensorAverageState, tempsensorSample);
@@ -99,9 +99,9 @@ void adcInternalInit(void)
 {
     // Call adcInternalProcess repeatedly to fill moving average array
     for (int i = 0 ; i < 9 ; i++) {
-//        while (adcInternalIsBusy()) {
-//            // empty
-//        }
+        while (adcInternalIsBusy()) {
+            // empty
+        }
         adcInternalProcess(0);
     }
 }

@@ -129,7 +129,12 @@
 #define FAST_DATA_ZERO_INIT
 #define FAST_DATA
 #define FAST_CODE
-#endif // USE_FAST_DATA
+#endif  //USE_FAST_DATA
+
+// DMA to/from any memory
+#define DMA_DATA_ZERO_INIT          __attribute__ ((section(".dmaram_bss"), aligned(32)))
+#define DMA_DATA                    __attribute__ ((section(".dmaram_data"), aligned(32)))
+#define STATIC_DMA_DATA_AUTO        static DMA_DATA
 
 #ifdef USE_DMA_RAM
 #if defined(STM32H7)

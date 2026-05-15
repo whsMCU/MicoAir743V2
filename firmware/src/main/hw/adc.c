@@ -31,19 +31,14 @@ DMA_HandleTypeDef hdma_adc3;
 
 //#define DEBUG_ADC_CHANNELS
 
-adcOperatingConfig_t adcOperatingConfig[ADC_CHANNEL_COUNT];
-
-volatile uint16_t adcValues[ADC_CHANNEL_COUNT_Custem];
-
 adcConfig_t adcConfig;
 
-#define ADC_SOURCE_COUNT 5
 #define ADC_BUF_LENGTH ADC_SOURCE_COUNT
 #define ADC_BUF_BYTES (ADC_BUF_LENGTH * sizeof(uint16_t))
 #define ADC_BUF_CACHE_ALIGN_BYTES  ((ADC_BUF_BYTES + 0x20) & ~0x1f)
 #define ADC_BUF_CACHE_ALIGN_LENGTH (ADC_BUF_CACHE_ALIGN_BYTES / sizeof(uint16_t))
 
-static volatile DMA_RAM uint16_t adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH] __attribute__((aligned(32)));
+static volatile DMA_RAM uint16_t adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH];
 
 void adcConfig_Init(void)
 {
@@ -80,16 +75,10 @@ void adcConfig_Init(void)
 
 //static bool adcInternalConversionInProgress = false;
 
-//bool adcInternalIsBusy(void)
-//{
-//    if (adcInternalConversionInProgress) {
-//        if (ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC) != RESET) {
-//            adcInternalConversionInProgress = false;
-//        }
-//    }
-//
-//    return adcInternalConversionInProgress;
-//}
+bool adcInternalIsBusy(void)
+{
+  return false;
+}
 
 //void adcInternalStartConversion(void)
 //{
@@ -98,16 +87,6 @@ void adcConfig_Init(void)
 //
 //    adcInternalConversionInProgress = true;
 //}
-
-uint16_t adcInternalReadVrefint(void)
-{
-    return adcConversionBuffer[4];
-}
-
-uint16_t adcInternalReadTempsensor(void)
-{
-    return adcConversionBuffer[3];
-}
 #endif
 
 // H743, H735, H750 and H7A3 seems to use 16-bit precision value,
@@ -251,7 +230,7 @@ bool adcInit(void)
     Error_Handler();
   }
 
-  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[2], 3);
+  HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[4], 3);
 
   adcVREFINTCAL = *(uint16_t *)VREFINT_CAL_ADDR;
   adcTSCAL1 = *(uint16_t *)TEMPSENSOR_CAL1_ADDR;
@@ -261,27 +240,6 @@ bool adcInit(void)
 
 //     ADC_SoftwareStartConv(adc.ADCx);
     return ret;
-}
-
-uint16_t adcGetChannel(uint8_t channel)
-{
-    //adcGetChannelValues();
-
-#ifdef DEBUG_ADC_CHANNELS
-    if (adcOperatingConfig[0].enabled) {
-        debug[0] = adcValues[adcOperatingConfig[0].dmaIndex];
-    }
-    if (adcOperatingConfig[1].enabled) {
-        debug[1] = adcValues[adcOperatingConfig[1].dmaIndex];
-    }
-    if (adcOperatingConfig[2].enabled) {
-        debug[2] = adcValues[adcOperatingConfig[2].dmaIndex];
-    }
-    if (adcOperatingConfig[3].enabled) {
-        debug[3] = adcValues[adcOperatingConfig[3].dmaIndex];
-    }
-#endif
-    return adcConversionBuffer[channel];
 }
 
 #ifdef USE_ADC_INTERNAL
@@ -436,6 +394,30 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 
   /* USER CODE END ADC3_MspDeInit 1 */
   }
+}
+
+void adcGetChannelValues(void)
+{
+    // Transfer values in conversion buffer into adcValues[]
+    SCB_InvalidateDCache_by_Addr((uint32_t*)adcConversionBuffer, ADC_BUF_CACHE_ALIGN_BYTES);
+    for (unsigned i = 0; i < ADC_EXTERNAL_COUNT; i++) {
+            adcValues[i] = adcConversionBuffer[i];
+    }
+}
+
+uint16_t adcInternalRead(adcSource_e source)
+{
+    switch (source) {
+    case ADC_VREFINT:
+    case ADC_TEMPSENSOR:
+#if ADC_INTERNAL_VBAT4_ENABLED
+    case ADC_VBAT4:
+#endif
+        //const unsigned dmaIndex = adcOperatingConfig[source].dmaIndex;
+        return source < ADC_BUF_LENGTH ? adcConversionBuffer[source] : 0;
+    default:
+        return 0;
+    }
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)

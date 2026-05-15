@@ -83,7 +83,7 @@ bool spiInit(void)
 	  spi_dev_tbl[i].dev.h_dma_tx = NULL;
   }
   spiBegin(BMI270);
-  spiBegin(MAX7456);
+  //spiBegin(MAX7456);
   cliAdd("spi", cliSPI);
   return ret;
 }
