@@ -420,8 +420,8 @@ uint16_t adcInternalRead(adcSource_e source)
     }
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
-{
-   /* Invalidate Data Cache to get the updated content of the SRAM on the second half of the ADC converted data buffer: 32 bytes */
-  SCB_InvalidateDCache_by_Addr((uint32_t *) &adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH], ADC_BUF_CACHE_ALIGN_LENGTH);
-}
+//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+//{
+//   /* Invalidate Data Cache to get the updated content of the SRAM on the second half of the ADC converted data buffer: 32 bytes */
+//  SCB_InvalidateDCache_by_Addr((uint32_t *) &adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH], ADC_BUF_CACHE_ALIGN_LENGTH);
+//}
