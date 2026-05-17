@@ -145,7 +145,16 @@ void hwInit(void)
 
 void initialiseMemorySections(void)
 {
- #ifdef USE_FAST_DATA
+
+  #ifdef USE_ITCM_RAM
+    /* Load fast-functions into ITCM RAM */
+    extern uint8_t tcm_code_start;
+    extern uint8_t tcm_code_end;
+    extern uint8_t tcm_code;
+    memcpy(&tcm_code_start, &tcm_code, (size_t) (&tcm_code_end - &tcm_code_start));
+  #endif  
+
+  #ifdef USE_FAST_DATA
    /* Load FAST_DATA variable initializers into DTCM RAM */
    extern uint8_t _sfastram_data;
    extern uint8_t _efastram_data;
@@ -245,36 +254,56 @@ void MPU_Config(void)
   /** Initializes and configures the Region and the memory to be protected
   */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.SubRegionDisable = 0x87;
+  MPU_InitStruct.SubRegionDisable = 0x00;
   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
 
-  // DMA transmit buffer in D2 SRAM1
-  // Reading needs cache coherence operation
-  MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-  MPU_InitStruct.BaseAddress = (uint32_t)&dmaram_start;
 
-	// Adjust start of the region to align with cache line size.
-	uint32_t start = (uint32_t)&dmaram_start & ~0x1F;
-	uint32_t length = (uint32_t)&dmaram_end - start;
 
-	if (length < 32) {
-		 // This will also prevent flsl from returning negative (case length == 0)
-		 length = 32;
-	}
+  #ifdef USE_ITCM_RAM
+    //  Mark ITCM-RAM as read-only
+    // "For Cortex®-M7, TCMs memories always behave as Non-cacheable, Non-shared normal memories, irrespective of the memory type attributes defined in the MPU for a memory region containing addresses held in the TCM"
+    // See AN4838
+    MPU_InitStruct.Number = MPU_REGION_NUMBER0;
+    MPU_InitStruct.BaseAddress = 0x00000000;
+    MPU_InitStruct.Size = MPU_REGION_SIZE_64KB;
+    MPU_InitStruct.AccessPermission = MPU_REGION_PRIV_RO_URO;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_BUFFERABLE;
 
-	int msbpos = flsl(length) - 1;
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+  #endif
 
-	if (length != (1U << msbpos)) {
-		 msbpos += 1;
-	}
-  MPU_InitStruct.Size = msbpos;
-  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+  #ifdef USE_DMA_RAM
+    // DMA transmit buffer in D2 SRAM1
+    // Reading needs cache coherence operation
+    MPU_InitStruct.Number = MPU_REGION_NUMBER1;
+    MPU_InitStruct.BaseAddress = (uint32_t)&dmaram_start;
+    // Adjust start of the region to align with cache line size.
+    uint32_t start = (uint32_t)&dmaram_start & ~0x1F;
+    uint32_t length = (uint32_t)&dmaram_end - start;
 
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
+    if (length < 32) {
+      // This will also prevent flsl from returning negative (case length == 0)
+      length = 32;
+    }
+
+    int msbpos = flsl(length) - 1;
+
+    if (length != (1U << msbpos)) {
+      msbpos += 1;
+    }
+    MPU_InitStruct.Size = msbpos;
+    MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+  #endif
+
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 

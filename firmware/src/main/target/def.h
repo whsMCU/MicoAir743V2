@@ -99,6 +99,7 @@
 //#define USE_GYRO_SLEW_LIMITER
 #define USE_LATE_TASK_STATISTICS
 
+#define USE_ITCM_RAM
 #define USE_FAST_DATA
 #define USE_DYN_NOTCH_FILTER
 
@@ -120,6 +121,20 @@
 #define USE_GPS_RESCUE
 
 #define NOINLINE __attribute__((noinline))
+
+#ifdef USE_ITCM_RAM
+#if defined(ITCM_RAM_OPTIMISATION) && !defined(DEBUG)
+#define FAST_CODE                   __attribute__((section(".tcm_code"))) __attribute__((optimize(ITCM_RAM_OPTIMISATION)))
+#else
+#define FAST_CODE                   __attribute__((section(".tcm_code")))
+#endif
+#endif
+// If a particular target is short of ITCM RAM, defining FAST_CODE_PREF in the target.h file will
+// cause functions decorated FAST_CODE_PREF to *not* go into ITCM RAM but if FAST_CODE_PREF is not
+// defined for the target, FAST_CODE_PREF will become an alias to FAST_CODE (in the common post
+// header file), and functions decorated with FAST_CODE_PREF *will* go into ITCM RAM.
+#define FAST_CODE_NOINLINE          NOINLINE
+#endif // USE_ITCM_RAM
 
 #ifdef USE_FAST_DATA
 #define FAST_DATA_ZERO_INIT         __attribute__ ((section(".fastram_bss"), aligned(4)))

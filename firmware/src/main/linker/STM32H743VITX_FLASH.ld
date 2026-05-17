@@ -88,6 +88,19 @@ SECTIONS
     . = ALIGN(4);
   } >FLASH
 
+  /* Critical program code goes into ITCM RAM */
+  /* Copy specific fast-executing code to ITCM RAM */
+  tcm_code = LOADADDR(.tcm_code);
+  .tcm_code :
+  {
+    . = ALIGN(4);
+    tcm_code_start = .;
+    *(.tcm_code)
+    *(.tcm_code*)
+    . = ALIGN(4);
+    tcm_code_end = .;
+  } >ITCMRAM AT >FLASH
+
   .ARM.extab (READONLY) : /* The READONLY keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
   {
     *(.ARM.extab* .gnu.linkonce.armextab.*)
