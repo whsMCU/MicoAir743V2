@@ -73,6 +73,10 @@ int main(void)
 
   initialiseMemorySections();
 
+  __HAL_RCC_D2SRAM1_CLK_ENABLE();
+  __HAL_RCC_D2SRAM2_CLK_ENABLE();
+  __HAL_RCC_D2SRAM3_CLK_ENABLE();
+
   MPU_Config();
 
   /* Enable the CPU Cache */
@@ -85,10 +89,6 @@ int main(void)
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 
   cachedRccCsrValue = RCC->RSR;
-
-  __HAL_RCC_D2SRAM1_CLK_ENABLE();
-  __HAL_RCC_D2SRAM2_CLK_ENABLE();
-  __HAL_RCC_D2SRAM3_CLK_ENABLE();
 
   cycleCounterInit();
 
@@ -247,6 +247,9 @@ void SystemClock_Config(void)
 void MPU_Config(void)
 {
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
+  uint32_t start = 0;
+  uint32_t end = 0;
+  uint32_t length = 0;
 
   /* Disables the MPU */
   HAL_MPU_Disable();
@@ -263,8 +266,9 @@ void MPU_Config(void)
     //  Mark ITCM-RAM as read-only
     // "For Cortex®-M7, TCMs memories always behave as Non-cacheable, Non-shared normal memories, irrespective of the memory type attributes defined in the MPU for a memory region containing addresses held in the TCM"
     // See AN4838
+    start = 0x00000000;
     MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-    MPU_InitStruct.BaseAddress = 0x00000000;
+    MPU_InitStruct.BaseAddress = start;
     MPU_InitStruct.Size = MPU_REGION_SIZE_64KB;
     MPU_InitStruct.AccessPermission = MPU_REGION_PRIV_RO_URO;
     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
@@ -278,11 +282,13 @@ void MPU_Config(void)
   #ifdef USE_DMA_RAM
     // DMA transmit buffer in D2 SRAM1
     // Reading needs cache coherence operation
+    start = (uint32_t)&dmaram_start;
+    end = (uint32_t)&dmaram_end;
     MPU_InitStruct.Number = MPU_REGION_NUMBER1;
-    MPU_InitStruct.BaseAddress = (uint32_t)&dmaram_start;
+    MPU_InitStruct.BaseAddress = start;
     // Adjust start of the region to align with cache line size.
-    uint32_t start = (uint32_t)&dmaram_start & ~0x1F;
-    uint32_t length = (uint32_t)&dmaram_end - start;
+    start = start & ~0x1F;
+    length = end - start;
 
     if (length < 32) {
       // This will also prevent flsl from returning negative (case length == 0)
