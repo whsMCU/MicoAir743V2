@@ -1252,39 +1252,39 @@ void ledStripUpdate(timeUs_t currentTimeUs)
 {
     UNUSED(currentTimeUs);
 
-    if (!isWS2811LedStripReady()) {
-        // Call schedulerIgnoreTaskExecTime() unless data is being processed
-        schedulerIgnoreTaskExecTime();
-        return;
-    }
-
-    if (ledStripEnabled && IS_RC_MODE_ACTIVE(BOXLEDLOW)) {
-        ledStripDisable();
-    } else if (!IS_RC_MODE_ACTIVE(BOXLEDLOW)) {
-        ledStripEnable();
-    }
-
-    if (ledStripEnabled) {
-        switch (ledStripConfig.ledstrip_profile) {
-#ifdef USE_LED_STRIP_STATUS_MODE
-            case LED_PROFILE_STATUS: {
-                applyStatusProfile(currentTimeUs);
-                break;
-            }
-#endif
-            case LED_PROFILE_RACE:
-            case LED_PROFILE_BEACON: {
-                applySimpleProfile(currentTimeUs);
-                break;
-            }
-
-            default:
-                break;
-        }
-    } else {
-        // Call schedulerIgnoreTaskExecTime() unless data is being processed
-        schedulerIgnoreTaskExecTime();
-    }
+//    if (!isWS2811LedStripReady()) {
+//        // Call schedulerIgnoreTaskExecTime() unless data is being processed
+//        schedulerIgnoreTaskExecTime();
+//        return;
+//    }
+//
+//    if (ledStripEnabled && IS_RC_MODE_ACTIVE(BOXLEDLOW)) {
+//        ledStripDisable();
+//    } else if (!IS_RC_MODE_ACTIVE(BOXLEDLOW)) {
+//        ledStripEnable();
+//    }
+//
+//    if (ledStripEnabled) {
+//        switch (ledStripConfig.ledstrip_profile) {
+//#ifdef USE_LED_STRIP_STATUS_MODE
+//            case LED_PROFILE_STATUS: {
+//                applyStatusProfile(currentTimeUs);
+//                break;
+//            }
+//#endif
+//            case LED_PROFILE_RACE:
+//            case LED_PROFILE_BEACON: {
+//                applySimpleProfile(currentTimeUs);
+//                break;
+//            }
+//
+//            default:
+//                break;
+//        }
+//    } else {
+//        // Call schedulerIgnoreTaskExecTime() unless data is being processed
+//        schedulerIgnoreTaskExecTime();
+//    }
 }
 
 uint8_t getLedProfile(void)

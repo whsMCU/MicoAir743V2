@@ -89,7 +89,7 @@ void voltageMeterReset(voltageMeter_t *meter)
 //
 
 #ifndef VBAT_SCALE_DEFAULT
-#define VBAT_SCALE_DEFAULT 110
+#define VBAT_SCALE_DEFAULT 213
 #endif
 
 #ifndef VBAT_RESDIVVAL_DEFAULT

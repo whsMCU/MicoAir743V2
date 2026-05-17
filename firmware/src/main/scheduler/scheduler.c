@@ -423,7 +423,7 @@ void FAST_CODE scheduler(void)
   // Check for incoming RX data. Don't do this in the checker as that is called repeatedly within
   // a given gyro loop, and ELRS takes a long time to process this and so can only be safely processed
   // before the checkers
-  rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
+//  rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
 
   scheduleCount++;
 }

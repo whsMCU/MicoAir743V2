@@ -116,7 +116,7 @@ int main(void)
 void FAST_CODE run(void)
 {
     while (true) {
-        //scheduler();
+    	scheduler();
     }
 }
 
@@ -259,8 +259,6 @@ void MPU_Config(void)
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
   MPU_InitStruct.SubRegionDisable = 0x00;
   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-
-
 
   #ifdef USE_ITCM_RAM
     //  Mark ITCM-RAM as read-only

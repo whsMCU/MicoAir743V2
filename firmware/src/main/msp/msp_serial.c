@@ -57,7 +57,7 @@ void resetMspPort(uint8_t ch, mspPort_t *mspPortToReset)
 void mspSerialAllocatePorts(void)
 {
     resetMspPort(_DEF_UART3, &mspPorts[0]);
-    resetMspPort(_DEF_UART4, &mspPorts[1]);
+    //resetMspPort(_DEF_UART4, &mspPorts[1]);
     resetMspPort(_DEF_UART6, &mspPorts[2]);
 }
 
@@ -539,7 +539,7 @@ void mspSerialInit(void)
     memset(mspPorts, 0, sizeof(mspPorts));
 
     uartOpen(_DEF_UART3, 115200); //OPFLOW, RANGEFINDER
-    uartOpen(_DEF_UART4, 115200); //ESC
+    //uartOpen(_DEF_UART4, 115200); //ESC
     uartOpen(_DEF_UART6, 115200); //GCS
     mspSerialAllocatePorts();
 }

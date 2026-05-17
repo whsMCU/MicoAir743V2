@@ -200,7 +200,7 @@ bool adcInit(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_VBAT;
+  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_810CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
@@ -214,7 +214,7 @@ bool adcInit(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
+  sConfig.Channel = ADC_CHANNEL_VREFINT;
   sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
   {
@@ -223,7 +223,7 @@ bool adcInit(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_VREFINT;
+  sConfig.Channel = ADC_CHANNEL_VBAT;
   sConfig.Rank = ADC_REGULAR_RANK_3;
   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
   {
@@ -232,14 +232,7 @@ bool adcInit(void)
 
   HAL_ADC_Start_DMA(&hadc3, (uint32_t*)&adcConversionBuffer[4], 3);
 
-  adcVREFINTCAL = *(uint16_t *)VREFINT_CAL_ADDR;
-  adcTSCAL1 = *(uint16_t *)TEMPSENSOR_CAL1_ADDR;
-  adcTSCAL2 = *(uint16_t *)TEMPSENSOR_CAL2_ADDR;
-
-  adcTSSlopeK = (110 - 30) * 1000 / (adcTSCAL2 - adcTSCAL1);
-
-//     ADC_SoftwareStartConv(adc.ADCx);
-    return ret;
+  return ret;
 }
 
 #ifdef USE_ADC_INTERNAL

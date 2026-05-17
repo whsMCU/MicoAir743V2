@@ -128,7 +128,6 @@
 #else
 #define FAST_CODE                   __attribute__((section(".tcm_code")))
 #endif
-#endif
 // If a particular target is short of ITCM RAM, defining FAST_CODE_PREF in the target.h file will
 // cause functions decorated FAST_CODE_PREF to *not* go into ITCM RAM but if FAST_CODE_PREF is not
 // defined for the target, FAST_CODE_PREF will become an alias to FAST_CODE (in the common post
@@ -139,11 +138,9 @@
 #ifdef USE_FAST_DATA
 #define FAST_DATA_ZERO_INIT         __attribute__ ((section(".fastram_bss"), aligned(4)))
 #define FAST_DATA                   __attribute__ ((section(".fastram_data"), aligned(4)))
-#define FAST_CODE
 #else
 #define FAST_DATA_ZERO_INIT
 #define FAST_DATA
-#define FAST_CODE
 #endif  //USE_FAST_DATA
 
 // DMA to/from any memory
