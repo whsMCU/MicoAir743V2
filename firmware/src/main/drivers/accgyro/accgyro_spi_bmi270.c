@@ -164,10 +164,10 @@ static void cliBmi270(cli_args_t *args);
 static void bmi270EnableSPI(uint8_t dev)
 {
 	UNUSED(dev);
-    gpioPinWrite(_PIN_BMI270_CS, _DEF_LOW);
-    delay(1);
-    gpioPinWrite(_PIN_BMI270_CS, _DEF_HIGH);
-    delay(10);
+  gpioPinWrite(_PIN_BMI270_CS, _DEF_LOW);
+  delay(1);
+  gpioPinWrite(_PIN_BMI270_CS, _DEF_HIGH);
+  delay(10);
 }
 
 static void bmi270UploadConfig(uint8_t dev)
@@ -261,7 +261,7 @@ void bmi270Config()
 }
 bool bmi270_Init(void)
 {
-    bool ret = false;
+  bool ret = false;
 	delay(35);
 	while (millis() < 100);
 
@@ -279,7 +279,6 @@ bool bmi270_Init(void)
 
     gyroInit();
 
-    
     #ifdef _USE_HW_CLI
         cliAdd("bmi270", cliBmi270);
     #endif
@@ -307,34 +306,34 @@ bool bmi270Detect(uint8_t ch)
 void bmi270Intcallback(void)
 {
 	static uint32_t pre_time = 0;
-    bmi270.rx_callback_dt = micros() - pre_time;
-    int32_t gyroDmaDuration = cmpTimeCycles(micros(), bmi270.gyroLastEXTI);
+	bmi270.rx_callback_dt = micros() - pre_time;
+	int32_t gyroDmaDuration = cmpTimeCycles(micros(), bmi270.gyroLastEXTI);
 
-    if (gyroDmaDuration > bmi270.gyroDmaMaxDuration) {
-    	bmi270.gyroDmaMaxDuration = gyroDmaDuration;
-    }
-    pre_time = micros();
-    bmi270.dataReady = true;
+	if (gyroDmaDuration > bmi270.gyroDmaMaxDuration) {
+		bmi270.gyroDmaMaxDuration = gyroDmaDuration;
+	}
+	pre_time = micros();
+	bmi270.dataReady = true;
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	static uint32_t pre_time = 0;
-    if(GPIO_Pin==GPIO_PIN_4)
-    {
-    	bmi270.exit_callback_dt = micros() - pre_time;
-      pre_time = micros();
-      // Ideally we'd use a timer to capture such information, but unfortunately the port used for EXTI interrupt does
-      // not have an associated timer
-      uint32_t nowCycles = micros();
-      bmi270.gyroSyncEXTI = bmi270.gyroLastEXTI + bmi270.gyroDmaMaxDuration;
-      bmi270.gyroLastEXTI = nowCycles;
+	if(GPIO_Pin==GPIO_PIN_7)
+	{
+		bmi270.exit_callback_dt = micros() - pre_time;
+		pre_time = micros();
+		// Ideally we'd use a timer to capture such information, but unfortunately the port used for EXTI interrupt does
+		// not have an associated timer
+		uint32_t nowCycles = micros();
+		bmi270.gyroSyncEXTI = bmi270.gyroLastEXTI + bmi270.gyroDmaMaxDuration;
+		bmi270.gyroLastEXTI = nowCycles;
 
-      if (bmi270.gyroModeSPI == GYRO_EXTI_INT_DMA) {// && spiRx_flag(dev)
-        SPI_ByteReadWrite_DMA(dev, bmi270.txBuf, bmi270.rxBuf, 14);
-      }
-      bmi270.detectedEXTI++;
-    }
+		if (bmi270.gyroModeSPI == GYRO_EXTI_INT_DMA) {// && spiRx_flag(dev)
+			SPI_ByteReadWrite_DMA(dev, bmi270.txBuf, bmi270.rxBuf, 14);
+		}
+		bmi270.detectedEXTI++;
+	}
 }
 
 bool bmi270SpiAccRead(imu_t *acc)

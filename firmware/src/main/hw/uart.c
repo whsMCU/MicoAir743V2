@@ -1016,8 +1016,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	if(huart->Instance == USART6)
 	{
-    qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
+		rxRuntimeState.callbackTime = micros() - pre_time;
+    pre_time = micros();
+    rxRuntimeState.RxCallback_Flag = true;
 		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
+    qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
+//      HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t *)&rx_buf[_DEF_UART2][0], MAX_SIZE);
+//      __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+    rxRuntimeState.RxCallback_Flag = false;
 	}
 }
 

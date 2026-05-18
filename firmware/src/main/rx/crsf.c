@@ -624,7 +624,7 @@ bool crsfRxInit(rxRuntimeState_t *rxRuntimeState)
     rxRuntimeState->rcFrameTimeUsFn = rxFrameTimeUs;
 
     uint32_t crsfBaudrate = CRSF_BAUDRATE;
-    uartOpen(_DEF_UART2, crsfBaudrate);
+    uartOpen(_DEF_UART6, crsfBaudrate);
 
     if (rssiSource == RSSI_SOURCE_NONE) {
         rssiSource = RSSI_SOURCE_RX_PROTOCOL_CRSF;

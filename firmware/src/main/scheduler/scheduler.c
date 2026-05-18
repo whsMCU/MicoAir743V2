@@ -414,16 +414,16 @@ void FAST_CODE scheduler(void)
 
 
 
-  rxRuntimeState.uartAvalable = uartAvailable(_DEF_UART2);
-  while(uartAvailable(_DEF_UART2))
+  rxRuntimeState.uartAvalable = uartAvailable(_DEF_UART6);
+  while(uartAvailable(_DEF_UART6))
   {
-    crsfDataReceive(uartRead(_DEF_UART2), (void*) &rxRuntimeState);
+    crsfDataReceive(uartRead(_DEF_UART6), (void*) &rxRuntimeState);
   }
 
   // Check for incoming RX data. Don't do this in the checker as that is called repeatedly within
   // a given gyro loop, and ELRS takes a long time to process this and so can only be safely processed
   // before the checkers
-//  rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
+  rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
 
   scheduleCount++;
 }

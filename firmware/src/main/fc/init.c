@@ -144,7 +144,7 @@ void init(void)
 	mspSerialInit();
 	//mixerInit(mixerConfig.mixerMode);
 
-//	bmi270_Init();
+	bmi270_Init();
   //Sensor_Init();
 
 #ifdef USE_MAG
@@ -179,14 +179,13 @@ void init(void)
 			delay(25);
 			BEEP_OFF;
 		#else
-			//HAL_Delay(50);
 			delay(50);
 		#endif
 	}
 	LED0_OFF;
 	////////////////////////////////////////
 
-//	imuInit();
+	imuInit();
 
   DISABLE_STATE(FIXED_WING_LEGACY);
   DISABLE_STATE(MULTIROTOR);
@@ -204,7 +203,7 @@ void init(void)
 
 //    failsafeInit();
 //
-//    rxInit();
+    rxInit();
 
     initRcProcessing();
 
@@ -248,7 +247,7 @@ void init(void)
 
     positionEstimationConfig_Init();
 
-	batteryInit(); // always needs doing, regardless of features.
+    batteryInit(); // always needs doing, regardless of features.
 
 #ifdef USE_PERSISTENT_STATS
     statsInit();
