@@ -156,9 +156,17 @@ static void initGyroLPF(float cutoffHz, float gyroDt,
     }
 }
 
+//static DMA_DATA uint8_t gyroBuf[GYRO_COUNT][2][GYRO_BUF_SIZE / 2];
+//
+//for (int i = 0; i < GYRO_COUNT; i++) {
+//    if (gyroDetectedFlags & GYRO_MASK(i)) {  // Only initialize detected gyros
+//        // SPI DMA buffer required per device
+//        gyro.gyroSensor[i].gyroDev.dev.txBuf = gyroBuf[i][0];
+//        gyro.gyroSensor[i].gyroDev.dev.rxBuf = gyroBuf[i][1];
+
 bool gyroInit(void)
 {
-	static uint8_t gyroBuf1[GYRO_BUF_SIZE];
+	static DMA_DATA uint8_t gyroBuf1[GYRO_BUF_SIZE];
 	// SPI DMA buffer required per device
 	bmi270.txBuf = gyroBuf1;
 	bmi270.rxBuf = &gyroBuf1[GYRO_BUF_SIZE / 2];

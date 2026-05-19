@@ -267,7 +267,7 @@ bool bmi270_Init(void)
 
 	for(int i = 0; i < 5; i++)
 	{
-		if (bmi270Detect(_DEF_SPI1))
+		if (bmi270Detect(_DEF_SPI3))
 		{
 			ret = true;
 			break;
@@ -392,8 +392,8 @@ static bool bmi270GyroReadRegister(imu_t *gyro)
         gyro->gyroDmaMaxDuration = 5;
         // Using DMA for gyro access upsets the scheduler on the F4
 
-		gyro->txBuf[0] = BMI270_REG_ACC_DATA_X_LSB | 0x80;
-		gyro->gyroModeSPI = GYRO_EXTI_INT_DMA;
+        gyro->txBuf[0] = BMI270_REG_ACC_DATA_X_LSB | 0x80;
+        gyro->gyroModeSPI = GYRO_EXTI_INT_DMA;
 
         break;
     }

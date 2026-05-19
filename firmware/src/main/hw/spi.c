@@ -105,7 +105,7 @@ bool spiBegin(uint8_t dev)
       hspi3.Init.CLKPolarity = SPI_POLARITY_HIGH;
       hspi3.Init.CLKPhase = SPI_PHASE_2EDGE;
       hspi3.Init.NSS = SPI_NSS_SOFT;
-      hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+      hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
       hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
       hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
       hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -420,7 +420,7 @@ void spiReadWriteBuf(uint8_t dev, uint8_t *txData, uint8_t *rxData, int len)
 // Read a block of data from a register
 void spiReadRegBuf(uint8_t dev, uint8_t reg, uint8_t *data, uint8_t length)
 {
-	spi_t  *p_spi = &spi_dev_tbl[dev].dev;
+	spi_t *p_spi = &spi_dev_tbl[dev].dev;
 	gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_LOW);
 	HAL_SPI_Transmit(p_spi->h_spi, &reg, sizeof(reg), 10);
 	HAL_SPI_Receive(p_spi->h_spi, data, length, 10);
@@ -668,6 +668,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
+
     /**SPI3 GPIO Configuration
     PD6     ------> SPI3_MOSI
     PB3 (JTDO/TRACESWO)     ------> SPI3_SCK
@@ -715,7 +716,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
     hdma_spi3_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_spi3_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_spi3_rx.Init.Mode = DMA_NORMAL;
-    hdma_spi3_rx.Init.Priority = DMA_PRIORITY_LOW;
+    hdma_spi3_rx.Init.Priority = DMA_PRIORITY_MEDIUM;
     hdma_spi3_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_spi3_rx) != HAL_OK)
     {
