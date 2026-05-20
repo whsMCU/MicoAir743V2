@@ -38,7 +38,7 @@ ENTRY(Reset_Handler)
 _estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);    /* end of RAM */
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+_Min_Stack_Size = 0x800; /* required amount of stack */
 
 /* Specify the memory areas */
 MEMORY
@@ -247,7 +247,30 @@ SECTIONS
     _edmaram = .;
     _dmaram_end__ = _edmaram;
   } >RAM_D1
-  
+
+  .DMA_RW_D2 (NOLOAD) :
+  {
+    . = ALIGN(32);
+    PROVIDE(dmarw_start = .);
+    _sdmarw = .;
+    _dmarw_start__ = _sdmarw;
+    KEEP(*(.DMA_RW))
+    PROVIDE(dmarw_end = .);
+    _edmarw = .;
+    _dmarw_end__ = _edmarw;
+  } >RAM_D2
+
+  .DMA_RW_AXI (NOLOAD) :
+  {
+    . = ALIGN(32);
+    PROVIDE(dmarwaxi_start = .);
+    _sdmarwaxi = .;
+    _dmarwaxi_start__ = _sdmarwaxi;
+    KEEP(*(.DMA_RW_AXI))
+    PROVIDE(dmarwaxi_end = .);
+    _edmarwaxi = .;
+    _dmarwaxi_end__ = _edmarwaxi;
+  } >RAM_D1
 
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack :

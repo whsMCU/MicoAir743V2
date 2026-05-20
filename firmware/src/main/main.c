@@ -54,6 +54,9 @@
 extern uint8_t dmaram_start;
 extern uint8_t dmaram_end;
 
+extern uint8_t dmarwaxi_start;
+extern uint8_t dmarwaxi_end;
+
 extern uint32_t cachedRccCsrValue;
 
 void initialiseMemorySections(void);
@@ -250,6 +253,7 @@ void MPU_Config(void)
   uint32_t start = 0;
   uint32_t end = 0;
   uint32_t length = 0;
+  int msbpos = 0;
 
   /* Disables the MPU */
   HAL_MPU_Disable();
@@ -293,7 +297,7 @@ void MPU_Config(void)
       length = 32;
     }
 
-    int msbpos = flsl(length) - 1;
+    msbpos = flsl(length) - 1;
 
     if (length != (1U << msbpos)) {
       msbpos += 1;
@@ -302,6 +306,34 @@ void MPU_Config(void)
     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
     MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
+    MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
+    MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+
+    HAL_MPU_ConfigRegion(&MPU_InitStruct);
+
+    // A region in AXI RAM accessible from SDIO internal DMA
+    start = (uint32_t)&dmarwaxi_start;
+    end = (uint32_t)&dmarwaxi_end;
+    MPU_InitStruct.Number = MPU_REGION_NUMBER2;
+    MPU_InitStruct.BaseAddress = start;
+    // Adjust start of the region to align with cache line size.
+    start = start & ~0x1F;
+    length = end - start;
+
+    if (length < 32) {
+      // This will also prevent flsl from returning negative (case length == 0)
+      length = 32;
+    }
+
+    msbpos = flsl(length) - 1;
+
+    if (length != (1U << msbpos)) {
+      msbpos += 1;
+    }
+    MPU_InitStruct.Size = msbpos;
+    MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+    MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+    MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
     MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
     MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
 

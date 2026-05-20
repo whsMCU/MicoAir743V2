@@ -623,6 +623,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 			  if(i == BMI270)
 			  {
 				  gpioPinWrite(spi_dev_tbl[i].csTag, _DEF_HIGH);
+				  SCB_InvalidateDCache_by_Addr((uint32_t*)bmi270.rxBuf, 32);
 				  bmi270Intcallback();
 			  }
 			  p_spi = &spi_dev_tbl[i].dev;
@@ -683,7 +684,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 
     GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
