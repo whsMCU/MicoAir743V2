@@ -57,8 +57,9 @@ void resetMspPort(uint8_t ch, mspPort_t *mspPortToReset)
 void mspSerialAllocatePorts(void)
 {
     resetMspPort(_DEF_UART3, &mspPorts[0]);
-    //resetMspPort(_DEF_UART4, &mspPorts[1]);
-    resetMspPort(_DEF_UART6, &mspPorts[2]);
+    resetMspPort(_DEF_UART1, &mspPorts[1]);
+    //resetMspPort(_DEF_UART4, &mspPorts[2]);
+
 }
 
 //void mspSerialReleasePortIfAllocated(serialPort_t *serialPort)
@@ -303,7 +304,7 @@ static int mspSerialSendFrame(mspPort_t *msp, uint8_t * hdr, int hdrLen, uint8_t
     if (!uartTxBufEmpty(ch) && ((int)uartTotalTxBytesFree(ch) < totalFrameLength))
         return 0;
 
-    static uint8_t frameBuf[16 + JUMBO_FRAME_SIZE_LIMIT + 2]; // 최대 크기 확보
+    static DMA_DATA uint8_t frameBuf[16 + JUMBO_FRAME_SIZE_LIMIT + 2]; // 최대 크기 확보
     int offset = 0;
 
     memset(frameBuf, 0, sizeof(frameBuf));
@@ -316,6 +317,12 @@ static int mspSerialSendFrame(mspPort_t *msp, uint8_t * hdr, int hdrLen, uint8_t
 
     memcpy(&frameBuf[offset], crc, crcLen);
     offset += crcLen;
+
+    /* DMA가 읽기 전에 Cache → RAM 반영 */
+    SCB_CleanDCache_by_Addr(
+        (uint32_t *)((uint32_t)frameBuf & ~31U),
+        (((uint32_t)frameBuf & 31U) +
+          totalFrameLength - 1 + 32U) & ~31U);
 
     msp_tx_start_time = micros();
     uartWriteDMA(ch, frameBuf, totalFrameLength);
@@ -539,8 +546,9 @@ void mspSerialInit(void)
     memset(mspPorts, 0, sizeof(mspPorts));
 
     uartOpen(_DEF_UART3, 115200); //OPFLOW, RANGEFINDER
+    uartOpen(_DEF_UART1, 115200); //GCS
     //uartOpen(_DEF_UART4, 115200); //ESC
-    uartOpen(_DEF_UART6, 115200); //GCS
+
     mspSerialAllocatePorts();
 }
 

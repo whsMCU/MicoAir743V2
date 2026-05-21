@@ -224,7 +224,7 @@ void bmi270Config()
         bmi270RegisterWrite(dev, BMI270_REG_FIFO_WTM_1, BMI270_VAL_FIFO_WTM_1, 1);
     }
 
-    // Configure the accelerometer
+  // Configure the accelerometer
 	bmi270RegisterWrite(dev, BMI270_REG_ACC_CONF, (BMI270_VAL_ACC_CONF_HP << 7) | (BMI270_VAL_ACC_CONF_BWP << 4) | BMI270_VAL_ACC_CONF_ODR800, 1);
 
 	// Configure the accelerometer full-scale range
@@ -393,6 +393,7 @@ static bool bmi270GyroReadRegister(imu_t *gyro)
         // Using DMA for gyro access upsets the scheduler on the F4
 
         gyro->txBuf[0] = BMI270_REG_ACC_DATA_X_LSB | 0x80;
+
         gyro->gyroModeSPI = GYRO_EXTI_INT_DMA;
 
         break;

@@ -25,7 +25,7 @@
 extern uint32_t msp_pre_time, msp_delta_time, msp_tx_start_time, msp_tx_end_time;
 
 // Each MSP port requires state and a receive buffer, revisit this default if someone needs more than 3 MSP ports.
-#define MAX_MSP_PORT_COUNT 3
+#define MAX_MSP_PORT_COUNT 2
 
 typedef enum {
     MSP_IDLE,

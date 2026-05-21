@@ -60,7 +60,7 @@ bool gpioInit(void)
   }
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0x0f, 0x0f);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0x00, 0x00);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 #ifdef _USE_HW_CLI
@@ -179,10 +179,6 @@ void gpioPinToggle(uint8_t ch)
 
   HAL_GPIO_TogglePin(gpio_tbl[ch].port, gpio_tbl[ch].pin);
 }
-
-
-
-
 
 #ifdef _USE_HW_CLI
 void cliGpio(cli_args_t *args)

@@ -133,7 +133,7 @@ void hwInit(void)
   ledInit();
   MX_DMA_Init();
 //  usbInit();
-//  uartInit();
+  uartInit();
 //  cliInit();
 //  i2cInit();
   spiInit();
