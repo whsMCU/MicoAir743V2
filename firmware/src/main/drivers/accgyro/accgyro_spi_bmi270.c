@@ -330,6 +330,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		bmi270.gyroLastEXTI = nowCycles;
 
 		if (bmi270.gyroModeSPI == GYRO_EXTI_INT_DMA) {// && spiRx_flag(dev)
+                        // Flush the D cache to ensure the data to be written is in main memory
+            SCB_CleanDCache_by_Addr(
+                    (uint32_t *)((uint32_t)bmi270.txBuf & ~CACHE_LINE_MASK),
+                    (((uint32_t)bmi270.txBuf & CACHE_LINE_MASK) + 14 - 1 + CACHE_LINE_SIZE) & ~CACHE_LINE_MASK);
 			SPI_ByteReadWrite_DMA(dev, bmi270.txBuf, bmi270.rxBuf, 14);
 		}
 		bmi270.detectedEXTI++;

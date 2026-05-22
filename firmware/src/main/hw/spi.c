@@ -609,9 +609,6 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 	}
 }
 
-#define CACHE_LINE_SIZE 32
-#define CACHE_LINE_MASK (CACHE_LINE_SIZE - 1)
-
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	spi_t  *p_spi;

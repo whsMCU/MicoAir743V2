@@ -167,5 +167,8 @@ extern uint8_t _dmaram_end__;
 #define DMA_RAM_RW
 #endif
 
+#define CACHE_LINE_SIZE 32
+#define CACHE_LINE_MASK (CACHE_LINE_SIZE - 1)
+
 
 #endif /* SRC_COMMON_DEF_H_ */
