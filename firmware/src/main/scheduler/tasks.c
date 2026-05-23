@@ -77,6 +77,8 @@
 #include "telemetry/telemetry.h"
 #include "telemetry/crsf.h"
 
+#include "hw/adc_impl.h"
+
 static void ledUpdate(uint32_t currentTimeUs)
 {
     static uint32_t pre_time = 0;
@@ -95,9 +97,12 @@ static void ledUpdate(uint32_t currentTimeUs)
 }
 
 uint32_t debug1;
+extern uint32_t msp_tx_start_time;
+
 static void debugPrint(uint32_t currentTimeUs)
 {
-
+  uartPrintf_IT(_DEF_UART1, "adcValue =  %d, buff = %d\r\n", adcGetValue(0), adcInternalRead(4));
+  msp_tx_start_time = micros();
 }
 
 static void taskHandleSerial(uint32_t currentTimeUs)

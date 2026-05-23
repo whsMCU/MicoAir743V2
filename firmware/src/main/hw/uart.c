@@ -666,7 +666,7 @@ uint32_t uartPrintf(uint8_t ch, char *fmt, ...)
 
 uint32_t uartPrintf_IT(uint8_t ch, char *fmt, ...)
 {
-  char buf[MAX_SIZE];
+  static char buf[MAX_SIZE];
   va_list args;
   int len;
   uint32_t ret;

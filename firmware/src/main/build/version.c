@@ -22,7 +22,7 @@
 
 #include "version.h"
 
-char __TARGET__[] = "STM32F405";
+char __TARGET__[] = "STM32H743";
 char __REVISION__[] = "no_revision";
 
 const char * const targetName = __TARGET__;

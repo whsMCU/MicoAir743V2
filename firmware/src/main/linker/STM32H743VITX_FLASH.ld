@@ -35,7 +35,9 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);    /* end of RAM */
+/*_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);*/  /* end of RAM */
+_estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM) - 8;/* Reserve 2 x 4bytes for info across reset */
+
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x800; /* required amount of stack */
@@ -281,7 +283,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM_D1
+  } >DTCMRAM /*RAM_D1*/
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

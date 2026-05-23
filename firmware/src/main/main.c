@@ -77,7 +77,6 @@ int main(void)
   __HAL_RCC_D2SRAM2_CLK_ENABLE();
   __HAL_RCC_D2SRAM3_CLK_ENABLE();
 
-  //MPU_Config();
   // Configure MPU
   memProtConfigure(mpuRegions, mpuRegionCount);
 
@@ -243,106 +242,6 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
- /* MPU Configuration */
-
-// void MPU_Config(void)
-// {
-//   MPU_Region_InitTypeDef MPU_InitStruct = {0};
-//   uint32_t start = 0;
-//   uint32_t end = 0;
-//   uint32_t length = 0;
-//   int msbpos = 0;
-
-//   /* Disables the MPU */
-//   HAL_MPU_Disable();
-
-//   /** Initializes and configures the Region and the memory to be protected
-//   */
-//   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-//   MPU_InitStruct.SubRegionDisable = 0x00;
-//   MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-
-//   #ifdef USE_ITCM_RAM
-//     //  Mark ITCM-RAM as read-only
-//     // "For Cortex®-M7, TCMs memories always behave as Non-cacheable, Non-shared normal memories, irrespective of the memory type attributes defined in the MPU for a memory region containing addresses held in the TCM"
-//     // See AN4838
-//     start = 0x00000000;
-//     MPU_InitStruct.Number = MPU_REGION_NUMBER0;
-//     MPU_InitStruct.BaseAddress = start;
-//     MPU_InitStruct.Size = MPU_REGION_SIZE_64KB;
-//     MPU_InitStruct.AccessPermission = MPU_REGION_PRIV_RO_URO;
-//     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-//     MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
-//     MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
-//     MPU_InitStruct.IsBufferable = MPU_ACCESS_BUFFERABLE;
-
-//     HAL_MPU_ConfigRegion(&MPU_InitStruct);
-//   #endif
-
-//   #ifdef USE_DMA_RAM
-//     // DMA transmit buffer in D2 SRAM1
-//     // Reading needs cache coherence operation
-//     start = (uint32_t)&dmaram_start;
-//     end = (uint32_t)&dmaram_end;
-//     MPU_InitStruct.Number = MPU_REGION_NUMBER1;
-//     MPU_InitStruct.BaseAddress = start;
-//     // Adjust start of the region to align with cache line size.
-//     start = start & ~0x1F;
-//     length = end - start;
-
-//     if (length < 32) {
-//       // This will also prevent flsl from returning negative (case length == 0)
-//       length = 32;
-//     }
-
-//     msbpos = flsl(length) - 1;
-
-//     if (length != (1U << msbpos)) {
-//       msbpos += 1;
-//     }
-//     MPU_InitStruct.Size = msbpos;
-//     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-//     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-//     MPU_InitStruct.IsShareable = MPU_ACCESS_SHAREABLE;
-//     MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
-//     MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-
-//     HAL_MPU_ConfigRegion(&MPU_InitStruct);
-
-//     // A region in AXI RAM accessible from SDIO internal DMA
-//     start = (uint32_t)&dmarwaxi_start;
-//     end = (uint32_t)&dmarwaxi_end;
-//     MPU_InitStruct.Number = MPU_REGION_NUMBER2;
-//     MPU_InitStruct.BaseAddress = start;
-//     // Adjust start of the region to align with cache line size.
-//     start = start & ~0x1F;
-//     length = end - start;
-
-//     if (length < 32) {
-//       // This will also prevent flsl from returning negative (case length == 0)
-//       length = 32;
-//     }
-
-//     msbpos = flsl(length) - 1;
-
-//     if (length != (1U << msbpos)) {
-//       msbpos += 1;
-//     }
-//     MPU_InitStruct.Size = msbpos;
-//     MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-//     MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-//     MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
-//     MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
-//     MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-
-//     HAL_MPU_ConfigRegion(&MPU_InitStruct);
-//   #endif
-
-//   /* Enables the MPU */
-//   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
-
-// }
 
 void Error_Handler(void)
 {

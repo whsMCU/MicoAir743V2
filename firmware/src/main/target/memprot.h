@@ -20,6 +20,8 @@
 
 #pragma once
 
+#define MAX_MPU_REGIONS 16
+
 typedef struct mpuRegion_s {
     uint32_t start;
     uint32_t end;        // Zero if determined by size member (MPU_REGION_SIZE_xxx)

@@ -392,7 +392,7 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 void adcGetChannelValues(void)
 {
     // Transfer values in conversion buffer into adcValues[]
-    SCB_InvalidateDCache_by_Addr((uint32_t*)adcConversionBuffer, ADC_BUF_CACHE_ALIGN_BYTES);
+    SCB_InvalidateDCache_by_Addr((uint32_t *)((uint32_t)adcConversionBuffer & ~31), ADC_BUF_CACHE_ALIGN_BYTES);
     for (unsigned i = 0; i < ADC_EXTERNAL_COUNT; i++) {
             adcValues[i] = adcConversionBuffer[i];
     }
@@ -413,8 +413,9 @@ uint16_t adcInternalRead(adcSource_e source)
     }
 }
 
-//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
-//{
-//   /* Invalidate Data Cache to get the updated content of the SRAM on the second half of the ADC converted data buffer: 32 bytes */
-//  SCB_InvalidateDCache_by_Addr((uint32_t *) &adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH], ADC_BUF_CACHE_ALIGN_LENGTH);
-//}
+uint32_t callback_count = 0;
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	callback_count++;
+}
