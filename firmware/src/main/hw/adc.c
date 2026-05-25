@@ -38,7 +38,7 @@ adcConfig_t adcConfig;
 #define ADC_BUF_CACHE_ALIGN_BYTES  ((ADC_BUF_BYTES + 0x20) & ~0x1f)
 #define ADC_BUF_CACHE_ALIGN_LENGTH (ADC_BUF_CACHE_ALIGN_BYTES / sizeof(uint16_t))
 
-static volatile DMA_RAM uint16_t adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH];
+static volatile DMA_RAM uint16_t adcConversionBuffer[ADC_BUF_CACHE_ALIGN_LENGTH] __attribute__((aligned(32)));
 
 void adcConfig_Init(void)
 {
@@ -168,7 +168,6 @@ bool adcInit(void)
   {
     Error_Handler();
   }
-
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adcConversionBuffer[0], 2);
 
@@ -411,11 +410,4 @@ uint16_t adcInternalRead(adcSource_e source)
     default:
         return 0;
     }
-}
-
-uint32_t callback_count = 0;
-
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-	callback_count++;
 }

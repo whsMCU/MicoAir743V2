@@ -149,10 +149,12 @@
 #define DMA_DATA                    __attribute__ ((section(".dmaram_data"), aligned(32)))
 #define STATIC_DMA_DATA_AUTO        static DMA_DATA
 
+#define PERSISTENT                  __attribute__ ((section(".persistent_data"), aligned(4)))
+
 #ifdef USE_DMA_RAM
 #if defined(STM32H7)
-#define DMA_RAM __attribute__((section(".DMA_RAM"), aligned(32)))
-#define DMA_RW_AXI __attribute__((section(".DMA_RW_AXI"), aligned(32)))
+#define DMA_RAM 										__attribute__((section(".DMA_RAM"), aligned(32)))
+#define DMA_RW_AXI 									__attribute__((section(".DMA_RW_AXI"), aligned(32)))
 extern uint8_t _dmaram_start__;
 extern uint8_t _dmaram_end__;
 #elif defined(STM32G4)

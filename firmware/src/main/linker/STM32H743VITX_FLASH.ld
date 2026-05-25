@@ -35,7 +35,7 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-/*_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);*/  /* end of RAM */
+/*_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);  /* end of RAM */
 _estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM) - 8;/* Reserve 2 x 4bytes for info across reset */
 
 /* Generate a link error if heap and stack don't fit into RAM */
@@ -273,6 +273,14 @@ SECTIONS
     _edmarwaxi = .;
     _dmarwaxi_end__ = _edmarwaxi;
   } >RAM_D1
+  
+    .persistent_data (NOLOAD) :
+  {
+    __persistent_data_start__ = .;
+    *(.persistent_data)
+    . = ALIGN(4);
+    __persistent_data_end__ = .;
+  } >RAM_D1
 
   /* User_heap_stack section, used to check that there is enough RAM left */
   ._user_heap_stack :
@@ -283,7 +291,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >DTCMRAM /*RAM_D1*/
+  } >DTCMRAM /*RAM_D1 DTCMRAM*/
 
   /* Remove information from the standard libraries */
   /DISCARD/ :

@@ -59,8 +59,6 @@ extern uint32_t cachedRccCsrValue;
 void initialiseMemorySections(void);
 
 void SystemClock_Config(void);
-void PeriphCommonClock_Config(void);
-//static void MPU_Config(void);
 static void CPU_CACHE_Enable(void);
 static void HandleStuckSysTick(void);
 
@@ -71,11 +69,9 @@ void run(void);
 int main(void)
 {
 
-  initialiseMemorySections();
+  memProtReset();
 
-  __HAL_RCC_D2SRAM1_CLK_ENABLE();
-  __HAL_RCC_D2SRAM2_CLK_ENABLE();
-  __HAL_RCC_D2SRAM3_CLK_ENABLE();
+  initialiseMemorySections();
 
   // Configure MPU
   memProtConfigure(mpuRegions, mpuRegionCount);
@@ -90,6 +86,10 @@ int main(void)
   HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
 
   cachedRccCsrValue = RCC->RSR;
+
+  __HAL_RCC_D2SRAM1_CLK_ENABLE();
+  __HAL_RCC_D2SRAM2_CLK_ENABLE();
+  __HAL_RCC_D2SRAM3_CLK_ENABLE();
 
   cycleCounterInit();
 
