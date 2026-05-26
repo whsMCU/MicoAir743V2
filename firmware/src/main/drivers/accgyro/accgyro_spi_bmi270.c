@@ -267,7 +267,7 @@ bool bmi270_Init(void)
 
 	for(int i = 0; i < 5; i++)
 	{
-		if (bmi270Detect(_DEF_SPI3))
+		if (bmi270Detect(dev))
 		{
 			ret = true;
 			break;
@@ -522,6 +522,11 @@ static void (*frameCallBack)(void) = NULL;
 void bmi270SetCallBack(void (*p_func)(void))
 {
   frameCallBack = p_func;
+}
+
+void accgyro_spi_read(uint8_t *_buffer)
+{
+	SPI_ByteRead(0, (BMI270_REG_ACC_DATA_X_LSB | 0x80), _buffer, 7);
 }
 
 #ifdef _USE_HW_CLI
