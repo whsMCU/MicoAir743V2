@@ -176,6 +176,15 @@ void initialiseMemorySections(void)
    extern uint8_t _sdmaram_idata;
    bzero(&_sdmaram_bss, (size_t) (&_edmaram_bss - &_sdmaram_bss));
    memcpy(&_sdmaram_data, &_sdmaram_idata, (size_t) (&_edmaram_data - &_sdmaram_data));
+
+  /* sram2 variable intializers*/
+   extern uint8_t _ssram2;
+   extern uint8_t _esram2;
+   uint32_t *p = &_ssram2;
+   while (p < &_esram2)
+       *p++ = 0;
+
+  // bzero(&_ssram2, (size_t) (&_esram2 - &_ssram2));
  #endif
 }
 
