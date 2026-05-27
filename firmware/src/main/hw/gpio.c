@@ -60,7 +60,7 @@ bool gpioInit(void)
   }
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0x00, 0x00);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 #ifdef _USE_HW_CLI
@@ -113,7 +113,7 @@ bool gpioPinMode(uint8_t ch, uint8_t mode)
 
     case _DEF_OUTPUT_PULLUP:
       GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-      GPIO_InitStruct.Pull = GPIO_PULLUP;
+      GPIO_InitStruct.Pull = GPIO_NOPULL;
       GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
       break;
 
