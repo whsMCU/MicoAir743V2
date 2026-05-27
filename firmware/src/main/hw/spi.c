@@ -105,7 +105,7 @@ bool spiBegin(uint8_t dev)
       hspi3.Init.CLKPolarity = SPI_POLARITY_HIGH;
       hspi3.Init.CLKPhase = SPI_PHASE_2EDGE;
       hspi3.Init.NSS = SPI_NSS_SOFT;
-      hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+      hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
       hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
       hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
       hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -319,9 +319,9 @@ void spiSetClkDivisor(uint8_t dev, uint32_t divisor)
   spi_t  *p_spi = &spi_dev_tbl[dev].dev;
   HAL_StatusTypeDef status;
     gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_LOW);
-    //HAL_SPI_Transmit(p_spi->h_spi, &MemAddress, 1, 10);
-    //status = HAL_SPI_Receive(p_spi->h_spi, data, length, 10);
-    status = HAL_SPI_TransmitReceive(p_spi->h_spi, &MemAddress, data, length, 10);
+    HAL_SPI_Transmit(p_spi->h_spi, &MemAddress, 1, 10);
+    status = HAL_SPI_Receive(p_spi->h_spi, data, length, 10);
+//    status = HAL_SPI_TransmitReceive(p_spi->h_spi, &MemAddress, data, length, 10);
     gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_HIGH);
   return status;
 }
