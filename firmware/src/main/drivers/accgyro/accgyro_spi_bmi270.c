@@ -197,6 +197,9 @@ static uint8_t getBmiOsrMode()
     return 0;
 }
 
+uint8_t befor_config = 0;
+uint8_t after_config = 0;
+
 void bmi270Config()
 {
     // If running in hardware_lpf experimental mode then switch to FIFO-based,
@@ -210,6 +213,7 @@ void bmi270Config()
     // Perform a soft reset to set all configuration to default
     // Delay 100ms before continuing configuration
     bmi270RegisterWrite(dev, BMI270_REG_CMD, BMI270_VAL_CMD_SOFTRESET, 100);
+
     // Toggle the chip into SPI mode
     bmi270EnableSPI(dev);
 
@@ -252,13 +256,16 @@ void bmi270Config()
 	bmi270RegisterWrite(dev, BMI270_REG_PWR_CONF, BMI270_VAL_PWR_CONF, 1);
 
 	// Enable the gyro, accelerometer and temperature sensor - disable aux interface
+	befor_config = bmi270RegisterRead(dev, BMI270_REG_PWR_CTRL);
 	bmi270RegisterWrite(dev, BMI270_REG_PWR_CTRL, BMI270_VAL_PWR_CTRL, 1);
+	after_config = bmi270RegisterRead(dev, BMI270_REG_PWR_CTRL);
 
 	// Flush the FIFO
 	if (fifoMode) {
 		bmi270RegisterWrite(dev, BMI270_REG_CMD, BMI270_VAL_CMD_FIFOFLUSH, 1);
 	}
 }
+
 bool bmi270_Init(void)
 {
   bool ret = false;
