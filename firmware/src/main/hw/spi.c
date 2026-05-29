@@ -462,7 +462,7 @@ void spiWriteRegBuf(uint8_t dev, uint8_t reg, uint8_t *data, uint32_t length)
 	spi_t  *p_spi = &spi_dev_tbl[dev].dev;
 	gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_LOW);
 	HAL_SPI_Transmit(p_spi->h_spi, &reg, sizeof(reg), 10);
-	HAL_SPI_Receive(p_spi->h_spi, data, length, 10);
+	HAL_SPI_Transmit(p_spi->h_spi, data, length, 10);
 	gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_HIGH);
   spiWait(dev);
 }
@@ -621,7 +621,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 			  {
 				  gpioPinWrite(spi_dev_tbl[i].csTag, _DEF_HIGH);
 				  SCB_InvalidateDCache_by_Addr((uint32_t*)((uint32_t)bmi270.rxBuf & ~CACHE_LINE_MASK),
-																			 (((uint32_t)bmi270.rxBuf & CACHE_LINE_MASK) + 14 - 1 + CACHE_LINE_SIZE) & ~CACHE_LINE_MASK);
+																			 (((uint32_t)bmi270.rxBuf & CACHE_LINE_MASK) + 8 - 1 + CACHE_LINE_SIZE) & ~CACHE_LINE_MASK);
 				  bmi270Intcallback();
 			  }
 			  p_spi = &spi_dev_tbl[i].dev;
@@ -682,7 +682,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 
     GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);

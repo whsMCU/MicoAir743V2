@@ -15,6 +15,4 @@ bool bmi270SpiGyroRead(imu_t *gyro);
 void bmi270SetCallBack(void (*p_func)(void));
 void bmi270Intcallback(void);
 
-void accgyro_spi_read(uint8_t *_buffer);
-
 #endif /* SRC_COMMON_HW_INCLUDE_BMI270_H_ */

@@ -115,16 +115,9 @@ int main(void)
 
 }
 
-//uint32_t temp_count = 0;
-//static uint8_t _buffer[32];
 void FAST_CODE run(void)
 {
     while (true) {
-//    	if(micros() - temp_count >= 1000000)
-//    	{
-//    		temp_count = micros();
-//    		accgyro_spi_read(_buffer);
-//    	}
     	scheduler();
     }
 }

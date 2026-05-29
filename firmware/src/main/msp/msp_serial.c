@@ -318,12 +318,6 @@ static int mspSerialSendFrame(mspPort_t *msp, uint8_t * hdr, int hdrLen, uint8_t
     memcpy(&frameBuf[offset], crc, crcLen);
     offset += crcLen;
 
-    /* DMA가 읽기 전에 Cache → RAM 반영 */
-    SCB_CleanDCache_by_Addr(
-        (uint32_t *)((uint32_t)frameBuf & ~31U),
-        (((uint32_t)frameBuf & 31U) +
-          totalFrameLength - 1 + 32U) & ~31U);
-
     msp_tx_start_time = micros();
     uartWriteDMA(ch, frameBuf, totalFrameLength);
 

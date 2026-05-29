@@ -197,9 +197,6 @@ static uint8_t getBmiOsrMode()
     return 0;
 }
 
-uint8_t befor_config = 0;
-uint8_t after_config = 0;
-
 void bmi270Config()
 {
     // If running in hardware_lpf experimental mode then switch to FIFO-based,
@@ -256,9 +253,7 @@ void bmi270Config()
 	bmi270RegisterWrite(dev, BMI270_REG_PWR_CONF, BMI270_VAL_PWR_CONF, 1);
 
 	// Enable the gyro, accelerometer and temperature sensor - disable aux interface
-	befor_config = bmi270RegisterRead(dev, BMI270_REG_PWR_CTRL);
 	bmi270RegisterWrite(dev, BMI270_REG_PWR_CTRL, BMI270_VAL_PWR_CTRL, 1);
-	after_config = bmi270RegisterRead(dev, BMI270_REG_PWR_CTRL);
 
 	// Flush the FIFO
 	if (fifoMode) {
@@ -336,11 +331,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		bmi270.gyroSyncEXTI = bmi270.gyroLastEXTI + bmi270.gyroDmaMaxDuration;
 		bmi270.gyroLastEXTI = nowCycles;
 
-		if (bmi270.gyroModeSPI == GYRO_EXTI_INT_DMA) {// && spiRx_flag(dev)
-                        // Flush the D cache to ensure the data to be written is in main memory
-            SCB_CleanDCache_by_Addr(
-                    (uint32_t *)((uint32_t)bmi270.txBuf & ~CACHE_LINE_MASK),
-                    (((uint32_t)bmi270.txBuf & CACHE_LINE_MASK) + 14 - 1 + CACHE_LINE_SIZE) & ~CACHE_LINE_MASK);
+		if (bmi270.gyroModeSPI == GYRO_EXTI_INT_DMA) {
 			SPI_ByteReadWrite_DMA(dev, bmi270.txBuf, bmi270.rxBuf, 14);
 		}
 		bmi270.detectedEXTI++;
@@ -529,11 +520,6 @@ static void (*frameCallBack)(void) = NULL;
 void bmi270SetCallBack(void (*p_func)(void))
 {
   frameCallBack = p_func;
-}
-
-void accgyro_spi_read(uint8_t *_buffer)
-{
-	SPI_ByteRead(0, (BMI270_REG_ACC_DATA_X_LSB | 0x80), _buffer, 7);
 }
 
 #ifdef _USE_HW_CLI
