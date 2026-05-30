@@ -319,6 +319,8 @@ static int mspSerialSendFrame(mspPort_t *msp, uint8_t * hdr, int hdrLen, uint8_t
     offset += crcLen;
 
     msp_tx_start_time = micros();
+    SCB_CleanDCache_by_Addr((uint32_t *)((uint32_t)frameBuf & ~0x1F),
+                            (((uint32_t)frameBuf & 0x1F) + totalFrameLength + 31) & ~0x1F);
     uartWriteDMA(ch, frameBuf, totalFrameLength);
 
     return totalFrameLength;

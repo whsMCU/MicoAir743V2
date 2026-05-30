@@ -31,7 +31,7 @@
 // 10 MHz max SPI frequency
 #define DPS310_MAX_SPI_CLK_HZ 10000000
 
-#define DPS310_I2C_ADDR             0x76
+#define DPS310_I2C_ADDR             0x77
 
 #define DPS310_REG_PSR_B2           0x00
 #define DPS310_REG_PSR_B1           0x01

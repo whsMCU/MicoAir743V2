@@ -125,7 +125,7 @@ void FAST_CODE run(void)
 void hwInit(void)
 {
   #ifdef _USE_HW_RTC
-//    rtcInit();
+    rtcInit();
   #endif
   gpioInit();
 //  flashInit();
@@ -134,7 +134,7 @@ void hwInit(void)
 //  usbInit();
   uartInit();
 //  cliInit();
-//  i2cInit();
+  i2cInit();
   spiInit();
   adcInit();
 //  timerInit();

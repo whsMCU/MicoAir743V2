@@ -139,22 +139,20 @@ void init(void)
 
 	tasksInitData();
 	cliOpen(_DEF_USB, 57600);
-	//uartOpen(_DEF_UART1, 115200);
 
 	mspSerialInit();
 	//mixerInit(mixerConfig.mixerMode);
 
 	bmi270_Init();
-  //Sensor_Init();
 
 #ifdef USE_MAG
-//	compassInit();
+	compassInit();
 #endif
 
 	position_Init();
 
 #ifdef USE_BARO
-//	Baro_Init();
+	Baro_Init();
 #endif
 
 #ifdef USE_ADC_INTERNAL

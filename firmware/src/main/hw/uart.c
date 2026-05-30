@@ -675,6 +675,7 @@ uint32_t uartPrintf_IT(uint8_t ch, char *fmt, ...)
   len = vsnprintf(buf, MAX_SIZE, fmt, args);
 
   ret = uartWriteIT(ch, (uint8_t *)buf, len);
+  //ret = uartWriteDMA(ch, (uint8_t *)buf, len);
 
   va_end(args);
 
@@ -1314,7 +1315,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 
     /* UART5 DMA Init */
     /* UART5_RX Init */
-    hdma_uart5_rx.Instance = DMA1_Stream0;
+    //hdma_uart5_rx.Instance = DMA1_Stream0;
     //hdma_uart5_rx.Init.Channel = DMA_CHANNEL_4;
     hdma_uart5_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
     hdma_uart5_rx.Init.PeriphInc = DMA_PINC_DISABLE;

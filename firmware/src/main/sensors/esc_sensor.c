@@ -225,13 +225,13 @@ bool escSensorInit(void)
     // Initialize serial port
     //escSensorPort = openSerialPort(portConfig->identifier, FUNCTION_ESC_SENSOR, escSensorDataReceive, NULL, ESC_SENSOR_BAUDRATE, MODE_RX, options);
 
-    uartOpen(_DEF_UART5, ESC_SENSOR_BAUDRATE);
+    uartOpen(_DEF_UART7, ESC_SENSOR_BAUDRATE);
 
     for (int i = 0; i < MAX_SUPPORTED_MOTORS; i = i + 1) {
         escSensorData[i].dataAge = ESC_DATA_INVALID;
     }
 
-    return uartIsConnected(_DEF_UART5);//escSensorPort != NULL;
+    return uartIsConnected(_DEF_UART7);//escSensorPort != NULL;
 }
 
 static uint8_t updateCrc8(uint8_t crc, uint8_t crc_seed)
