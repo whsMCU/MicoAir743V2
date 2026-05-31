@@ -215,11 +215,6 @@ static void escSensorDataReceive(uint16_t c, void *data)
 
 bool escSensorInit(void)
 {
-//    const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_ESC_SENSOR);
-//    if (!portConfig) {
-//        return false;
-//    }
-
     //portOptions_e options = SERIAL_NOT_INVERTED  | (escSensorConfig()->halfDuplex ? SERIAL_BIDIR : 0);
 
     // Initialize serial port
@@ -312,7 +307,7 @@ void escSensorProcess(timeUs_t currentTimeUs)
 {
     const timeMs_t currentTimeMs = currentTimeUs / 1000;
 
-    if (!uartIsConnected(_DEF_UART5) || !motorIsEnabled()) {
+    if (!uartIsConnected(_DEF_UART7) || !motorIsEnabled()) {
         return;
     }
 

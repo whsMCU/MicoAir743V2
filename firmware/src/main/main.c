@@ -137,7 +137,7 @@ void hwInit(void)
   i2cInit();
   spiInit();
   adcInit();
-//  timerInit();
+  timerInit();
 
 //  if (sdInit() == true)
 //  {

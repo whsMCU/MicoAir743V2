@@ -396,9 +396,9 @@ void tasksInit(void)
 //    setTaskEnabled(TASK_BST_MASTER_PROCESS, true);
 //#endif
 //
-//#ifdef USE_ESC_SENSOR
-//    setTaskEnabled(TASK_ESC_SENSOR, featureIsEnabled(FEATURE_ESC_SENSOR));
-//#endif
+#ifdef USE_ESC_SENSOR
+    setTaskEnabled(TASK_ESC_SENSOR, featureConfigured(FEATURE_ESC_SENSOR));
+#endif
 
 #ifdef USE_ADC_INTERNAL
     setTaskEnabled(TASK_ADC_INTERNAL, true);

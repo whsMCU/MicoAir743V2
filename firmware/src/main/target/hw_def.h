@@ -47,7 +47,7 @@
 #define      HW_LED_MAX_CH          3
 
 #define _USE_HW_UART
-#define      HW_UART_MAX_CH         7
+#define      HW_UART_MAX_CH         8
 
 
 #define _USE_HW_CLI
