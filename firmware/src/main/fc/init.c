@@ -206,7 +206,7 @@ void init(void)
     initRcProcessing();
 
 #ifdef USE_GPS
-//    gpsInit();
+    gpsInit();
 #endif
 
 #ifdef USE_LED_STRIP

@@ -32,6 +32,7 @@ UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart6;
+UART_HandleTypeDef huart7;
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 DMA_HandleTypeDef hdma_usart2_rx;
@@ -177,31 +178,46 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       break;
 
     case _DEF_UART4:
-    	huart4.Instance = UART4;
-    	huart4.Init.BaudRate = baud;
-    	huart4.Init.WordLength = UART_WORDLENGTH_8B;
+      huart4.Instance = UART4;
+      huart4.Init.BaudRate = baud;
+      huart4.Init.WordLength = UART_WORDLENGTH_8B;
       huart4.Init.StopBits = UART_STOPBITS_1;
-    	huart4.Init.Parity = UART_PARITY_NONE;
-    	huart4.Init.Mode = UART_MODE_TX_RX;
-    	huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-    	huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+      huart4.Init.Parity = UART_PARITY_NONE;
+      huart4.Init.Mode = UART_MODE_TX_RX;
+      huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+      huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+      huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+      huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+      huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
       qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART4][0], MAX_SIZE);
 
-    	if (HAL_UART_Init(&huart4) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}
-    	else
-    	{
-    		ret = true;
+      if (HAL_UART_Init(&huart4) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      else
+      {
+        ret = true;
         is_open[ch] = true;
-        if(HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4][0], 1) != HAL_OK)
+        if(HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4][0], 1) != HAL_OK);
         {
           ret = false;
         }
+      }
 
-    	}
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart4, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart4, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart4) != HAL_OK)
+      {
+        Error_Handler();
+      }
       break;
 
     case _DEF_UART5:
@@ -274,6 +290,45 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       }
 
       break;
+    case _DEF_UART7:
+      huart7.Instance = UART7;
+      huart7.Init.BaudRate = baud;
+      huart7.Init.WordLength = UART_WORDLENGTH_8B;
+      huart7.Init.StopBits = UART_STOPBITS_1;
+      huart7.Init.Parity = UART_PARITY_NONE;
+      huart7.Init.Mode = UART_MODE_TX_RX;
+      huart7.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+      huart7.Init.OverSampling = UART_OVERSAMPLING_16;
+      huart7.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+      huart7.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+      huart7.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+      if (HAL_UART_Init(&huart7) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      else
+      {
+        ret = true;
+        is_open[ch] = true;
+        if(HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7][0], 1) != HAL_OK);
+        {
+          ret = false;
+        }
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart7, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart7, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart7) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      break;
   }
 
   return ret;
@@ -325,6 +380,11 @@ uint32_t uartAvailable(uint8_t ch)
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart6_rx.Instance->NDTR);
       ret = qbufferAvailable(&ring_buffer[ch]);
       break;
+
+    case _DEF_UART7:
+    	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart7_rx.Instance->NDTR);
+      ret = qbufferAvailable(&ring_buffer[ch]);
+      break;
   }
   return ret;
 }
@@ -360,6 +420,10 @@ bool uartTxBufEmpty(uint8_t ch)
     case _DEF_UART6:
       ret = qbufferTxEmpty(&ring_buffer[ch]);
       break;
+
+    case _DEF_UART7:
+      ret = qbufferTxEmpty(&ring_buffer[ch]);
+      break;
   }
   return ret;
 }
@@ -393,6 +457,10 @@ uint32_t uartTotalTxBytesFree(uint8_t ch)
       break;
 
     case _DEF_UART6:
+      ret = qbufferTxBytesFree(&ring_buffer[ch]);
+      break;
+
+    case _DEF_UART7:
       ret = qbufferTxBytesFree(&ring_buffer[ch]);
       break;
   }
@@ -435,6 +503,10 @@ uint8_t uartRead(uint8_t ch)
       break;
 
     case _DEF_UART6:
+    	qbufferRead(&ring_buffer[ch], &ret, 1);
+      break;
+
+    case _DEF_UART7:
     	qbufferRead(&ring_buffer[ch], &ret, 1);
       break;
   }
@@ -494,6 +566,14 @@ uint32_t uartWrite(uint8_t ch, uint8_t *p_data, uint32_t length)
 
     case _DEF_UART6:
       status = HAL_UART_Transmit(&huart6, p_data, length, 100);
+      if (status == HAL_OK)
+      {
+        ret = length;
+      }
+      break;
+
+    case _DEF_UART7:
+      status = HAL_UART_Transmit(&huart7, p_data, length, 100);
       if (status == HAL_OK)
       {
         ret = length;
@@ -566,6 +646,14 @@ uint32_t uartWriteIT(uint8_t ch, uint8_t *p_data, uint32_t length)
         ret = length;
       }
       break;
+
+    case _DEF_UART7:
+      status = HAL_UART_Transmit_IT(&huart7, p_data, length);
+      if (status == HAL_OK)
+      {
+        ret = length;
+      }
+      break;
   }
 
   return ret;
@@ -633,6 +721,14 @@ uint32_t uartWriteDMA(uint8_t ch, uint8_t *p_data, uint32_t length)
         ret = length;
       }
       break;
+
+    case _DEF_UART7:
+      status = HAL_UART_Transmit_DMA(&huart7, p_data, length);
+      if (status == HAL_OK)
+      {
+        ret = length;
+      }
+      break;
   }
 
   return ret;
@@ -675,7 +771,6 @@ uint32_t uartPrintf_IT(uint8_t ch, char *fmt, ...)
   len = vsnprintf(buf, MAX_SIZE, fmt, args);
 
   ret = uartWriteIT(ch, (uint8_t *)buf, len);
-  //ret = uartWriteDMA(ch, (uint8_t *)buf, len);
 
   va_end(args);
 
@@ -717,6 +812,10 @@ uint32_t uartGetBaud(uint8_t ch)
     case _DEF_UART6:
       ret = huart6.Init.BaudRate;
       break;
+
+    case _DEF_UART7:
+      ret = huart7.Init.BaudRate;
+      break;
   }
 
   return ret;
@@ -729,7 +828,6 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
 	switch(ch)
 	{
     case _DEF_USB:
-			huart2.Init.BaudRate = baud;
     	if (HAL_UART_Init(&huart2) != HAL_OK)
     	{
     	  Error_Handler();
@@ -797,6 +895,17 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
     case _DEF_UART6:
 			huart6.Init.BaudRate = baud;
     	if (HAL_UART_Init(&huart6) != HAL_OK)
+    	{
+    	  Error_Handler();
+    	}else
+    	{
+    		ret = true;
+    	}
+			break;
+
+    case _DEF_UART7:
+			huart7.Init.BaudRate = baud;
+    	if (HAL_UART_Init(&huart7) != HAL_OK)
     	{
     	  Error_Handler();
     	}else
@@ -988,14 +1097,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
   if(huart->Instance == USART2)
   {
-      rxRuntimeState.callbackTime = micros() - pre_time;
-      pre_time = micros();
-      rxRuntimeState.RxCallback_Flag = true;
       HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2][0], 1);
       qbufferWrite(&ring_buffer[_DEF_UART2], (uint8_t *)&rx_buf[_DEF_UART2][0], 1);
-//      HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t *)&rx_buf[_DEF_UART2][0], MAX_SIZE);
-//      __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
-      rxRuntimeState.RxCallback_Flag = false;
   }
 
   if(huart->Instance == USART3)
@@ -1024,10 +1127,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     rxRuntimeState.RxCallback_Flag = true;
 		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
     qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
-//      HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t *)&rx_buf[_DEF_UART2][0], MAX_SIZE);
-//      __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
+//      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], MAX_SIZE);
+//      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
     rxRuntimeState.RxCallback_Flag = false;
 	}
+  if(huart->Instance == UART7)
+  {
+    qbufferWrite(&ring_buffer[_DEF_UART7], (uint8_t *)&rx_buf[_DEF_UART7][0], 1);
+    HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7][0], 1);
+  }
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
@@ -1394,6 +1502,40 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 
   /* USER CODE END USART6_MspInit 1 */
   }
+  else if(uartHandle->Instance==UART7)
+  {
+  /* USER CODE BEGIN UART7_MspInit 0 */
+
+  /* USER CODE END UART7_MspInit 0 */
+
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_UART7;
+    PeriphClkInitStruct.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_D2PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* UART7 clock enable */
+    __HAL_RCC_UART7_CLK_ENABLE();
+
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    /**UART7 GPIO Configuration
+    PE7     ------> UART7_RX
+    PE8     ------> UART7_TX
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF7_UART7;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /* USER CODE BEGIN UART7_MspInit 1 */
+
+  /* USER CODE END UART7_MspInit 1 */
+  }
 }
 
 void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
@@ -1421,6 +1563,24 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
   /* USER CODE BEGIN USART1_MspDeInit 1 */
 
   /* USER CODE END USART1_MspDeInit 1 */
+  }
+  else if(uartHandle->Instance==USART2)
+  {
+  /* USER CODE BEGIN USART2_MspDeInit 0 */
+
+  /* USER CODE END USART2_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_USART2_CLK_DISABLE();
+
+    /**USART2 GPIO Configuration
+    PA2     ------> USART2_TX
+    PA3     ------> USART2_RX
+    */
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_2|GPIO_PIN_3);
+
+  /* USER CODE BEGIN USART2_MspDeInit 1 */
+
+  /* USER CODE END USART2_MspDeInit 1 */
   }
   else if(uartHandle->Instance==USART3)
   {
@@ -1540,4 +1700,23 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 
   /* USER CODE END USART2_MspDeInit 1 */
   }
+    else if(uartHandle->Instance==UART7)
+  {
+  /* USER CODE BEGIN UART7_MspDeInit 0 */
+
+  /* USER CODE END UART7_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_UART7_CLK_DISABLE();
+
+    /**UART7 GPIO Configuration
+    PE7     ------> UART7_RX
+    PE8     ------> UART7_TX
+    */
+    HAL_GPIO_DeInit(GPIOE, GPIO_PIN_7|GPIO_PIN_8);
+
+  /* USER CODE BEGIN UART7_MspDeInit 1 */
+
+  /* USER CODE END UART7_MspDeInit 1 */
+  }
+  
 }

@@ -149,7 +149,7 @@ static void gpsResetSolution(void)
 
 void gpsInit(void)
 {
-	uartOpen(_DEF_UART1, 9600);
+	uartOpen(_DEF_UART3, 9600);
 
 	uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_PRT[0], sizeof(UBX_CFG_PRT));
 	HAL_Delay(100);
