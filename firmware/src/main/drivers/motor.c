@@ -33,6 +33,7 @@
 
 #include "fc/runtime_config.h"
 
+#include "drivers/dshot.h"
 #include "drivers/motor.h"
 
 #include "rx/rx.h"
@@ -58,6 +59,7 @@ unsigned short LF, LR, RR, RF;
 
 void motorConfig_Init(void)
 {
+  motorConfig.motorProtocol = MOTOR_PROTOCOL_DSHOT600;
   motorConfig.minthrottle = 1050;
   motorConfig.maxthrottle = 2000;
   motorConfig.mincommand = 1000;
@@ -66,6 +68,14 @@ void motorConfig_Init(void)
   motorConfig.motorCount = 4;
   motorConfig.enabled = false;
 
+}
+
+void motorDevInit(void)
+{
+    dshotPwmDevInit(&motorConfig);
+		motorConfig.initialized = true;
+		motorConfig.motorEnableTimeMs = 0;
+		motorConfig.enabled = false;
 }
 
 void motorShutdown(void)

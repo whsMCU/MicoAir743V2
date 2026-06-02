@@ -30,12 +30,20 @@
 #ifdef USE_DSHOT
 
 //#include "drivers/pwm_output.h"
-//#include "pwm_output_dshot_shared.h"
-//#include "drivers/dshot.h"
+#include "dshot_shared.h"
+#include "drivers/dshot.h"
 #include "dshot_dpwm.h"
-//#include "drivers/motor_impl.h"
+#include "drivers/motor_impl.h"
 
-//#include "pg/motor.h"
+#include "drivers/motor.h"
+
+const motorVTable_t *motor_vTable;
+
+#ifdef USE_DSHOT_TELEMETRY
+FAST_DATA_ZERO_INIT uint32_t inputStampUs;
+
+FAST_DATA_ZERO_INIT dshotTelemetryCycleCounters_t dshotDMAHandlerCycleCounters;
+#endif
 
 // XXX TODO: Share a single region among dshotDmaBuffer and dshotBurstDmaBuffer
 
@@ -111,27 +119,19 @@ static void dshotPwmDisableMotors(void)
 
 static bool dshotPwmEnableMotors(void)
 {
-    for (int i = 0; i < dshotMotorCount; i++) {
-        motorDmaOutput_t *motor = getMotorDmaOutput(i);
-        const IO_t motorIO = IOGetByTag(motor->timerHardware->tag);
-        IOConfigGPIOAF(motorIO, motor->iocfg, motor->timerHardware->alternateFunction);
-    }
-
     // No special processing required
     return true;
 }
 
 static bool dshotPwmIsMotorEnabled(unsigned index)
 {
-    return pwmMotors[index].enabled;
+	UNUSED(index);
+    return true;
 }
 
 static IO_t pwmDshotGetMotorIO(unsigned index)
 {
-    if (index >= dshotMotorCount) {
-        return IO_NONE;
-    }
-    return pwmMotors[index].io;
+    return 0;
 }
 
 static FAST_CODE void dshotWriteInt(uint8_t index, uint16_t value)
@@ -149,22 +149,22 @@ static const motorVTable_t dshotPwmVTable = {
     .enable = dshotPwmEnableMotors,
     .disable = dshotPwmDisableMotors,
     .isMotorEnabled = dshotPwmIsMotorEnabled,
-    .decodeTelemetry = pwmTelemetryDecode,
+    //.decodeTelemetry = pwmTelemetryDecode,
     .write = dshotWrite,
     .writeInt = dshotWriteInt,
     .updateComplete = pwmCompleteDshotMotorUpdate,
-    .convertExternalToMotor = dshotConvertFromExternal,
-    .convertMotorToExternal = dshotConvertToExternal,
+    //.convertExternalToMotor = dshotConvertFromExternal,
+    //.convertMotorToExternal = dshotConvertToExternal,
     .shutdown = dshotPwmShutdown,
-    .requestTelemetry = pwmDshotRequestTelemetry,
-    .isMotorIdle = pwmDshotIsMotorIdle,
+    //.requestTelemetry = pwmDshotRequestTelemetry,
+    //.isMotorIdle = pwmDshotIsMotorIdle,
     .getMotorIO = pwmDshotGetMotorIO,
 };
 
-bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
+bool dshotPwmDevInit(const motorConfig_t *motorConfig)
 {
-    device->vTable = &dshotPwmVTable;
-    dshotMotorCount = device->count;
+		motor_vTable = &dshotPwmVTable;
+    dshotMotorCount = motorConfig->motorCount;
 #ifdef USE_DSHOT_TELEMETRY
     useDshotTelemetry = motorConfig->useDshotTelemetry;
 #endif
@@ -184,30 +184,10 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig)
         break;
     }
 
+
     for (int motorIndex = 0; motorIndex < MAX_SUPPORTED_MOTORS && motorIndex < dshotMotorCount; motorIndex++) {
-        const unsigned reorderedMotorIndex = motorConfig->motorOutputReordering[motorIndex];
-        const ioTag_t tag = motorConfig->ioTags[reorderedMotorIndex];
-        const timerHardware_t *timerHardware = timerAllocate(tag, OWNER_MOTOR, RESOURCE_INDEX(reorderedMotorIndex));
-
-        if (timerHardware != NULL) {
-            pwmMotors[motorIndex].io = IOGetByTag(tag);
-            IOInit(pwmMotors[motorIndex].io, OWNER_MOTOR, RESOURCE_INDEX(reorderedMotorIndex));
-
-            if (pwmDshotMotorHardwareConfig(timerHardware,
-                motorIndex,
-                reorderedMotorIndex,
-                motorConfig->motorProtocol,
-                motorConfig->motorInversion ? timerHardware->output ^ TIMER_OUTPUT_INVERTED : timerHardware->output)) {
-                pwmMotors[motorIndex].enabled = true;
-
-                continue;
-            }
-        }
-
-        /* not enough motors initialised for the mixer or a break in the motors */
-        dshotMotorCount = 0;
-        /* TODO: block arming and add reason system cannot arm */
-        return false;
+    	dmaMotors[motorIndex].TimHandle = &htim1;
+    	dmaMotors[motorIndex].configured = true;
     }
 
     return true;

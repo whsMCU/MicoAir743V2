@@ -24,10 +24,10 @@
 
 #include "common/time.h"
 #include "common/axis.h"
-
-//#include "drivers/dshot_bitbang.h"
+#include "drivers/motor_types.h"
 
 typedef struct motorConfig_s {
+		uint8_t  motorProtocol;                 // Pwm Protocol
     uint16_t digitalIdleOffsetValue;        // Idle value for DShot protocol, full motor output = 10000
     uint16_t minthrottle;                   // Set the minimum throttle command sent to the ESC (Electronic Speed Controller). This is the minimum value that allow motors to run at a idle speed.
     uint16_t maxthrottle;                   // This is the maximum value for the ESCs at full power this value can be increased up to 2000
@@ -35,6 +35,8 @@ typedef struct motorConfig_s {
     uint8_t motorPoleCount;                // Magnetic poles in the motors for calculating actual RPM from eRPM provided by ESC telemetry
     uint8_t motorCount;
     bool enabled;
+    bool initialized;
+    timeMs_t motorEnableTimeMs;
 } motorConfig_t;
 
 typedef struct motor_s {
@@ -55,6 +57,8 @@ extern motor_t motor;
 extern unsigned short LF, LR, RR, RF;
 
 void motorConfig_Init(void);
+
+void motorDevInit(void);
 
 void motorWriteAll(void);
 void motorDisable(void);

@@ -22,7 +22,7 @@ DMA_HandleTypeDef hdma_tim8_ch4_trig_com;
 
 static void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
-bool timerInit()
+bool timerInit(void)
 {
 	bool ret = true;
 

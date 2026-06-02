@@ -22,8 +22,12 @@
 
 #pragma once
 
-//#include "drivers/dshot.h"
-//#include "drivers/motor_types.h"
+#include "hw.h"
+
+#include "drivers/dshot.h"
+#include "drivers/motor_types.h"
+
+#define MHZ_TO_HZ(x) ((x) * 1000000)
 
 // Timer clock frequency for the dshot speeds
 #define MOTOR_DSHOT600_HZ     MHZ_TO_HZ(12)
@@ -90,46 +94,19 @@ extern DSHOT_DMA_BUFFER_UNIT dshotDmaInputBuffer[MAX_SUPPORTED_MOTORS][DSHOT_DMA
 extern DSHOT_DMA_BUFFER_UNIT dshotBurstDmaBuffer[MAX_DMA_TIMERS][DSHOT_DMA_BUFFER_SIZE * 4];
 #endif
 
-typedef struct {
-    TIM_TypeDef *timer;
-#if defined(USE_DSHOT)
-    uint16_t outputPeriod;
-#if defined(USE_DSHOT_DMAR)
-#if defined(STM32F7) || defined(STM32H7) || defined(STM32G4)
-    TIM_HandleTypeDef timHandle;
-    DMA_HandleTypeDef hdma_tim;
-#endif
-    dmaResource_t *dmaBurstRef;
-    uint16_t dmaBurstLength;
-    uint32_t *dmaBurstBuffer;
-#endif
-#endif
-    uint16_t timerDmaSources;
-} motorDmaTimer_t;
-
 typedef struct motorDmaOutput_s {
     dshotProtocolControl_t protocolControl;
-    ioTag_t ioTag;
-    const timerHardware_t *timerHardware;
-#ifdef USE_DSHOT
-    uint16_t timerDmaSource;
-    uint8_t timerDmaIndex;
+
     bool configured;
-#if defined(STM32H7) || defined(STM32G4)
-    TIM_HandleTypeDef TimHandle;
-    DMA_HandleTypeDef hdma_tim;
+
+    TIM_HandleTypeDef *TimHandle;
+    DMA_HandleTypeDef *hdma_tim;
+    uint16_t outputPeriod;
     IO_t io;
-#endif
+
     uint8_t output;
     uint8_t index;
     uint32_t iocfg;
-
-#if defined(USE_HAL_DRIVER) && defined(USE_FULL_LL_DRIVER)
-    LL_DMA_InitTypeDef    dmaInitStruct;
-    uint32_t llChannel;
-#else
-    DMA_InitTypeDef   dmaInitStruct;
-#endif
 
 #ifdef USE_DSHOT_TELEMETRY
     volatile bool isInput;
@@ -146,17 +123,13 @@ typedef struct motorDmaOutput_s {
 
 #endif // USE_DSHOT_TELEMETRY
 
-    dmaResource_t *dmaRef;
-#endif // USE_DSHOT
-
-    motorDmaTimer_t *timer;
     DSHOT_DMA_BUFFER_UNIT *dmaBuffer;
 } motorDmaOutput_t;
 
 motorDmaOutput_t *getMotorDmaOutput(unsigned index);
 
 void pwmWriteDshotInt(uint8_t index, uint16_t value);
-bool pwmDshotMotorHardwareConfig(const timerHardware_t *timerHardware, uint8_t motorIndex, uint8_t reorderedMotorIndex, motorProtocolTypes_e pwmProtocolType, uint8_t output);
+//bool pwmDshotMotorHardwareConfig(const timerHardware_t *timerHardware, uint8_t motorIndex, uint8_t reorderedMotorIndex, motorProtocolTypes_e pwmProtocolType, uint8_t output);
 #ifdef USE_DSHOT_TELEMETRY
 bool pwmTelemetryDecode(void);
 #endif

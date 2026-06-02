@@ -143,6 +143,8 @@ void init(void)
 	mspSerialInit();
 	//mixerInit(mixerConfig.mixerMode);
 
+	motorDevInit();
+
 	bmi270_Init();
 
 #ifdef USE_MAG
