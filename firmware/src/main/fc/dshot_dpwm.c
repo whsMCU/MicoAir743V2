@@ -37,6 +37,8 @@
 
 #include "drivers/motor.h"
 
+#include "drivers/dshot_command.h"
+
 const motorVTable_t *motor_vTable;
 
 #ifdef USE_DSHOT_TELEMETRY
@@ -161,10 +163,10 @@ static const motorVTable_t dshotPwmVTable = {
     .getMotorIO = pwmDshotGetMotorIO,
 };
 
-bool dshotPwmDevInit(const motorConfig_t *motorConfig)
+bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
 {
-		motor_vTable = &dshotPwmVTable;
-    dshotMotorCount = motorConfig->motorCount;
+		device->vTable = &dshotPwmVTable;
+    dshotMotorCount = device->count;
 #ifdef USE_DSHOT_TELEMETRY
     useDshotTelemetry = motorConfig->useDshotTelemetry;
 #endif
@@ -184,13 +186,79 @@ bool dshotPwmDevInit(const motorConfig_t *motorConfig)
         break;
     }
 
-
     for (int motorIndex = 0; motorIndex < MAX_SUPPORTED_MOTORS && motorIndex < dshotMotorCount; motorIndex++) {
     	dmaMotors[motorIndex].TimHandle = &htim1;
     	dmaMotors[motorIndex].configured = true;
+      dmaMotors[motorIndex].dmaBuffer = &dshotDmaBuffer[motorIndex][0];
+      dmaMotors[motorIndex].outputPeriod = htim1.Instance->ARR;
+      dmaMotors[motorIndex].Channel = motorIndex * 4;
     }
 
     return true;
+}
+
+FAST_CODE void pwmCompleteDshotMotorUpdate(void)
+{
+    /* If there is a dshot command loaded up, time it correctly with motor update*/
+    if (!dshotCommandQueueEmpty() && !dshotCommandOutputIsEnabled(dshotMotorCount)) {
+        return;
+    }
+
+    for (int i = 0; i < dmaMotorTimerCount; i++) {
+#ifdef USE_DSHOT_DMAR
+        if (useBurstDshot) {
+            xLL_EX_DMA_SetDataLength(dmaMotorTimers[i].dmaBurstRef, dmaMotorTimers[i].dmaBurstLength);
+            xLL_EX_DMA_EnableResource(dmaMotorTimers[i].dmaBurstRef);
+
+            /* configure the DMA Burst Mode */
+            LL_TIM_ConfigDMABurst(dmaMotorTimers[i].timer, LL_TIM_DMABURST_BASEADDR_CCR1, LL_TIM_DMABURST_LENGTH_4TRANSFERS);
+            /* Enable the TIM DMA Request */
+            LL_TIM_EnableDMAReq_UPDATE(dmaMotorTimers[i].timer);
+        } else
+#endif
+        {
+        	dmaMotors[i].TimHandle->Instance->ARR = dmaMotors[i].outputPeriod;
+
+            /* Reset timer counter */
+            __HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
+
+            /* Enable channel DMA requests */
+            HAL_TIM_PWM_Start_DMA(dmaMotors[i].TimHandle, dmaMotors[i].Channel, (uint32_t *)dmaMotors[i].dmaBuffer, dmaMotors[i].bufferSize);
+        }
+    }
+}
+
+FAST_CODE void motor_DMA_IRQHandler(void)
+{
+//    if (DMA_GET_FLAG_STATUS(descriptor, DMA_IT_TCIF)) {
+//        motorDmaOutput_t * const motor = &dmaMotors[descriptor->userParam];
+//#ifdef USE_DSHOT_TELEMETRY
+//        if (!motor->isInput) {
+//            dshotDMAHandlerCycleCounters.irqAt = getCycleCounter();
+//#endif
+//#ifdef USE_DSHOT_DMAR
+//            if (useBurstDshot) {
+//                xLL_EX_DMA_DisableResource(motor->timerHardware->dmaTimUPRef);
+//                LL_TIM_DisableDMAReq_UPDATE(motor->timerHardware->tim);
+//            } else
+//#endif
+//            {
+//                xLL_EX_DMA_DisableResource(motor->dmaRef);
+//                LL_EX_TIM_DisableIT(motor->timerHardware->tim, motor->timerDmaSource);
+//            }
+//
+//#ifdef USE_DSHOT_TELEMETRY
+//            if (useDshotTelemetry) {
+//                pwmDshotSetDirectionInput(motor);
+//                xLL_EX_DMA_SetDataLength(motor->dmaRef, GCR_TELEMETRY_INPUT_LEN);
+//                xLL_EX_DMA_EnableResource(motor->dmaRef);
+//                LL_EX_TIM_EnableIT(motor->timerHardware->tim, motor->timerDmaSource);
+//                dshotDMAHandlerCycleCounters.changeDirectionCompletedAt = getCycleCounter();
+//            }
+//        }
+//#endif
+//        DMA_CLEAR_FLAG(descriptor, DMA_IT_TCIF);
+//    }
 }
 
 #endif // USE_DSHOT

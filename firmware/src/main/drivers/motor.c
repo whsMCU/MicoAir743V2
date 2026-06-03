@@ -39,7 +39,13 @@
 #include "rx/rx.h"
 
 motorConfig_t motorConfig;
-motor_t motor;
+
+float FAST_DATA_ZERO_INIT motor[MAX_SUPPORTED_MOTORS];
+
+static FAST_DATA_ZERO_INIT motorDevice_t motorDevice;
+
+static bool motorProtocolEnabled = false;
+static bool motorProtocolDshot = false;
 
 unsigned short LF, LR, RR, RF;
 
@@ -66,21 +72,55 @@ void motorConfig_Init(void)
   motorConfig.digitalIdleOffsetValue = 550;
   motorConfig.motorPoleCount = 14;   // Most brushes motors that we use are 14 poles
   motorConfig.motorCount = 4;
-  motorConfig.enabled = false;
+}
 
+
+bool isMotorProtocolEnabled(void)
+{
+    return motorProtocolEnabled;
+}
+
+bool isMotorProtocolDshot(void)
+{
+    return motorProtocolDshot;
+}
+
+bool isMotorProtocolBidirDshot(void)
+{
+    return isMotorProtocolDshot() && useDshotTelemetry;
+}
+
+unsigned motorDeviceCount(void)
+{
+    return motorDevice.count;
+}
+
+const motorVTable_t *motorGetVTable(void)
+{
+    return motorDevice.vTable;
 }
 
 void motorDevInit(void)
 {
-    dshotPwmDevInit(&motorConfig);
-		motorConfig.initialized = true;
-		motorConfig.motorEnableTimeMs = 0;
-		motorConfig.enabled = false;
+		bool success = false;
+
+    motorDevice.count = motorConfig.motorCount;
+    success = dshotPwmDevInit(&motorDevice, &motorConfig);
+
+    // if the VTable has been populated, the device is initialized.
+    if (success) {
+			motorDevice.initialized = true;
+			motorDevice.motorEnableTimeMs = 0;
+			motorDevice.enabled = false;
+    }
 }
 
 void motorShutdown(void)
 {
-  motorConfig.enabled = false;
+  motorDevice.vTable->shutdown();
+  motorDevice.enabled = false;
+  motorDevice.motorEnableTimeMs = 0;
+  motorDevice.initialized = false;
 }
 
 FAST_CODE void motorWriteAll(void)
@@ -91,38 +131,66 @@ FAST_CODE void motorWriteAll(void)
     {
       if(rcData[THROTTLE] > 1030 || _PID_Test.pid_test_flag == 1)
       {
-        motor.motor[R_R] = RR > 21000 ? 21000 : RR < 11000 ? 11000 : RR;
-        motor.motor[R_F] = RF > 21000 ? 21000 : RF < 11000 ? 11000 : RF;
-        motor.motor[L_R] = LR > 21000 ? 21000 : LR < 11000 ? 11000 : LR;
-        motor.motor[L_F] = LF > 21000 ? 21000 : LF < 11000 ? 11000 : LF;
+        motor[R_R] = RR > 21000 ? 21000 : RR < 11000 ? 11000 : RR;
+        motor[R_F] = RF > 21000 ? 21000 : RF < 11000 ? 11000 : RF;
+        motor[L_R] = LR > 21000 ? 21000 : LR < 11000 ? 11000 : LR;
+        motor[L_F] = LF > 21000 ? 21000 : LF < 11000 ? 11000 : LF;
       }
       else
       {
-        motor.motor[R_R] = 11000;
-        motor.motor[R_F] = 11000;
-        motor.motor[L_R] = 11000;
-        motor.motor[L_F] = 11000;
+        motor[R_R] = 11000;
+        motor[R_F] = 11000;
+        motor[L_R] = 11000;
+        motor[L_F] = 11000;
       }
     }
     else
     {
-      motor.motor[R_R] = 10500;
-      motor.motor[R_F] = 10500;
-      motor.motor[L_R] = 10500;
-      motor.motor[L_F] = 10500;
+      motor[R_R] = 10500;
+      motor[R_F] = 10500;
+      motor[L_R] = 10500;
+      motor[L_F] = 10500;
     }
   }
   else
   {
-    motor.motor[R_R] = 10500;
-    motor.motor[R_F] = 10500;
-    motor.motor[L_R] = 10500;
-    motor.motor[L_F] = 10500;
+    motor[R_R] = 10500;
+    motor[R_F] = 10500;
+    motor[L_R] = 10500;
+    motor[L_F] = 10500;
   }
-  TIM4->CCR1 = motor.motor[R_R];
-  TIM4->CCR2 = motor.motor[R_F];
-  TIM4->CCR3 = motor.motor[L_R];
-  TIM4->CCR4 = motor.motor[L_F];
+  TIM4->CCR1 = motor[R_R];
+  TIM4->CCR2 = motor[R_F];
+  TIM4->CCR3 = motor[L_R];
+  TIM4->CCR4 = motor[L_F];
+
+  if (motorDevice.enabled) {
+		// Perform the decode of the last data received
+		// New data will be received once the send of motor data, triggered above, completes
+	#if defined(USE_DSHOT) && defined(USE_DSHOT_TELEMETRY)
+		if (motorDevice.vTable->decodeTelemetry) {
+				motorDevice.vTable->decodeTelemetry();
+		}
+	#endif
+		motor[R_R] = 48;
+		motor[R_F] = 48;
+		motor[L_R] = 48;
+		motor[L_F] = 48;
+	  if(ARMING_FLAG(ARMED))
+	  {
+			motor[R_R] = 300;
+			motor[R_F] = 300;
+			motor[L_R] = 300;
+			motor[L_F] = 300;
+	  }
+		// Update the motor data
+		for (int i = 0; i < motorDevice.count; i++) {
+				motorDevice.vTable->write(i, motor[i]);
+		}
+
+		// Trigger the transmission of the motor data
+		motorDevice.vTable->updateComplete();
+  }
 }
 
 //TIM4->CCR1 // RR
@@ -130,9 +198,22 @@ FAST_CODE void motorWriteAll(void)
 //TIM4->CCR3 // LR
 //TIM4->CCR4 // LF
 
+void motorRequestTelemetry(unsigned index)
+{
+    if (index >= motorDevice.count) {
+        return;
+    }
+
+    if (motorDevice.vTable->requestTelemetry) {
+        motorDevice.vTable->requestTelemetry(index);
+    }
+}
+
 void motorDisable(void)
 {
-  motorConfig.enabled = false;
+  motorDevice.vTable->disable();
+	motorDevice.enabled = false;
+  motorDevice.motorEnableTimeMs = 0;
   TIM4->CCR1 = 10500;
   TIM4->CCR2 = 10500;
   TIM4->CCR3 = 10500;
@@ -141,15 +222,116 @@ void motorDisable(void)
 
 void motorEnable(void)
 {
-  motorConfig.enabled = true;
+  if (motorDevice.initialized && motorDevice.vTable->enable())
+  {
+      motorDevice.enabled = true;
+      motorDevice.motorEnableTimeMs = millis();
+  }
 }
 
 bool motorIsEnabled(void)
 {
-    return motorConfig.enabled;
+    return motorDevice.enabled;
+}
+
+bool motorIsMotorEnabled(unsigned index)
+{
+    return motorDevice.vTable->isMotorEnabled(index);
 }
 
 uint8_t getMotorCount(void)
 {
     return motorConfig.motorCount;
+}
+
+bool motorIsMotorIdle(unsigned index)
+{
+    return motorDevice.vTable->isMotorIdle ? motorDevice.vTable->isMotorIdle(index) : false;
+}
+
+#ifdef USE_DSHOT
+timeMs_t motorGetMotorEnableTimeMs(void)
+{
+    return motorDevice.motorEnableTimeMs;
+}
+#endif
+
+/* functions below for empty methods and no active motors */
+void motorPostInitNull(void)
+{
+}
+
+static bool motorEnableNull(void)
+{
+    return false;
+}
+
+static void motorDisableNull(void)
+{
+}
+
+static bool motorIsEnabledNull(unsigned index)
+{
+    UNUSED(index);
+    return false;
+}
+
+bool motorDecodeTelemetryNull(void)
+{
+    return true;
+}
+
+void motorWriteNull(uint8_t index, float value)
+{
+    UNUSED(index);
+    UNUSED(value);
+}
+
+static void motorWriteIntNull(uint8_t index, uint16_t value)
+{
+    UNUSED(index);
+    UNUSED(value);
+}
+
+void motorUpdateCompleteNull(void)
+{
+}
+
+static void motorShutdownNull(void)
+{
+}
+
+static float motorConvertFromExternalNull(uint16_t value)
+{
+    UNUSED(value);
+    return 0.0f ;
+}
+
+static uint16_t motorConvertToExternalNull(float value)
+{
+    UNUSED(value);
+    return 0;
+}
+
+static const motorVTable_t motorNullVTable = {
+    .postInit = motorPostInitNull,
+    .enable = motorEnableNull,
+    .disable = motorDisableNull,
+    .isMotorEnabled = motorIsEnabledNull,
+    .decodeTelemetry = motorDecodeTelemetryNull,
+    .write = motorWriteNull,
+    .writeInt = motorWriteIntNull,
+    .updateComplete = motorUpdateCompleteNull,
+    .convertExternalToMotor = motorConvertFromExternalNull,
+    .convertMotorToExternal = motorConvertToExternalNull,
+    .shutdown = motorShutdownNull,
+    .requestTelemetry = NULL,
+    .isMotorIdle = NULL,
+    .getMotorIO = NULL,
+};
+
+void motorNullDevInit(motorDevice_t *device)
+{
+    device->vTable = &motorNullVTable;
+    device->count = 0;
 }

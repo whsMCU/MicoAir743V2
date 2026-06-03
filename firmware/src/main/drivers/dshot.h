@@ -96,7 +96,7 @@ uint16_t prepareDshotPacket(dshotProtocolControl_t *pcb);
 extern bool useDshotTelemetry;
 extern uint8_t dshotMotorCount;
 
-bool dshotPwmDevInit(const motorConfig_t *motorConfig);
+bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig);
 
 #ifdef USE_DSHOT_TELEMETRY
 

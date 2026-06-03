@@ -34,14 +34,7 @@ typedef struct motorConfig_s {
     uint16_t mincommand;                    // This is the value for the ESCs when they are not armed. In some cases, this value must be lowered down to 900 for some specific ESCs
     uint8_t motorPoleCount;                // Magnetic poles in the motors for calculating actual RPM from eRPM provided by ESC telemetry
     uint8_t motorCount;
-    bool enabled;
-    bool initialized;
-    timeMs_t motorEnableTimeMs;
 } motorConfig_t;
-
-typedef struct motor_s {
-    uint16_t motor[4];        // Idle value for DShot protocol, full motor output = 10000
-} motor_t;
 
 typedef enum {
   R_R,
@@ -51,14 +44,20 @@ typedef enum {
 }motor_e;
 
 extern motorConfig_t motorConfig;
-
-extern motor_t motor;
-
+extern float motor[MAX_SUPPORTED_MOTORS];
 extern unsigned short LF, LR, RR, RF;
 
 void motorConfig_Init(void);
 
+timeMs_t motorGetMotorEnableTimeMs(void);
+
+bool isMotorProtocolDshot(void);
+bool isMotorProtocolBidirDshot(void);
+bool isMotorProtocolEnabled(void);
+
 void motorDevInit(void);
+unsigned motorDeviceCount(void);
+const motorVTable_t *motorGetVTable(void);
 
 void motorWriteAll(void);
 void motorDisable(void);

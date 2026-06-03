@@ -100,8 +100,9 @@ typedef struct motorDmaOutput_s {
     bool configured;
 
     TIM_HandleTypeDef *TimHandle;
-    DMA_HandleTypeDef *hdma_tim;
+    uint32_t Channel;
     uint16_t outputPeriod;
+    uint8_t bufferSize;
     IO_t io;
 
     uint8_t output;
@@ -134,5 +135,7 @@ void pwmWriteDshotInt(uint8_t index, uint16_t value);
 bool pwmTelemetryDecode(void);
 #endif
 void pwmCompleteDshotMotorUpdate(void);
+
+void motor_DMA_IRQHandler(void);
 
 extern bool useBurstDshot;

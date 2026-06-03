@@ -74,9 +74,6 @@ bool pwmTelemetryDecode(void);
 #endif
 #endif
 
-
-#include "hw.h"
-
 #ifdef USE_DSHOT
 
 #include "build/debug.h"
@@ -92,7 +89,7 @@ bool pwmTelemetryDecode(void);
 //#include "drivers/pwm_output.h"
 #include "drivers/dshot.h"
 #include "dshot_dpwm.h"
-//#include "drivers/dshot_command.h"
+#include "drivers/dshot_command.h"
 #include "drivers/motor.h"
 
 #include "dshot_shared.h"
@@ -161,8 +158,8 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
 
     /*If there is a command ready to go overwrite the value and send that instead*/
     if (dshotCommandIsProcessing()) {
-        value = dshotCommandGetCurrent(index);
         if (value) {
+        value = dshotCommandGetCurrent(index);
             motor->protocolControl.requestTelemetry = true;
         }
     }
@@ -170,7 +167,6 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
     motor->protocolControl.value = value;
 
     uint16_t packet = prepareDshotPacket(&motor->protocolControl);
-    uint8_t bufferSize;
 
 #ifdef USE_DSHOT_DMAR
     if (useBurstDshot) {
@@ -179,17 +175,17 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
     } else
 #endif
     {
-        bufferSize = loadDmaBuffer(motor->dmaBuffer, 1, packet);
+    	motor->bufferSize = loadDmaBuffer(motor->dmaBuffer, 1, packet);
 
-        motor->timer->timerDmaSources |= motor->timerDmaSource;
+        //motor->timer->timerDmaSources |= motor->timerDmaSource;
 
 #ifdef USE_FULL_LL_DRIVER
         xLL_EX_DMA_SetDataLength(motor->dmaRef, bufferSize);
         xLL_EX_DMA_EnableResource(motor->dmaRef);
 #else
-        xDMA_SetCurrDataCounter(motor->dmaRef, bufferSize);
+        //xDMA_SetCurrDataCounter(motor->dmaRef, bufferSize);
 
-        xDMA_Cmd(motor->dmaRef, ENABLE);
+        //xDMA_Cmd(motor->dmaRef, ENABLE);
 
 #endif // USE_FULL_LL_DRIVER
     }

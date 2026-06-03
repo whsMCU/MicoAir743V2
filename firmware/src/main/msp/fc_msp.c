@@ -456,10 +456,10 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
 
           sbufWriteU16(dst, ARMING_FLAG(ARMED));
 
-          sbufWriteU16(dst, motor.motor[R_R]);
-          sbufWriteU16(dst, motor.motor[R_F]);
-          sbufWriteU16(dst, motor.motor[L_R]);
-          sbufWriteU16(dst, motor.motor[L_F]);
+          sbufWriteU16(dst, motor[R_R]);
+          sbufWriteU16(dst, motor[R_F]);
+          sbufWriteU16(dst, motor[L_R]);
+          sbufWriteU16(dst, motor[L_F]);
 
           sbufWriteU32(dst, debug[0]);
           sbufWriteU32(dst, debug[1]);
