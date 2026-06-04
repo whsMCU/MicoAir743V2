@@ -8,6 +8,7 @@
 
 #include "timer.h"
 #include "light_ws2811strip.h"
+#include "fc/dshot_dpwm.h"
 
 TIM_HandleTypeDef htim1;
 DMA_HandleTypeDef hdma_tim1_ch1;
@@ -121,11 +122,6 @@ bool timerInit(void)
 
 	/* USER CODE END TIM4_Init 2 */
 	HAL_TIM_MspPostInit(&htim1);
-
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
 
 
 	////////////////////////////////////////////////////////////////
@@ -349,6 +345,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 }
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim) {
+		motor_DMA_IRQHandler(htim);
     if (htim->Instance == TIM8) {
         HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_4);
         WS2811_DMA_IRQHandler();

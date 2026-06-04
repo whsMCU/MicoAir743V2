@@ -204,7 +204,7 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         return;
     }
 
-    for (int i = 0; i < dmaMotorTimerCount; i++) {
+    for (int i = 0; i < dshotMotorCount; i++) {
 #ifdef USE_DSHOT_DMAR
         if (useBurstDshot) {
             xLL_EX_DMA_SetDataLength(dmaMotorTimers[i].dmaBurstRef, dmaMotorTimers[i].dmaBurstLength);
@@ -217,7 +217,7 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         } else
 #endif
         {
-        	dmaMotors[i].TimHandle->Instance->ARR = dmaMotors[i].outputPeriod;
+        	//dmaMotors[i].TimHandle->Instance->ARR = dmaMotors[i].outputPeriod;
 
             /* Reset timer counter */
             __HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
@@ -228,8 +228,31 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
     }
 }
 
-FAST_CODE void motor_DMA_IRQHandler(void)
+FAST_CODE void motor_DMA_IRQHandler(TIM_HandleTypeDef *htim)
 {
+  switch(htim->Channel)
+  {
+      case HAL_TIM_ACTIVE_CHANNEL_1:
+          HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_1);
+          break;
+
+      case HAL_TIM_ACTIVE_CHANNEL_2:
+          HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_2);
+          break;
+
+      case HAL_TIM_ACTIVE_CHANNEL_3:
+          HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_3);
+          break;
+
+      case HAL_TIM_ACTIVE_CHANNEL_4:
+          HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_4);
+          break;
+
+      case HAL_TIM_ACTIVE_CHANNEL_CLEARED:
+      default:
+					break;
+  }
+
 //    if (DMA_GET_FLAG_STATUS(descriptor, DMA_IT_TCIF)) {
 //        motorDmaOutput_t * const motor = &dmaMotors[descriptor->userParam];
 //#ifdef USE_DSHOT_TELEMETRY
