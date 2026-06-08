@@ -150,7 +150,7 @@ static const motorVTable_t dshotPwmVTable = {
     //.convertExternalToMotor = dshotConvertFromExternal,
     //.convertMotorToExternal = dshotConvertToExternal,
     .shutdown = dshotPwmShutdown,
-    .requestTelemetry = pwmDshotRequestTelemetry,
+    //.requestTelemetry = pwmDshotRequestTelemetry,
     //.isMotorIdle = pwmDshotIsMotorIdle,
     .getMotorIO = pwmDshotGetMotorIO,
 };
@@ -213,11 +213,13 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         {
         	//dmaMotors[i].TimHandle->Instance->ARR = dmaMotors[i].outputPeriod;
         	motor_update_time_temp[i] = micros();
-            /* Reset timer counter */
-            __HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
 
-            /* Enable channel DMA requests */
-            HAL_TIM_PWM_Start_DMA(dmaMotors[i].TimHandle, dmaMotors[i].Channel, (uint32_t *)dmaMotors[i].dmaBuffer, dmaMotors[i].bufferSize);
+          /* Enable channel DMA requests */
+          HAL_TIM_PWM_Start_DMA(dmaMotors[i].TimHandle, dmaMotors[i].Channel,
+																(uint32_t *)dmaMotors[i].dmaBuffer, dmaMotors[i].bufferSize);
+
+          /* Reset timer counter */
+          __HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
         }
     }
 }

@@ -180,7 +180,6 @@ FAST_CODE void motorWriteAll(void)
 		motor[L_F] = 0;
 	  if(ARMING_FLAG(ARMED))
 	  {
-
 			motor[R_R] = applyCommand[THROTTLE];
 			motor[R_F] = applyCommand[THROTTLE];
 			motor[L_R] = applyCommand[THROTTLE];
