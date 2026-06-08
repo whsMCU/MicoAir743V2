@@ -33,6 +33,8 @@ uint8_t getTimerIndex(TIM_TypeDef *timer);
 motorDmaOutput_t *getMotorDmaOutput(unsigned index);
 void dshotEnableChannels(unsigned motorCount);
 
+void pwmDshotRequestTelemetry(unsigned index);
+
 #ifdef USE_DSHOT_TELEMETRY
 void pwmDshotSetDirectionOutput(
     motorDmaOutput_t * const motor

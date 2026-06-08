@@ -39,14 +39,6 @@
 
 #include "drivers/dshot_command.h"
 
-const motorVTable_t *motor_vTable;
-
-#ifdef USE_DSHOT_TELEMETRY
-FAST_DATA_ZERO_INIT uint32_t inputStampUs;
-
-FAST_DATA_ZERO_INIT dshotTelemetryCycleCounters_t dshotDMAHandlerCycleCounters;
-#endif
-
 // XXX TODO: Share a single region among dshotDmaBuffer and dshotBurstDmaBuffer
 
 DSHOT_DMA_BUFFER_ATTRIBUTE DSHOT_DMA_BUFFER_UNIT dshotDmaBuffer[MAX_SUPPORTED_MOTORS][DSHOT_DMA_BUFFER_ALLOC_SIZE];
@@ -158,7 +150,7 @@ static const motorVTable_t dshotPwmVTable = {
     //.convertExternalToMotor = dshotConvertFromExternal,
     //.convertMotorToExternal = dshotConvertToExternal,
     .shutdown = dshotPwmShutdown,
-    //.requestTelemetry = pwmDshotRequestTelemetry,
+    .requestTelemetry = pwmDshotRequestTelemetry,
     //.isMotorIdle = pwmDshotIsMotorIdle,
     .getMotorIO = pwmDshotGetMotorIO,
 };
@@ -197,6 +189,8 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
     return true;
 }
 
+uint32_t motor_update_time[4], motor_update_time_temp[4];
+
 FAST_CODE void pwmCompleteDshotMotorUpdate(void)
 {
     /* If there is a dshot command loaded up, time it correctly with motor update*/
@@ -218,7 +212,7 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
 #endif
         {
         	//dmaMotors[i].TimHandle->Instance->ARR = dmaMotors[i].outputPeriod;
-
+        	motor_update_time_temp[i] = micros();
             /* Reset timer counter */
             __HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
 
@@ -234,18 +228,22 @@ FAST_CODE void motor_DMA_IRQHandler(TIM_HandleTypeDef *htim)
   {
       case HAL_TIM_ACTIVE_CHANNEL_1:
           HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_1);
+          motor_update_time[0] = micros()-motor_update_time_temp[0];
           break;
 
       case HAL_TIM_ACTIVE_CHANNEL_2:
           HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_2);
+          motor_update_time[1] = micros()-motor_update_time_temp[1];
           break;
 
       case HAL_TIM_ACTIVE_CHANNEL_3:
           HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_3);
+          motor_update_time[2] = micros()-motor_update_time_temp[2];
           break;
 
       case HAL_TIM_ACTIVE_CHANNEL_4:
           HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_4);
+          motor_update_time[3] = micros()-motor_update_time_temp[3];
           break;
 
       case HAL_TIM_ACTIVE_CHANNEL_CLEARED:

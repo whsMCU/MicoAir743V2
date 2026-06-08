@@ -35,8 +35,8 @@
 #define MOTOR_DSHOT150_HZ     MHZ_TO_HZ(3)
 
 // These three constants are times in timer clock ticks, e.g. with a 6 MHz clock 20 ticks for bitlength = 300kHz bit rate
-#define MOTOR_BIT_0           133//7
-#define MOTOR_BIT_1           266//14
+#define MOTOR_BIT_0           7
+#define MOTOR_BIT_1           14
 #define MOTOR_BITLENGTH       20
 
 #define MOTOR_PROSHOT1000_HZ         MHZ_TO_HZ(24)

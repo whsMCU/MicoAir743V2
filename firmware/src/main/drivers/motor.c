@@ -123,6 +123,8 @@ void motorShutdown(void)
   motorDevice.initialized = false;
 }
 
+extern float applyCommand[4];
+
 FAST_CODE void motorWriteAll(void)
 {
   if(ARMING_FLAG(ARMED))
@@ -172,16 +174,17 @@ FAST_CODE void motorWriteAll(void)
 				motorDevice.vTable->decodeTelemetry();
 		}
 	#endif
-		motor[R_R] = 48;
-		motor[R_F] = 48;
-		motor[L_R] = 48;
-		motor[L_F] = 48;
+		motor[R_R] = 0;
+		motor[R_F] = 0;
+		motor[L_R] = 0;
+		motor[L_F] = 0;
 	  if(ARMING_FLAG(ARMED))
 	  {
-			motor[R_R] = 300;
-			motor[R_F] = 300;
-			motor[L_R] = 300;
-			motor[L_F] = 300;
+
+			motor[R_R] = applyCommand[THROTTLE];
+			motor[R_F] = applyCommand[THROTTLE];
+			motor[L_R] = applyCommand[THROTTLE];
+			motor[L_F] = applyCommand[THROTTLE];
 	  }
 		// Update the motor data
 		for (int i = 0; i < motorDevice.count; i++) {
