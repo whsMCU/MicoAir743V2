@@ -136,6 +136,6 @@ bool pwmTelemetryDecode(void);
 #endif
 void pwmCompleteDshotMotorUpdate(void);
 
-void motor_DMA_IRQHandler(TIM_HandleTypeDef *htim);
+void motor_DMA_IRQHandler(DMA_HandleTypeDef *htim);
 
 extern bool useBurstDshot;

@@ -329,9 +329,9 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim) {
 
-  if (htim->Instance == TIM1) {
-		motor_DMA_IRQHandler(htim);
-  }
+//  if (htim->Instance == TIM1) {
+//		motor_DMA_IRQHandler(htim);
+//  }
 
     if (htim->Instance == TIM8) {
         HAL_TIM_PWM_Stop_DMA(htim, TIM_CHANNEL_4);
