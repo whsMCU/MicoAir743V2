@@ -185,8 +185,10 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
       dmaMotors[motorIndex].outputPeriod = htim1.Instance->ARR;
       dmaMotors[motorIndex].Channel = motorIndex * 4;
       dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1]->XferCpltCallback = motor_DMA_IRQHandler;
+      TIM_CCxChannelCmd(dmaMotors[motorIndex].TimHandle->Instance, dmaMotors[motorIndex].Channel, TIM_CCx_ENABLE);
     }
-
+    __HAL_TIM_MOE_ENABLE(dmaMotors[0].TimHandle);
+    __HAL_TIM_ENABLE(dmaMotors[0].TimHandle);
     return true;
 }
 
@@ -198,7 +200,6 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
     if (!dshotCommandQueueEmpty() && !dshotCommandOutputIsEnabled(dshotMotorCount)) {
         return;
     }
-
 
     for (int i = 0; i < dshotMotorCount; i++) {
 #ifdef USE_DSHOT_DMAR
@@ -213,29 +214,19 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         } else
 #endif
         {
-
         	motor_update_time_temp[i] = micros();
 
-        	HAL_DMA_Start_IT(dmaMotors[i].TimHandle->hdma[i + 1],
-													(uint32_t)dmaMotors[i].dmaBuffer,
-													(uint32_t)&dmaMotors[i].TimHandle->Instance->CCR1 + dmaMotors[i].Channel,
-													dmaMotors[i].bufferSize);
-
-        	__HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
-
-            TIM_CCxChannelCmd(dmaMotors[i].TimHandle->Instance,
-														dmaMotors[i].Channel,
-														TIM_CCx_ENABLE);
+        	HAL_DMA_Start_IT(dmaMotors[i].TimHandle->hdma[i + 1],	(uint32_t)dmaMotors[i].dmaBuffer,
+    											(uint32_t)&dmaMotors[i].TimHandle->Instance->CCR1 + dmaMotors[i].Channel,
+    											dmaMotors[i].bufferSize);
         }
     }
-
-  	__HAL_TIM_SET_COUNTER(dmaMotors[0].TimHandle, 0);
-    dmaMotors[0].TimHandle->Instance->EGR = TIM_EGR_UG;
-    __HAL_TIM_GENERATE_EVENT(&htim1, TIM_EVENTSOURCE_UPDATE);
-    __HAL_TIM_MOE_ENABLE(dmaMotors[0].TimHandle);
-    __HAL_TIM_ENABLE(dmaMotors[0].TimHandle);
+    for (int i = 0; i < dshotMotorCount; i++) {
+    	//__HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
+      __HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
+    }
 }
-volatile uint8_t all_motor_updated_count = 0;
+
 FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 {
 	TIM_HandleTypeDef *htim = (TIM_HandleTypeDef *)((DMA_HandleTypeDef *)hdma)->Parent;
@@ -243,38 +234,23 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 	if (hdma == htim->hdma[TIM_DMA_ID_CC1])
 	{
 		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC1);
-        TIM_CCxChannelCmd(htim->Instance, TIM_CHANNEL_1, TIM_CCx_DISABLE);
-        all_motor_updated_count++;
 		motor_update_time[0] = micros()-motor_update_time_temp[0];
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC2])
 	{
 		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC2);
-        TIM_CCxChannelCmd(htim->Instance, TIM_CHANNEL_2, TIM_CCx_DISABLE);
-        all_motor_updated_count++
 		motor_update_time[1] = micros()-motor_update_time_temp[1];
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC3])
 	{
 		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC3);
-        TIM_CCxChannelCmd(htim->Instance, TIM_CHANNEL_3, TIM_CCx_DISABLE);
-        all_motor_updated_count++
 		motor_update_time[2] = micros()-motor_update_time_temp[2];
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC4])
 	{
 		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC4);
-        TIM_CCxChannelCmd(htim->Instance, TIM_CHANNEL_4, TIM_CCx_DISABLE);
-        all_motor_updated_count++
 		motor_update_time[3] = micros()-motor_update_time_temp[3];
 	}
-
-    if(all_motor_updated_count >= 4)
-    {
-        all_motor_updated_count = 0;
-        __HAL_TIM_MOE_DISABLE(dmaMotors[0].TimHandle);
-        __HAL_TIM_DISABLE(dmaMotors[0].TimHandle);
-    }
 
 //    if (DMA_GET_FLAG_STATUS(descriptor, DMA_IT_TCIF)) {
 //        motorDmaOutput_t * const motor = &dmaMotors[descriptor->userParam];
