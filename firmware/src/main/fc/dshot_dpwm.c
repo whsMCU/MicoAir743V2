@@ -230,7 +230,7 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
     }
 
   	__HAL_TIM_SET_COUNTER(dmaMotors[0].TimHandle, 0);
-    __HAL_TIM_CLEAR_FLAG(dmaMotors[0].TimHandle, TIM_FLAG_UPDATE);
+    dmaMotors[0].TimHandle->Instance->EGR = TIM_EGR_UG;
     __HAL_TIM_GENERATE_EVENT(&htim1, TIM_EVENTSOURCE_UPDATE);
     __HAL_TIM_MOE_ENABLE(dmaMotors[0].TimHandle);
     __HAL_TIM_ENABLE(dmaMotors[0].TimHandle);
