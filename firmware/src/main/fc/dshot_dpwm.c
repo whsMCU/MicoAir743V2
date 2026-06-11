@@ -187,8 +187,6 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
       dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1]->XferCpltCallback = motor_DMA_IRQHandler;
       TIM_CCxChannelCmd(dmaMotors[motorIndex].TimHandle->Instance, dmaMotors[motorIndex].Channel, TIM_CCx_ENABLE);
     }
-    __HAL_TIM_MOE_ENABLE(dmaMotors[0].TimHandle);
-    __HAL_TIM_ENABLE(dmaMotors[0].TimHandle);
     return true;
 }
 
@@ -214,17 +212,19 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         } else
 #endif
         {
-        	motor_update_time_temp[i] = micros();
-
         	HAL_DMA_Start_IT(dmaMotors[i].TimHandle->hdma[i + 1],	(uint32_t)dmaMotors[i].dmaBuffer,
     											(uint32_t)&dmaMotors[i].TimHandle->Instance->CCR1 + dmaMotors[i].Channel,
     											dmaMotors[i].bufferSize);
         }
     }
     for (int i = 0; i < dshotMotorCount; i++) {
+    	motor_update_time_temp[i] = micros();
+
+    	CLEAR_BIT(dmaMotors[i].TimHandle->Instance->CR1, TIM_CR1_ARPE); //TIM_AUTORELOAD_PRELOAD_DISABLE
     	//__HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
       __HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
     }
+
 }
 
 FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)

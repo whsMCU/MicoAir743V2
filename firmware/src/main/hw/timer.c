@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "light_ws2811strip.h"
 #include "fc/dshot_dpwm.h"
+#include "drivers/dshot_shared.h"
 
 TIM_HandleTypeDef htim1;
 DMA_HandleTypeDef hdma_tim1_ch1;
@@ -28,9 +29,8 @@ bool timerInit(void)
 	bool ret = true;
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_OC_InitTypeDef sConfigOC = {0};
-  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
 
   /* USER CODE BEGIN TIM1_Init 1 */
 
@@ -41,7 +41,7 @@ bool timerInit(void)
   htim1.Init.Period = 19;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
@@ -51,17 +51,11 @@ bool timerInit(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  if (HAL_TIM_OC_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
@@ -69,6 +63,12 @@ bool timerInit(void)
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+
+  for(int i = 0; i < 4; i++)
+  {
+  	dmaMotors[i].ocInitStruct = sConfigOC;
+  }
+
   if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
@@ -85,26 +85,24 @@ bool timerInit(void)
   {
     Error_Handler();
   }
-  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
-  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
-  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBreakDeadTimeConfig.BreakFilter = 0;
-  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
-  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
-  sBreakDeadTimeConfig.Break2Filter = 0;
-  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_BOTHEDGE;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 2;
+
+  for(int i = 0; i < 4; i++)
   {
-    Error_Handler();
+  	dmaMotors[i].icInitStruct = sConfigIC;
   }
 
 	/* USER CODE BEGIN TIM4_Init 2 */
 
 	/* USER CODE END TIM4_Init 2 */
 	HAL_TIM_MspPostInit(&htim1);
+
+  __HAL_TIM_MOE_ENABLE(&htim1);
+  __HAL_TIM_ENABLE(&htim1);
 
 
 	////////////////////////////////////////////////////////////////
@@ -266,6 +264,16 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 
     __HAL_LINKDMA(tim_baseHandle,hdma[TIM_DMA_ID_CC4],hdma_tim1_ch4);
 
+    dmaMotors[0].dmaResource = hdma_tim1_ch1.Instance;
+    dmaMotors[1].dmaResource = hdma_tim1_ch2.Instance;
+    dmaMotors[2].dmaResource = hdma_tim1_ch3.Instance;
+    dmaMotors[3].dmaResource = hdma_tim1_ch4.Instance;
+
+    dmaMotors[0].dmaInitStruct = hdma_tim1_ch1.Init;
+    dmaMotors[1].dmaInitStruct = hdma_tim1_ch2.Init;
+    dmaMotors[2].dmaInitStruct = hdma_tim1_ch3.Init;
+    dmaMotors[3].dmaInitStruct = hdma_tim1_ch4.Init;
+
     /* TIM1 interrupt Init */
     HAL_NVIC_SetPriority(TIM1_UP_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(TIM1_UP_IRQn);
@@ -402,8 +410,15 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
     /* Peripheral clock disable */
     __HAL_RCC_TIM1_CLK_DISABLE();
 
+    /* TIM1 DMA DeInit */
+    HAL_DMA_DeInit(tim_baseHandle->hdma[TIM_DMA_ID_CC1]);
+    HAL_DMA_DeInit(tim_baseHandle->hdma[TIM_DMA_ID_CC2]);
+    HAL_DMA_DeInit(tim_baseHandle->hdma[TIM_DMA_ID_CC3]);
+    HAL_DMA_DeInit(tim_baseHandle->hdma[TIM_DMA_ID_CC4]);
+
     /* TIM1 interrupt Deinit */
     HAL_NVIC_DisableIRQ(TIM1_UP_IRQn);
+    HAL_NVIC_DisableIRQ(TIM1_CC_IRQn);
   /* USER CODE BEGIN TIM1_MspDeInit 1 */
 
   /* USER CODE END TIM1_MspDeInit 1 */

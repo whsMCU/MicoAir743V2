@@ -100,6 +100,11 @@ typedef struct motorDmaOutput_s {
     bool configured;
 
     TIM_HandleTypeDef *TimHandle;
+    void *dmaResource;
+    DMA_InitTypeDef dmaInitStruct;
+    TIM_OC_InitTypeDef ocInitStruct;
+		TIM_IC_InitTypeDef icInitStruct;
+
     uint32_t Channel;
     uint16_t outputPeriod;
     uint8_t bufferSize;
@@ -114,13 +119,9 @@ typedef struct motorDmaOutput_s {
     timeDelta_t dshotTelemetryDeadtimeUs;
     uint8_t dmaInputLen;
 
-#ifdef USE_HAL_DRIVER
+
     LL_TIM_OC_InitTypeDef ocInitStruct;
     LL_TIM_IC_InitTypeDef icInitStruct;
-#else
-    TIM_OCInitTypeDef ocInitStruct;
-    TIM_ICInitTypeDef icInitStruct;
-#endif
 
 #endif // USE_DSHOT_TELEMETRY
 
