@@ -72,6 +72,8 @@ void motorConfig_Init(void)
   motorConfig.digitalIdleOffsetValue = 550;
   motorConfig.motorPoleCount = 14;   // Most brushes motors that we use are 14 poles
   motorConfig.motorCount = 4;
+  motorConfig.useDshotTelemetry = true;
+  motorConfig.useDshotEdt = DSHOT_EDT_FORCE;
 }
 
 

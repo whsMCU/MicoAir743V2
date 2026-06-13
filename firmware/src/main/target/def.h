@@ -47,7 +47,9 @@
 #define _DEF_OUTPUT           4
 #define _DEF_OUTPUT_PULLUP    5
 #define _DEF_OUTPUT_PULLDOWN  6
-#define _DEF_INPUT_AF_PP      7
+#define _DEF_OUTPUT_AF_PP      7
+#define _DEF_AVOID_GLITCH      8
+#define _DEF_INPUT_AF_PP      9
 
 
 #define MAX_SUPPORTED_MOTORS 8
@@ -101,6 +103,7 @@
 //#define USE_GYRO_SLEW_LIMITER
 #define USE_LATE_TASK_STATISTICS
 #define USE_DSHOT
+#define USE_DSHOT_TELEMETRY
 
 #define USE_ITCM_RAM
 #define USE_FAST_DATA

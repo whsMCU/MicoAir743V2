@@ -176,13 +176,13 @@ static const dshotTelemetryType_t extendedTelemetryLookup[8] = {
 void initDshotTelemetry(const timeUs_t looptimeUs)
 {
     // if bidirectional DShot is not available
-    if (!motorConfig()->dev.useDshotTelemetry && !featureIsEnabled(FEATURE_ESC_SENSOR)) {
+    if (!motorConfig.useDshotTelemetry && !featureConfigured(FEATURE_ESC_SENSOR)) {
         return;
     }
 
     // erpmToHz is used by bidir dshot and ESC telemetry
-    erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE / (motorConfig()->motorPoleCount / 2.0f);
-    edtAlwaysDecode = motorConfig()->dev.useDshotEdt == DSHOT_EDT_FORCE;
+    erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE / (motorConfig.motorPoleCount / 2.0f);
+    edtAlwaysDecode = motorConfig.useDshotEdt == DSHOT_EDT_FORCE;
 
 #ifdef USE_RPM_FILTER
     if (motorConfig()->dev.useDshotTelemetry) {

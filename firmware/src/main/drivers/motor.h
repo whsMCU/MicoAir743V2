@@ -26,6 +26,30 @@
 #include "common/axis.h"
 #include "drivers/motor_types.h"
 
+//TODO: DMAR is platform specific. This should be moved to platform specific code.
+typedef enum {
+    DSHOT_DMAR_OFF,
+    DSHOT_DMAR_ON,
+    DSHOT_DMAR_AUTO
+} dshotDmar_e;
+
+typedef enum {
+    DSHOT_BITBANG_OFF,
+    DSHOT_BITBANG_ON,
+    DSHOT_BITBANG_AUTO,
+} dshotBitbangMode_e;
+
+typedef enum {
+    DSHOT_TELEMETRY_OFF,
+    DSHOT_TELEMETRY_ON,
+} dshotTelemetry_e;
+
+typedef enum {
+    DSHOT_EDT_OFF = 0,
+    DSHOT_EDT_ON = 1,
+    DSHOT_EDT_FORCE = 2,
+} dshotEdt_e;
+
 typedef struct motorConfig_s {
 		uint8_t  motorProtocol;                 // Pwm Protocol
     uint16_t digitalIdleOffsetValue;        // Idle value for DShot protocol, full motor output = 10000
@@ -34,6 +58,8 @@ typedef struct motorConfig_s {
     uint16_t mincommand;                    // This is the value for the ESCs when they are not armed. In some cases, this value must be lowered down to 900 for some specific ESCs
     uint8_t motorPoleCount;                // Magnetic poles in the motors for calculating actual RPM from eRPM provided by ESC telemetry
     uint8_t motorCount;
+    uint8_t  useDshotTelemetry;
+    uint8_t  useDshotEdt;
 } motorConfig_t;
 
 typedef enum {

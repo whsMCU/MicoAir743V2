@@ -44,38 +44,6 @@
 
 #ifdef USE_DSHOT
 
-#include "drivers/dshot.h"
-#include "dshot_dpwm.h"
-
-extern FAST_DATA_ZERO_INIT uint8_t dmaMotorTimerCount;
-
-extern FAST_DATA_ZERO_INIT motorDmaOutput_t dmaMotors[MAX_SUPPORTED_MOTORS];
-
-uint8_t getTimerIndex(TIM_TypeDef *timer);
-motorDmaOutput_t *getMotorDmaOutput(unsigned index);
-void dshotEnableChannels(unsigned motorCount);
-
-#ifdef USE_DSHOT_TELEMETRY
-void pwmDshotSetDirectionOutput(
-    motorDmaOutput_t * const motor
-#ifndef USE_DSHOT_TELEMETRY
-#if defined(STM32F7) || defined(STM32H7)
-    , LL_TIM_OC_InitTypeDef* pOcInit, LL_DMA_InitTypeDef* pDmaInit
-#else
-    , TIM_OCInitTypeDef *pOcInit, DMA_InitTypeDef* pDmaInit
-#endif
-#endif
-);
-
-void pwmDshotRequestTelemetry(unsigned index);
-bool pwmDshotIsMotorIdle(unsigned index);
-bool pwmTelemetryDecode(void);
-
-#endif
-#endif
-
-#ifdef USE_DSHOT
-
 #include "build/debug.h"
 
 //#include "drivers/dma.h"
@@ -163,7 +131,7 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
             motor->protocolControl.requestTelemetry = true;
         }
     }
-
+    motor->protocolControl.requestTelemetry = true;
     motor->protocolControl.value = value;
 
     uint16_t packet = prepareDshotPacket(&motor->protocolControl);
@@ -194,7 +162,12 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
 
 #ifdef USE_DSHOT_TELEMETRY
 
-void dshotEnableChannels(unsigned motorCount);
+void dshotEnableChannels(unsigned motorCount)
+{
+    for (unsigned i = 0; i < motorCount; i++) {
+    	TIM_CCxChannelCmd(dmaMotors[motorCount].TimHandle->Instance, dmaMotors[motorCount].Channel, TIM_CCx_ENABLE);
+    }
+}
 
 static uint32_t decodeTelemetryPacket(const uint32_t buffer[], uint32_t count)
 {
@@ -268,19 +241,10 @@ FAST_CODE_NOINLINE bool pwmTelemetryDecode(void)
             return false;
         }
         if (dmaMotors[i].isInput) {
-#ifdef USE_FULL_LL_DRIVER
-            uint32_t edges = GCR_TELEMETRY_INPUT_LEN - xLL_EX_DMA_GetDataLength(dmaMotors[i].dmaRef);
-#else
-            uint32_t edges = GCR_TELEMETRY_INPUT_LEN - xDMA_GetCurrDataCounter(dmaMotors[i].dmaRef);
-#endif
 
-#ifdef USE_FULL_LL_DRIVER
-            LL_EX_TIM_DisableIT(dmaMotors[i].timerHardware->tim, dmaMotors[i].timerDmaSource);
-#elif defined(AT32F435)
-            tmr_dma_request_enable(dmaMotors[i].timerHardware->tim, dmaMotors[i].timerDmaSource, FALSE);
-#else
-            TIM_DMACmd(dmaMotors[i].timerHardware->tim, dmaMotors[i].timerDmaSource, DISABLE);
-#endif
+            uint32_t edges = GCR_TELEMETRY_INPUT_LEN - __HAL_DMA_GET_COUNTER(dmaMotors[i].dmaRef);
+
+            __HAL_TIM_DISABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
 
             uint16_t rawValue;
 
