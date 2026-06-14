@@ -48,6 +48,7 @@
 //#include "drivers/vtx_common.h"
 //#include "drivers/vtx_rtc6705.h"
 //#include "drivers/vtx_table.h"
+#include "drivers/dshot.h"
 
 //#include "io/displayport_max7456.h"
 #include "io/ledstrip.h"
@@ -159,6 +160,11 @@ void init(void)
 
 #ifdef USE_ADC_INTERNAL
 	adcInternalInit();
+#endif
+
+#if defined(USE_DSHOT_TELEMETRY) || defined(USE_ESC_SENSOR)
+    // Initialize the motor frequency filter now that we have a target looptime
+    initDshotTelemetry(bmi270.targetLooptime);
 #endif
 
   // Finally initialize the gyro filtering

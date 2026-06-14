@@ -131,7 +131,7 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
             motor->protocolControl.requestTelemetry = true;
         }
     }
-    motor->protocolControl.requestTelemetry = true;
+    //motor->protocolControl.requestTelemetry = true;
     motor->protocolControl.value = value;
 
     uint16_t packet = prepareDshotPacket(&motor->protocolControl);
@@ -165,7 +165,7 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
 void dshotEnableChannels(unsigned motorCount)
 {
     for (unsigned i = 0; i < motorCount; i++) {
-    	TIM_CCxChannelCmd(dmaMotors[motorCount].TimHandle->Instance, dmaMotors[motorCount].Channel, TIM_CCx_ENABLE);
+    	TIM_CCxChannelCmd(dmaMotors[i].TimHandle->Instance, dmaMotors[i].Channel, TIM_CCx_ENABLE);
     }
 }
 
