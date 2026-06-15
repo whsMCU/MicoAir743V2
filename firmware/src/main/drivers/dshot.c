@@ -132,7 +132,7 @@ FAST_CODE uint16_t prepareDshotPacket(dshotProtocolControl_t *pcb)
     // append checksum
 #ifdef USE_DSHOT_TELEMETRY
     if (useDshotTelemetry) {
-        csum = ~csum;
+        //csum = ~csum;
     }
 #endif
     csum &= 0xf;

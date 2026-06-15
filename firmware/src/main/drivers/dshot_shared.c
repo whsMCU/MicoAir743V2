@@ -131,7 +131,7 @@ FAST_CODE void pwmWriteDshotInt(uint8_t index, uint16_t value)
             motor->protocolControl.requestTelemetry = true;
         }
     }
-    //motor->protocolControl.requestTelemetry = true;
+
     motor->protocolControl.value = value;
 
     uint16_t packet = prepareDshotPacket(&motor->protocolControl);

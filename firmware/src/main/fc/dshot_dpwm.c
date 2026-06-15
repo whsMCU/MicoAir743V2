@@ -186,7 +186,7 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
       dmaMotors[motorIndex].Channel = motorIndex * 4;
       dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1]->XferCpltCallback = motor_DMA_IRQHandler;
       dmaMotors[motorIndex].dmaRef = dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1];
-      dmaMotors[motorIndex].io = motorIndex;
+      dmaMotors[motorIndex].io = motorIndex + 3;
       dmaMotors[motorIndex].index = 4 - motorIndex;
       TIM_CCxChannelCmd(dmaMotors[motorIndex].TimHandle->Instance, dmaMotors[motorIndex].Channel, TIM_CCx_ENABLE);
 
@@ -207,6 +207,7 @@ void pwmDshotSetDirectionOutput(
 #endif
 
     HAL_DMA_DeInit(motor->dmaRef);
+    motor->TimHandle->hdma[motor->io - 2]->XferCpltCallback = motor_DMA_IRQHandler;
 
 #ifdef USE_DSHOT_TELEMETRY
     motor->isInput = false;
@@ -220,8 +221,11 @@ void pwmDshotSetDirectionOutput(
 
     motor->dmaRef->Init = *pDmaInit;
     HAL_DMA_Init(motor->dmaRef);
+
     
-    __HAL_LINKDMA(motor->TimHandle, hdma[motor->index + 1], motor->dmaRef);
+    // __HAL_LINKDMA(motor->TimHandle, hdma[motor->index + 1], *motor->dmaRef);
+    //motor->TimHandle->hdma[motor->io - 2] = motor->dmaRef;
+    //motor->dmaRef->Parent = motor->TimHandle;
 
     __HAL_DMA_ENABLE_IT(motor->dmaRef, DMA_IT_TC);
 }
@@ -236,6 +240,7 @@ FAST_CODE static void pwmDshotSetDirectionInput(
     TIM_TypeDef *timer = motor->TimHandle->Instance;
 
     HAL_DMA_DeInit(motor->dmaRef);
+    motor->TimHandle->hdma[motor->io - 2]->XferCpltCallback = motor_DMA_IRQHandler;
 
     motor->isInput = true;
     if (!inputStampUs) {
@@ -247,14 +252,14 @@ FAST_CODE static void pwmDshotSetDirectionInput(
 
 #ifdef STM32H7
     // Configure pin as GPIO output to avoid glitch during timer configuration
-    gpioPinMode(motor->io, _DEF_AVOID_GLITCH);
+    gpioPinMode(motor->io + 3, _DEF_AVOID_GLITCH);
 #endif
 
     HAL_TIM_IC_ConfigChannel(motor->TimHandle, &motor->icInitStruct, motor->Channel);
 
 #ifdef STM32H7
     // Configure pin back to timer
-    gpioPinMode(motor->io, _DEF_INPUT_AF_PP);
+    gpioPinMode(motor->io + 3, _DEF_INPUT_AF_PP);
 #endif
 
     motor->dmaInitStruct.Direction = DMA_PERIPH_TO_MEMORY;
@@ -297,7 +302,6 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
     	//__HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
       __HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
     }
-
 }
 
 FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
@@ -318,10 +322,10 @@ FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 
 		#ifdef USE_DSHOT_TELEMETRY
 								if (useDshotTelemetry) {
-										pwmDshotSetDirectionInput(motor);
-										__HAL_DMA_SET_COUNTER(motor->dmaRef, GCR_TELEMETRY_INPUT_LEN);
-										__HAL_DMA_ENABLE(motor->dmaRef);
-										__HAL_TIM_ENABLE_DMA(motor->TimHandle, 7680);
+//										pwmDshotSetDirectionInput(motor);
+//										__HAL_DMA_SET_COUNTER(motor->dmaRef, GCR_TELEMETRY_INPUT_LEN);
+//										__HAL_DMA_ENABLE(motor->dmaRef);
+//										__HAL_TIM_ENABLE_DMA(motor->TimHandle, 7680);
 										dshotDMAHandlerCycleCounters.changeDirectionCompletedAt = getCycleCounter();
 								}
 						}
