@@ -213,7 +213,7 @@ void pwmDshotSetDirectionOutput(
 #endif
 
     __HAL_TIM_DISABLE_OCxPRELOAD(motor->TimHandle, motor->Channel);
-    HAL_TIM_PWM_ConfigChannel(motor->TimHandle, pOcInit, motor->Channel);
+    HAL_TIM_OC_ConfigChannel(motor->TimHandle, pOcInit, motor->Channel);
     __HAL_TIM_ENABLE_OCxPRELOAD(motor->TimHandle, motor->Channel);
 
     motor->dmaInitStruct.Direction = DMA_MEMORY_TO_PERIPH;
