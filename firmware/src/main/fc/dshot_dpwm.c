@@ -220,6 +220,8 @@ void pwmDshotSetDirectionOutput(
 
     motor->dmaRef->Init = *pDmaInit;
     HAL_DMA_Init(motor->dmaRef);
+    
+    __HAL_LINKDMA(motor->TimHandle, hdma[motor->index + 1], motor->dmaRef);
 
     __HAL_DMA_ENABLE_IT(motor->dmaRef, DMA_IT_TC);
 }
