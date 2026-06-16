@@ -252,14 +252,14 @@ FAST_CODE static void pwmDshotSetDirectionInput(
 
 #ifdef STM32H7
     // Configure pin as GPIO output to avoid glitch during timer configuration
-    gpioPinMode(motor->io + 3, _DEF_AVOID_GLITCH);
+    gpioPinMode(motor->io, _DEF_AVOID_GLITCH);
 #endif
 
     HAL_TIM_IC_ConfigChannel(motor->TimHandle, &motor->icInitStruct, motor->Channel);
 
 #ifdef STM32H7
     // Configure pin back to timer
-    gpioPinMode(motor->io + 3, _DEF_INPUT_AF_PP);
+    gpioPinMode(motor->io, _DEF_INPUT_AF_PP);
 #endif
 
     motor->dmaInitStruct.Direction = DMA_PERIPH_TO_MEMORY;
