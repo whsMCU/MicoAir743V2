@@ -56,6 +56,8 @@ FAST_DATA_ZERO_INIT bool useDshotTelemetry = false;
 
 FAST_DATA_ZERO_INIT loadDmaBufferFn *loadDmaBuffer;
 
+motorProtocolTypes_e pwmProtocolType;
+
 FAST_CODE_NOINLINE uint8_t loadDmaBufferDshot(uint32_t *dmaBuffer, int stride, uint16_t packet)
 {
     int i;
@@ -184,10 +186,14 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
       dmaMotors[motorIndex].dmaBuffer = &dshotDmaBuffer[motorIndex][0];
       dmaMotors[motorIndex].outputPeriod = htim1.Instance->ARR;
       dmaMotors[motorIndex].Channel = motorIndex * 4;
+      dmaMotors[motorIndex].DMA_Channel = 1 << (9 + motorIndex);
       dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1]->XferCpltCallback = motor_DMA_IRQHandler;
       dmaMotors[motorIndex].dmaRef = dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1];
       dmaMotors[motorIndex].io = motorIndex + 3;
       dmaMotors[motorIndex].index = 4 - motorIndex;
+      pwmProtocolType = MOTOR_PROTOCOL_DSHOT600;
+      dmaMotors[motorIndex].dshotTelemetryDeadtimeUs = DSHOT_TELEMETRY_DEADTIME_US + 1000000 *
+          ( 16 * MOTOR_BITLENGTH) / getDshotHz(pwmProtocolType);
       TIM_CCxChannelCmd(dmaMotors[motorIndex].TimHandle->Instance, dmaMotors[motorIndex].Channel, TIM_CCx_ENABLE);
 
     }
@@ -300,14 +306,14 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
 
     	CLEAR_BIT(dmaMotors[i].TimHandle->Instance->CR1, TIM_CR1_ARPE); //TIM_AUTORELOAD_PRELOAD_DISABLE
     	//__HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
-      __HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
+      __HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, dmaMotors[i].DMA_Channel);
     }
 }
 
 FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 {
 		#ifdef USE_DSHOT_TELEMETRY
-						if (!motor->isInput) {
+
 								dshotDMAHandlerCycleCounters.irqAt = getCycleCounter();
 		#endif
 		#ifdef USE_DSHOT_DMAR
@@ -317,18 +323,19 @@ FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 								} else
 		#endif
 								{
+										__HAL_TIM_DISABLE_DMA(motor->TimHandle, motor->DMA_Channel);
 										__HAL_DMA_DISABLE(motor->dmaRef);
 								}
 
 		#ifdef USE_DSHOT_TELEMETRY
 								if (useDshotTelemetry) {
-//										pwmDshotSetDirectionInput(motor);
-//										__HAL_DMA_SET_COUNTER(motor->dmaRef, GCR_TELEMETRY_INPUT_LEN);
-//										__HAL_DMA_ENABLE(motor->dmaRef);
-//										__HAL_TIM_ENABLE_DMA(motor->TimHandle, 7680);
+										//pwmDshotSetDirectionInput(motor);
+
+										HAL_TIM_IC_Start_DMA(motor->TimHandle, motor->Channel,
+																					motor->dmaBuffer, GCR_TELEMETRY_INPUT_LEN);
+
 										dshotDMAHandlerCycleCounters.changeDirectionCompletedAt = getCycleCounter();
 								}
-						}
 		#endif
 }
 
@@ -338,31 +345,35 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 
 	if (hdma == htim->hdma[TIM_DMA_ID_CC1])
 	{
-		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC1);
 		motorDmaOutput_t * const motor = &dmaMotors[0];
-		motor_IRQHandler(motor);
-		motor_update_time[0] = micros()-motor_update_time_temp[0];
+		if (!motor->isInput) {
+			motor_IRQHandler(motor);
+			motor_update_time[0] = micros()-motor_update_time_temp[0];
+		}
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC2])
 	{
-		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC2);
 		motorDmaOutput_t * const motor = &dmaMotors[1];
-		motor_IRQHandler(motor);
-		motor_update_time[1] = micros()-motor_update_time_temp[1];
+		if (!motor->isInput) {
+			motor_IRQHandler(motor);
+			motor_update_time[1] = micros()-motor_update_time_temp[1];
+		}
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC3])
 	{
-		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC3);
 		motorDmaOutput_t * const motor = &dmaMotors[2];
-		motor_IRQHandler(motor);
-		motor_update_time[2] = micros()-motor_update_time_temp[2];
+		if (!motor->isInput) {
+			motor_IRQHandler(motor);
+			motor_update_time[2] = micros()-motor_update_time_temp[2];
+		}
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC4])
 	{
-		__HAL_TIM_DISABLE_DMA(htim, TIM_DMA_CC4);
 		motorDmaOutput_t * const motor = &dmaMotors[3];
-		motor_IRQHandler(motor);
-		motor_update_time[3] = micros()-motor_update_time_temp[3];
+		if (!motor->isInput) {
+			motor_IRQHandler(motor);
+			motor_update_time[3] = micros()-motor_update_time_temp[3];
+		}
 	}
 }
 

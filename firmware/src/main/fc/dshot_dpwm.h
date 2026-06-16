@@ -106,6 +106,7 @@ typedef struct motorDmaOutput_s {
 
 
     uint32_t Channel;
+    uint16_t DMA_Channel;
     uint16_t outputPeriod;
     uint8_t bufferSize;
     uint8_t io;

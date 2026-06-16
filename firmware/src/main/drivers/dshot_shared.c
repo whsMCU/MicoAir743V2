@@ -244,7 +244,7 @@ FAST_CODE_NOINLINE bool pwmTelemetryDecode(void)
 
             uint32_t edges = GCR_TELEMETRY_INPUT_LEN - __HAL_DMA_GET_COUNTER(dmaMotors[i].dmaRef);
 
-            __HAL_TIM_DISABLE_DMA(dmaMotors[i].TimHandle, 1 << (9 + i));
+            __HAL_TIM_DISABLE_DMA(dmaMotors[i].TimHandle, dmaMotors[i].DMA_Channel);
 
             uint16_t rawValue;
 
