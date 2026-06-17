@@ -189,7 +189,7 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
       dmaMotors[motorIndex].DMA_Channel = 1 << (9 + motorIndex);
       dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1]->XferCpltCallback = motor_DMA_IRQHandler;
       dmaMotors[motorIndex].dmaRef = dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1];
-      dmaMotors[motorIndex].io = motorIndex + 3;
+      dmaMotors[motorIndex].io = motorIndex + 2;
       dmaMotors[motorIndex].index = 4 - motorIndex;
       pwmProtocolType = MOTOR_PROTOCOL_DSHOT600;
       dmaMotors[motorIndex].dshotTelemetryDeadtimeUs = DSHOT_TELEMETRY_DEADTIME_US + 1000000 *
@@ -213,7 +213,7 @@ void pwmDshotSetDirectionOutput(
 #endif
 
     HAL_DMA_DeInit(motor->dmaRef);
-    motor->TimHandle->hdma[motor->io - 2]->XferCpltCallback = motor_DMA_IRQHandler;
+    motor->TimHandle->hdma[motor->io - 1]->XferCpltCallback = motor_DMA_IRQHandler;
 
 #ifdef USE_DSHOT_TELEMETRY
     motor->isInput = false;
@@ -230,7 +230,7 @@ void pwmDshotSetDirectionOutput(
 
     
     // __HAL_LINKDMA(motor->TimHandle, hdma[motor->index + 1], *motor->dmaRef);
-    //motor->TimHandle->hdma[motor->io - 2] = motor->dmaRef;
+    //motor->TimHandle->hdma[motor->io - 1] = motor->dmaRef;
     //motor->dmaRef->Parent = motor->TimHandle;
 
     __HAL_DMA_ENABLE_IT(motor->dmaRef, DMA_IT_TC);
@@ -246,7 +246,7 @@ FAST_CODE static void pwmDshotSetDirectionInput(
     TIM_TypeDef *timer = motor->TimHandle->Instance;
 
     HAL_DMA_DeInit(motor->dmaRef);
-    motor->TimHandle->hdma[motor->io - 2]->XferCpltCallback = motor_DMA_IRQHandler;
+    motor->TimHandle->hdma[motor->io - 1]->XferCpltCallback = motor_DMA_IRQHandler;
 
     motor->isInput = true;
     if (!inputStampUs) {
