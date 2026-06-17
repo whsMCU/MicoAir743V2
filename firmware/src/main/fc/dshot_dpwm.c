@@ -252,7 +252,7 @@ FAST_CODE static void pwmDshotSetDirectionInput(
     if (!inputStampUs) {
         inputStampUs = micros();
     }
-    SET_BIT(motor->TimHandle->Instance->CR1, TIM_CR1_ARPE); // Only update the period once all channels are done
+    SET_BIT(timer->CR1, TIM_CR1_ARPE); // Only update the period once all channels are done
 
     timer->ARR = 0xffffffff;
 
@@ -296,6 +296,8 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         } else
 #endif
         {
+        	CLEAR_BIT(dmaMotors[i].TimHandle->Instance->CR1, TIM_CR1_CEN);
+
         	HAL_DMA_Start_IT(dmaMotors[i].TimHandle->hdma[i + 1],	(uint32_t)dmaMotors[i].dmaBuffer,
     											(uint32_t)&dmaMotors[i].TimHandle->Instance->CCR1 + dmaMotors[i].Channel,
     											dmaMotors[i].bufferSize);
@@ -305,9 +307,15 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
     	motor_update_time_temp[i] = micros();
 
     	CLEAR_BIT(dmaMotors[i].TimHandle->Instance->CR1, TIM_CR1_ARPE); //TIM_AUTORELOAD_PRELOAD_DISABLE
-    	//__HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
+    	__HAL_TIM_SET_AUTORELOAD(dmaMotors[i].TimHandle, dmaMotors[i].outputPeriod);
+
+    	/* Reset timer counter */
+    	__HAL_TIM_SET_COUNTER(dmaMotors[i].TimHandle, 0);
+
+    	/* Enable channel DMA requests */
       __HAL_TIM_ENABLE_DMA(dmaMotors[i].TimHandle, dmaMotors[i].DMA_Channel);
     }
+   __HAL_TIM_ENABLE(&htim1);
 }
 
 FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
@@ -329,7 +337,7 @@ FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 
 		#ifdef USE_DSHOT_TELEMETRY
 								if (useDshotTelemetry) {
-										//pwmDshotSetDirectionInput(motor);
+										pwmDshotSetDirectionInput(motor);
 
 										HAL_TIM_IC_Start_DMA(motor->TimHandle, motor->Channel,
 																					motor->dmaBuffer, GCR_TELEMETRY_INPUT_LEN);

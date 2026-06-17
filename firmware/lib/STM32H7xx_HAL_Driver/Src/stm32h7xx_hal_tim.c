@@ -6956,7 +6956,7 @@ void TIM_Base_SetConfig(TIM_TypeDef *TIMx, const TIM_Base_InitTypeDef *Structure
   MODIFY_REG(tmpcr1, TIM_CR1_ARPE, Structure->AutoReloadPreload);
 
   /* Set the Autoreload value */
-  TIMx->ARR = (uint32_t)Structure->Period ;
+  TIMx->ARR = (uint32_t)Structure->Period;
 
   /* Set the Prescaler value */
   TIMx->PSC = Structure->Prescaler;

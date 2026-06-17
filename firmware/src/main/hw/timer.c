@@ -61,7 +61,7 @@ bool timerInit(void)
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_SET;
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
 
   for(int i = 0; i < 4; i++)
@@ -111,6 +111,11 @@ bool timerInit(void)
 
   __HAL_TIM_MOE_ENABLE(&htim1);
   __HAL_TIM_ENABLE(&htim1);
+
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0xffff);
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0xffff);
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0xffff);
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 0xffff);
 
 
 	////////////////////////////////////////////////////////////////
@@ -374,10 +379,12 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
     */
     GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_13|GPIO_PIN_14;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    //HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9|GPIO_PIN_11|GPIO_PIN_13|GPIO_PIN_14, GPIO_PIN_SET);
 
   /* USER CODE BEGIN TIM1_MspPostInit 1 */
 
