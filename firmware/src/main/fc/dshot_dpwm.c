@@ -318,6 +318,8 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
    __HAL_TIM_ENABLE(&htim1);
 }
 
+volatile uint32_t pin_switch_time, pin_switch_time_temp;
+
 FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 {
 		#ifdef USE_DSHOT_TELEMETRY
@@ -337,12 +339,14 @@ FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 
 		#ifdef USE_DSHOT_TELEMETRY
 								if (useDshotTelemetry) {
+									  pin_switch_time_temp = micros();
 										pwmDshotSetDirectionInput(motor);
 
 										HAL_TIM_IC_Start_DMA(motor->TimHandle, motor->Channel,
 																					motor->dmaBuffer, GCR_TELEMETRY_INPUT_LEN);
 
 										dshotDMAHandlerCycleCounters.changeDirectionCompletedAt = getCycleCounter();
+										pin_switch_time = micros()-pin_switch_time_temp;
 								}
 		#endif
 }
