@@ -246,7 +246,6 @@ FAST_CODE static void pwmDshotSetDirectionInput(
     TIM_TypeDef *timer = motor->TimHandle->Instance;
 
     HAL_DMA_DeInit(motor->dmaRef);
-    motor->TimHandle->hdma[motor->io - 1]->XferCpltCallback = motor_DMA_IRQHandler;
 
     motor->isInput = true;
     if (!inputStampUs) {
@@ -258,14 +257,15 @@ FAST_CODE static void pwmDshotSetDirectionInput(
 
 #ifdef STM32H7
     // Configure pin as GPIO output to avoid glitch during timer configuration
-    gpioPinMode(motor->io, _DEF_AVOID_GLITCH);
+    //gpioPinMode_DSHOT(motor->io, _DEF_AVOID_GLITCH);
+
 #endif
 
     HAL_TIM_IC_ConfigChannel(motor->TimHandle, &motor->icInitStruct, motor->Channel);
 
 #ifdef STM32H7
     // Configure pin back to timer
-    gpioPinMode(motor->io, _DEF_INPUT_AF_PP);
+    //gpioPinMode_DSHOT(motor->io, _DEF_INPUT_AF_PP);
 #endif
 
     motor->dmaInitStruct.Direction = DMA_PERIPH_TO_MEMORY;
@@ -318,7 +318,6 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
    __HAL_TIM_ENABLE(&htim1);
 }
 
-volatile uint32_t pin_switch_time, pin_switch_time_temp;
 
 FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 {
@@ -339,14 +338,14 @@ FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 
 		#ifdef USE_DSHOT_TELEMETRY
 								if (useDshotTelemetry) {
-									  pin_switch_time_temp = micros();
 										pwmDshotSetDirectionInput(motor);
+
+									  //motor->TimHandle->State = HAL_TIM_STATE_READY;
 
 										HAL_TIM_IC_Start_DMA(motor->TimHandle, motor->Channel,
 																					motor->dmaBuffer, GCR_TELEMETRY_INPUT_LEN);
 
 										dshotDMAHandlerCycleCounters.changeDirectionCompletedAt = getCycleCounter();
-										pin_switch_time = micros()-pin_switch_time_temp;
 								}
 		#endif
 }
@@ -387,6 +386,27 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 			motor_update_time[3] = micros()-motor_update_time_temp[3];
 		}
 	}
+}
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+	if (htim->Instance == TIM1 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+	{
+		HAL_TIM_IC_Stop_DMA(htim, TIM_CHANNEL_1);
+	}
+	else if(htim->Instance == TIM1 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
+	{
+		HAL_TIM_IC_Stop_DMA(htim, TIM_CHANNEL_2);
+	}
+	else if(htim->Instance == TIM1 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3)
+	{
+		HAL_TIM_IC_Stop_DMA(htim, TIM_CHANNEL_3);
+	}
+	else if(htim->Instance == TIM1 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4)
+	{
+		HAL_TIM_IC_Stop_DMA(htim, TIM_CHANNEL_4);
+	}
+
 }
 
 #endif // USE_DSHOT
