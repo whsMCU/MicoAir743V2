@@ -42,6 +42,7 @@
 #include "drivers/sensor.h"
 #include "drivers/gps/gps.h"
 #include "drivers/motor.h"
+#include "drivers/dshot.h"
 
 #include "flight/pid.h"
 #include "flight/gps_rescue_multirotor.h"
@@ -149,6 +150,10 @@ void taskUpdateOpticalFlow(timeUs_t currentTimeUs)
 
 FAST_CODE void taskFiltering(timeUs_t currentTimeUs)
 {
+		#ifdef USE_DSHOT_TELEMETRY
+				updateDshotTelemetry();  // decode and update Dshot telemetry
+		#endif
+
     gyroFiltering(currentTimeUs);
 
 }

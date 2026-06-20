@@ -132,47 +132,25 @@ bool gpioPinMode(uint8_t ch, uint8_t mode)
       GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
       GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
       break;
-  }
 
-  GPIO_InitStruct.Pin = gpio_tbl[ch].pin;
-  HAL_GPIO_Init(gpio_tbl[ch].port, &GPIO_InitStruct);
-
-  return ret;
-}
-
-bool gpioPinMode_DSHOT(uint8_t ch, uint8_t mode)
-{
-  bool ret = true;
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-
-  if (ch >= GPIO_MAX_CH)
-  {
-    return false;
-  }
-
-  switch(mode)
-  {
     case _DEF_AVOID_GLITCH:
       // Configure pin as GPIO output to avoid glitch during timer configuration
-      GPIO_SetPinMode(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_MODE_OUTPUT);
-      GPIO_SetPinSpeed(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_SPEED_FREQ_LOW); // Needs to be low
-      GPIO_SetPinPull(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_PULL_NO);
-      GPIO_SetPinOutputType(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_OUTPUT_PUSHPULL);
+      GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+      GPIO_InitStruct.Pull = GPIO_NOPULL;
+      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
       break;
 
     case _DEF_INPUT_AF_PP:
       // Configure pin back to timer
-      GPIO_SetPinMode(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_MODE_ALTERNATE);
-      if (gpio_tbl[ch].pin & 0xFF) {
-          GPIO_SetAFPin_0_7(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_AF_1);
-      } else {
-          GPIO_SetAFPin_8_15(gpio_tbl[ch].port, gpio_tbl[ch].pin, LL_GPIO_AF_1);
-      }
+      GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+      GPIO_InitStruct.Pull = GPIO_NOPULL;
+      GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+      GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
       break;
   }
 
   GPIO_InitStruct.Pin = gpio_tbl[ch].pin;
+  HAL_GPIO_Init(gpio_tbl[ch].port, &GPIO_InitStruct);
 
   return ret;
 }

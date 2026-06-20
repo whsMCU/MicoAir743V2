@@ -219,17 +219,16 @@ void pwmDshotSetDirectionOutput(
     motor->isInput = false;
 #endif
 
-    __HAL_TIM_DISABLE_OCxPRELOAD(motor->TimHandle, motor->Channel);
-    HAL_TIM_OC_ConfigChannel(motor->TimHandle, pOcInit, motor->Channel);
-    __HAL_TIM_ENABLE_OCxPRELOAD(motor->TimHandle, motor->Channel);
+    //__HAL_TIM_DISABLE_OCxPRELOAD(motor->TimHandle, motor->Channel);
+    HAL_TIM_PWM_ConfigChannel(motor->TimHandle, pOcInit, motor->Channel);
+    //__HAL_TIM_ENABLE_OCxPRELOAD(motor->TimHandle, motor->Channel);
 
     motor->dmaInitStruct.Direction = DMA_MEMORY_TO_PERIPH;
 
     motor->dmaRef->Init = *pDmaInit;
     HAL_DMA_Init(motor->dmaRef);
 
-    
-    // __HAL_LINKDMA(motor->TimHandle, hdma[motor->index + 1], *motor->dmaRef);
+    __HAL_LINKDMA(motor->TimHandle, hdma[motor->io - 1], *motor->dmaRef);
     //motor->TimHandle->hdma[motor->io - 1] = motor->dmaRef;
     //motor->dmaRef->Parent = motor->TimHandle;
 
@@ -257,7 +256,7 @@ FAST_CODE static void pwmDshotSetDirectionInput(
 
 #ifdef STM32H7
     // Configure pin as GPIO output to avoid glitch during timer configuration
-    //gpioPinMode_DSHOT(motor->io, _DEF_AVOID_GLITCH);
+    //gpioPinMode(motor->io, _DEF_AVOID_GLITCH);
 
 #endif
 
@@ -265,12 +264,19 @@ FAST_CODE static void pwmDshotSetDirectionInput(
 
 #ifdef STM32H7
     // Configure pin back to timer
-    //gpioPinMode_DSHOT(motor->io, _DEF_INPUT_AF_PP);
+    //gpioPinMode(motor->io, _DEF_INPUT_AF_PP);
 #endif
 
     motor->dmaInitStruct.Direction = DMA_PERIPH_TO_MEMORY;
+
     motor->dmaRef->Init = *pDmaInit;
     HAL_DMA_Init(motor->dmaRef);
+
+    __HAL_LINKDMA(motor->TimHandle, hdma[motor->io - 1], *motor->dmaRef);
+
+    motor->TimHandle->hdma[motor->io - 1]->XferCpltCallback = motor_DMA_IRQHandler;
+
+    __HAL_DMA_ENABLE_IT(motor->dmaRef, DMA_IT_TC);
 }
 #endif
 
@@ -340,7 +346,8 @@ FAST_CODE static void motor_IRQHandler(motorDmaOutput_t * const motor)
 								if (useDshotTelemetry) {
 										pwmDshotSetDirectionInput(motor);
 
-									  //motor->TimHandle->State = HAL_TIM_STATE_READY;
+									  motor->TimHandle->ChannelState[motor->io - 2] = HAL_TIM_CHANNEL_STATE_READY;
+									  motor->TimHandle->ChannelNState[motor->io - 2] = HAL_TIM_CHANNEL_STATE_READY;
 
 										HAL_TIM_IC_Start_DMA(motor->TimHandle, motor->Channel,
 																					motor->dmaBuffer, GCR_TELEMETRY_INPUT_LEN);
@@ -406,7 +413,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	{
 		HAL_TIM_IC_Stop_DMA(htim, TIM_CHANNEL_4);
 	}
-
+  //SCB_InvalidateDCache_by_Addr((uint32_t *)dshotDmaBuffer, sizeof(dshotDmaBuffer));
 }
 
 #endif // USE_DSHOT

@@ -379,11 +379,11 @@ bool getDshotSensorData(escSensorData_t *dest, int motorIndex) {
 #if defined(USE_ESC_SENSOR) || defined(USE_DSHOT_TELEMETRY)
 
 // Used with serial esc telem as well as dshot telem
-//float erpmToRpm(uint32_t erpm)
-//{
-//    // rpm = (erpm * ERPM_PER_LSB) / (motorConfig()->motorPoleCount / 2)
-//    return erpm * erpmToHz * SECONDS_PER_MINUTE;
-//}
+float erpmToRpm(uint32_t erpm)
+{
+    // rpm = (erpm * ERPM_PER_LSB) / (motorConfig()->motorPoleCount / 2)
+    return erpm * erpmToHz * SECONDS_PER_MINUTE;
+}
 
 #endif // USE_ESC_SENSOR || USE_DSHOT_TELEMETRY
 
