@@ -131,9 +131,9 @@ void hwInit(void)
 //  flashInit();
   ledInit();
   MX_DMA_Init();
-//  usbInit();
+  //usbInit();
   uartInit();
-//  cliInit();
+  //cliInit();
   i2cInit();
   spiInit();
   adcInit();

@@ -123,6 +123,10 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 /**
   * @}
   */
+uint32_t cdcAvailable(void);
+uint8_t cdcRead(void);
+uint32_t cdcGetBaud(void);
+uint32_t cdcWrite(uint8_t *p_data, uint32_t length);
 
 #ifdef __cplusplus
 }

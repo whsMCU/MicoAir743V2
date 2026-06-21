@@ -273,10 +273,6 @@ FAST_CODE static void pwmDshotSetDirectionInput(
     HAL_DMA_Init(motor->dmaRef);
 
     __HAL_LINKDMA(motor->TimHandle, hdma[motor->io - 1], *motor->dmaRef);
-
-    motor->TimHandle->hdma[motor->io - 1]->XferCpltCallback = motor_DMA_IRQHandler;
-
-    __HAL_DMA_ENABLE_IT(motor->dmaRef, DMA_IT_TC);
 }
 #endif
 
