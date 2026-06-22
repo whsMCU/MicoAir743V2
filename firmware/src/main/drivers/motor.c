@@ -183,9 +183,9 @@ FAST_CODE void motorWriteAll(void)
 	  if(ARMING_FLAG(ARMED))
 	  {
 			motor[R_R] = applyCommand[THROTTLE];
-			motor[R_F] = applyCommand[THROTTLE];
-			motor[L_R] = applyCommand[THROTTLE];
-			motor[L_F] = applyCommand[THROTTLE];
+			motor[R_F] = 0;//applyCommand[THROTTLE];
+			motor[L_R] = 0;//applyCommand[THROTTLE];
+			motor[L_F] = 0;//applyCommand[THROTTLE];
 	  }
 		// Update the motor data
 		for (int i = 0; i < motorDevice.count; i++) {

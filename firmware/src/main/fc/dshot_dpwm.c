@@ -200,6 +200,8 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
     return true;
 }
 
+volatile uint32_t test_time, test_temp_time;
+
 void pwmDshotSetDirectionOutput(
     motorDmaOutput_t * const motor
 #ifndef USE_DSHOT_TELEMETRY
@@ -257,7 +259,6 @@ FAST_CODE static void pwmDshotSetDirectionInput(
 #ifdef STM32H7
     // Configure pin as GPIO output to avoid glitch during timer configuration
     //gpioPinMode(motor->io, _DEF_AVOID_GLITCH);
-
 #endif
 
     HAL_TIM_IC_ConfigChannel(motor->TimHandle, &motor->icInitStruct, motor->Channel);
@@ -303,6 +304,7 @@ FAST_CODE void pwmCompleteDshotMotorUpdate(void)
         	HAL_DMA_Start_IT(dmaMotors[i].TimHandle->hdma[i + 1],	(uint32_t)dmaMotors[i].dmaBuffer,
     											(uint32_t)&dmaMotors[i].TimHandle->Instance->CCR1 + dmaMotors[i].Channel,
     											dmaMotors[i].bufferSize);
+
         }
     }
     for (int i = 0; i < dshotMotorCount; i++) {
@@ -409,7 +411,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	{
 		HAL_TIM_IC_Stop_DMA(htim, TIM_CHANNEL_4);
 	}
-  //SCB_InvalidateDCache_by_Addr((uint32_t *)dshotDmaBuffer, sizeof(dshotDmaBuffer));
+  SCB_InvalidateDCache_by_Addr((uint32_t *)dshotDmaBuffer, sizeof(dshotDmaBuffer));
 }
 
 #endif // USE_DSHOT

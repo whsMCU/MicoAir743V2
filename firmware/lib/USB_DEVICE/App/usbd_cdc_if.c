@@ -34,8 +34,8 @@ USBD_CDC_LineCodingTypeDef LineCoding =
 
 uint32_t rx_in  = 0;
 uint32_t rx_out = 0;
-uint32_t rx_len = 1024;
-uint8_t  rx_buf[1024];
+uint32_t rx_len = 2048;
+uint8_t  rx_buf[2048];
 bool     rx_full = false;
 
 

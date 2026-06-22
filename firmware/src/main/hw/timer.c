@@ -85,14 +85,6 @@ bool timerInit(void)
   {
     Error_Handler();
   }
-//  __HAL_TIM_ENABLE_OCxPRELOAD(&htim1, TIM_CHANNEL_1);
-//  __HAL_TIM_ENABLE_OCxPRELOAD(&htim1, TIM_CHANNEL_2);
-//  __HAL_TIM_ENABLE_OCxPRELOAD(&htim1, TIM_CHANNEL_3);
-//  __HAL_TIM_ENABLE_OCxPRELOAD(&htim1, TIM_CHANNEL_4);
-//  __HAL_TIM_DISABLE_OCxFAST(&htim1, TIM_CHANNEL_1);
-//  __HAL_TIM_DISABLE_OCxFAST(&htim1, TIM_CHANNEL_2);
-//  __HAL_TIM_DISABLE_OCxFAST(&htim1, TIM_CHANNEL_3);
-//  __HAL_TIM_DISABLE_OCxFAST(&htim1, TIM_CHANNEL_4);
 
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_BOTHEDGE;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
@@ -109,13 +101,16 @@ bool timerInit(void)
 	/* USER CODE END TIM4_Init 2 */
 	HAL_TIM_MspPostInit(&htim1);
 
-  __HAL_TIM_MOE_ENABLE(&htim1);
-  __HAL_TIM_ENABLE(&htim1);
-
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0xffff);
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0xffff);
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0xffff);
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 0xffff);
+
+  __HAL_TIM_MOE_ENABLE(&htim1);
+  SET_BIT(htim1.Instance->CR1, TIM_CR1_ARPE); //Enable auto-reload (ARR) preload.
+  __HAL_TIM_ENABLE(&htim1);
+
+
 
 
 	////////////////////////////////////////////////////////////////

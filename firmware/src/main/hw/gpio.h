@@ -28,7 +28,6 @@ void gpioPinWrite(uint8_t ch, bool value);
 bool gpioPinRead(uint8_t ch);
 void gpioPinToggle(uint8_t ch);
 
-
 #endif
 
 #endif /* SRC_COMMON_HW_INCLUDE_GPIO_H_ */
