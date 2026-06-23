@@ -85,6 +85,10 @@
 #define USE_ADC
 //#define USE_OSD
 //#define USE_MAX7456
+
+#define USE_SDCARD
+#define USE_SDCARD_SDIO
+
 #define USE_MOTOR
 #define USE_DMA_RAM
 

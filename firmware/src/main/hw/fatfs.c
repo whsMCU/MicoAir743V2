@@ -9,9 +9,9 @@
 #include "fatfs.h"
 
 #ifdef _USE_HW_FATFS
-#include "ff_gen_drv.h"
-#include "diskio.h"
-#include <drivers/sdcard/sd_diskio.h>
+//#include "ff_gen_drv.h"
+//#include "diskio.h"
+//#include <drivers/sdcard/sd_diskio.h>
 
 #include "ini/iniparser.h"
 

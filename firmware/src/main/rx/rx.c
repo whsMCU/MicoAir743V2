@@ -800,12 +800,12 @@ void processRxModes(uint32_t currentTimeUs)
 
   if(rcData[SF] == 2000)
   {
-    writeSDCard(PID_Roll_in);
-    writeSDCard(PID_Roll_out);
-    writeSDCard(PID_pitch_in);
-    writeSDCard(PID_pitch_out);
-    writeSDCard(PID_yaw_heading);
-    writeSDCard(PID_yaw_rate);
+//    writeSDCard(PID_Roll_in);
+//    writeSDCard(PID_Roll_out);
+//    writeSDCard(PID_pitch_in);
+//    writeSDCard(PID_pitch_out);
+//    writeSDCard(PID_yaw_heading);
+//    writeSDCard(PID_yaw_rate);
   }
 }
 

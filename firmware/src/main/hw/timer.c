@@ -272,15 +272,15 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 
     __HAL_LINKDMA(tim_baseHandle,hdma[TIM_DMA_ID_CC4],hdma_tim1_ch4);
 
-    dmaMotors[0].dmaResource = hdma_tim1_ch1.Instance;
-    dmaMotors[1].dmaResource = hdma_tim1_ch2.Instance;
-    dmaMotors[2].dmaResource = hdma_tim1_ch3.Instance;
-    dmaMotors[3].dmaResource = hdma_tim1_ch4.Instance;
+    dmaMotors[0].dmaResource = hdma_tim1_ch4.Instance;
+    dmaMotors[1].dmaResource = hdma_tim1_ch3.Instance;
+    dmaMotors[2].dmaResource = hdma_tim1_ch2.Instance;
+    dmaMotors[3].dmaResource = hdma_tim1_ch1.Instance;
 
-    dmaMotors[0].dmaInitStruct = hdma_tim1_ch1.Init;
-    dmaMotors[1].dmaInitStruct = hdma_tim1_ch2.Init;
-    dmaMotors[2].dmaInitStruct = hdma_tim1_ch3.Init;
-    dmaMotors[3].dmaInitStruct = hdma_tim1_ch4.Init;
+    dmaMotors[0].dmaInitStruct = hdma_tim1_ch4.Init;
+    dmaMotors[1].dmaInitStruct = hdma_tim1_ch3.Init;
+    dmaMotors[2].dmaInitStruct = hdma_tim1_ch2.Init;
+    dmaMotors[3].dmaInitStruct = hdma_tim1_ch1.Init;
 
     /* TIM1 interrupt Init */
     HAL_NVIC_SetPriority(TIM1_UP_IRQn, 0, 0);

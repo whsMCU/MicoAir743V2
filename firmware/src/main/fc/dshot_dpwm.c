@@ -361,7 +361,7 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 
 	if (hdma == htim->hdma[TIM_DMA_ID_CC1])
 	{
-		motorDmaOutput_t * const motor = &dmaMotors[0];
+		motorDmaOutput_t * const motor = &dmaMotors[3];
 		if (!motor->isInput) {
 			motor_IRQHandler(motor);
 			motor_update_time[0] = micros()-motor_update_time_temp[0];
@@ -369,7 +369,7 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC2])
 	{
-		motorDmaOutput_t * const motor = &dmaMotors[1];
+		motorDmaOutput_t * const motor = &dmaMotors[2];
 		if (!motor->isInput) {
 			motor_IRQHandler(motor);
 			motor_update_time[1] = micros()-motor_update_time_temp[1];
@@ -377,7 +377,7 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC3])
 	{
-		motorDmaOutput_t * const motor = &dmaMotors[2];
+		motorDmaOutput_t * const motor = &dmaMotors[1];
 		if (!motor->isInput) {
 			motor_IRQHandler(motor);
 			motor_update_time[2] = micros()-motor_update_time_temp[2];
@@ -385,7 +385,7 @@ FAST_CODE void motor_DMA_IRQHandler(DMA_HandleTypeDef *hdma)
 	}
 	else if(hdma == htim->hdma[TIM_DMA_ID_CC4])
 	{
-		motorDmaOutput_t * const motor = &dmaMotors[3];
+		motorDmaOutput_t * const motor = &dmaMotors[0];
 		if (!motor->isInput) {
 			motor_IRQHandler(motor);
 			motor_update_time[3] = micros()-motor_update_time_temp[3];

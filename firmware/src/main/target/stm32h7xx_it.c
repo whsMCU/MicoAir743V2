@@ -62,7 +62,7 @@ extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc3;
 extern I2C_HandleTypeDef hi2c1;
 extern I2C_HandleTypeDef hi2c2;
-//extern SD_HandleTypeDef hsd1;
+extern SD_HandleTypeDef hsd1;
 extern DMA_HandleTypeDef hdma_spi3_tx;
 extern DMA_HandleTypeDef hdma_spi3_rx;
 extern SPI_HandleTypeDef hspi3;
@@ -468,7 +468,7 @@ void SDMMC1_IRQHandler(void)
   /* USER CODE BEGIN SDMMC1_IRQn 0 */
 
   /* USER CODE END SDMMC1_IRQn 0 */
-  //HAL_SD_IRQHandler(&hsd1);
+  HAL_SD_IRQHandler(&hsd1);
   /* USER CODE BEGIN SDMMC1_IRQn 1 */
 
   /* USER CODE END SDMMC1_IRQn 1 */

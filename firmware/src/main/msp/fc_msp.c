@@ -261,52 +261,52 @@ static void mspRebootFn(uint8_t ch)
     //fcReboot(false);
 }
 
-static void serializeSDCardSummaryReply(sbuf_t *dst)
-{
-#ifdef USE_SDCARD
-    uint8_t flags = MSP_SDCARD_FLAG_SUPPORTTED;
-    uint8_t state;
-
-    sbufWriteU8(dst, flags);
-
-    // Merge the card and filesystem states together
-    if (!sdcard_isInserted()) {
-        state = MSP_SDCARD_STATE_NOT_PRESENT;
-    } else if (!sdcard_isFunctional()) {
-        state = MSP_SDCARD_STATE_FATAL;
-    } else {
-        switch (afatfs_getFilesystemState()) {
-            case AFATFS_FILESYSTEM_STATE_READY:
-                state = MSP_SDCARD_STATE_READY;
-                break;
-            case AFATFS_FILESYSTEM_STATE_INITIALIZATION:
-                if (sdcard_isInitialized()) {
-                    state = MSP_SDCARD_STATE_FS_INIT;
-                } else {
-                    state = MSP_SDCARD_STATE_CARD_INIT;
-                }
-                break;
-            case AFATFS_FILESYSTEM_STATE_FATAL:
-            case AFATFS_FILESYSTEM_STATE_UNKNOWN:
-            default:
-                state = MSP_SDCARD_STATE_FATAL;
-                break;
-        }
-    }
-
-    sbufWriteU8(dst, state);
-    sbufWriteU8(dst, afatfs_getLastError());
-    // Write free space and total space in kilobytes
-    sbufWriteU32(dst, afatfs_getContiguousFreeSpace() / 1024);
-    sbufWriteU32(dst, sdcard_getMetadata()->numBlocks / 2); // Block size is half a kilobyte
-#else
-    sbufWriteU8(dst, 0);
-    sbufWriteU8(dst, 0);
-    sbufWriteU8(dst, 0);
-    sbufWriteU32(dst, 0);
-    sbufWriteU32(dst, 0);
-#endif
-}
+//static void serializeSDCardSummaryReply(sbuf_t *dst)
+//{
+//#ifdef USE_SDCARD
+//    uint8_t flags = MSP_SDCARD_FLAG_SUPPORTTED;
+//    uint8_t state;
+//
+//    sbufWriteU8(dst, flags);
+//
+//    // Merge the card and filesystem states together
+//    if (!sdcard_isInserted()) {
+//        state = MSP_SDCARD_STATE_NOT_PRESENT;
+//    } else if (!sdcard_isFunctional()) {
+//        state = MSP_SDCARD_STATE_FATAL;
+//    } else {
+//        switch (afatfs_getFilesystemState()) {
+//            case AFATFS_FILESYSTEM_STATE_READY:
+//                state = MSP_SDCARD_STATE_READY;
+//                break;
+//            case AFATFS_FILESYSTEM_STATE_INITIALIZATION:
+//                if (sdcard_isInitialized()) {
+//                    state = MSP_SDCARD_STATE_FS_INIT;
+//                } else {
+//                    state = MSP_SDCARD_STATE_CARD_INIT;
+//                }
+//                break;
+//            case AFATFS_FILESYSTEM_STATE_FATAL:
+//            case AFATFS_FILESYSTEM_STATE_UNKNOWN:
+//            default:
+//                state = MSP_SDCARD_STATE_FATAL;
+//                break;
+//        }
+//    }
+//
+//    sbufWriteU8(dst, state);
+//    sbufWriteU8(dst, afatfs_getLastError());
+//    // Write free space and total space in kilobytes
+//    sbufWriteU32(dst, afatfs_getContiguousFreeSpace() / 1024);
+//    sbufWriteU32(dst, sdcard_getMetadata()->numBlocks / 2); // Block size is half a kilobyte
+//#else
+//    sbufWriteU8(dst, 0);
+//    sbufWriteU8(dst, 0);
+//    sbufWriteU8(dst, 0);
+//    sbufWriteU32(dst, 0);
+//    sbufWriteU32(dst, 0);
+//#endif
+//}
 
 static void serializeDataflashSummaryReply(sbuf_t *dst)
 {
@@ -1207,7 +1207,7 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
         break;
 
     case MSP_SDCARD_SUMMARY:
-        serializeSDCardSummaryReply(dst);
+        //serializeSDCardSummaryReply(dst);
         break;
 
 #if defined (USE_DJI_HD_OSD) || defined (USE_MSP_DISPLAYPORT)
@@ -2386,17 +2386,17 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
     case MSP_SET_INAV_PID:
         if(!ARMING_FLAG(ARMED))
         {
-          writeSDCard(PID_Roll_in);
-          writeSDCard(PID_Roll_out);
-          writeSDCard(PID_pitch_in);
-          writeSDCard(PID_pitch_out);
-          writeSDCard(PID_yaw_heading);
-          writeSDCard(PID_yaw_rate);
-          writeSDCard(ACC_offset);
-          writeSDCard(PID_ALT_in);
-          writeSDCard(PID_ALT_out);
-          writeSDCard(PID_POS_in);
-          writeSDCard(PID_POS_out);
+//          writeSDCard(PID_Roll_in);
+//          writeSDCard(PID_Roll_out);
+//          writeSDCard(PID_pitch_in);
+//          writeSDCard(PID_pitch_out);
+//          writeSDCard(PID_yaw_heading);
+//          writeSDCard(PID_yaw_rate);
+//          writeSDCard(ACC_offset);
+//          writeSDCard(PID_ALT_in);
+//          writeSDCard(PID_ALT_out);
+//          writeSDCard(PID_POS_in);
+//          writeSDCard(PID_POS_out);
         }
         break;
 

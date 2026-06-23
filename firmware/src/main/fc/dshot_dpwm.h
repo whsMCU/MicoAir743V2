@@ -113,12 +113,10 @@ typedef struct motorDmaOutput_s {
 
     uint8_t output;
     uint8_t index;
-    uint32_t iocfg;
 
 #ifdef USE_DSHOT_TELEMETRY
     volatile bool isInput;
     timeDelta_t dshotTelemetryDeadtimeUs;
-    uint8_t dmaInputLen;
 
     TIM_OC_InitTypeDef ocInitStruct;
 		TIM_IC_InitTypeDef icInitStruct;
