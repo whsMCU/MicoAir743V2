@@ -185,11 +185,11 @@ bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig)
     	dmaMotors[motorIndex].configured = true;
       dmaMotors[motorIndex].dmaBuffer = &dshotDmaBuffer[motorIndex][0];
       dmaMotors[motorIndex].outputPeriod = htim1.Instance->ARR;
-      dmaMotors[motorIndex].Channel = motorIndex * 4;
-      dmaMotors[motorIndex].DMA_Channel = 1 << (9 + motorIndex);
-      dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1]->XferCpltCallback = motor_DMA_IRQHandler;
-      dmaMotors[motorIndex].dmaRef = dmaMotors[motorIndex].TimHandle->hdma[motorIndex + 1];
-      dmaMotors[motorIndex].io = motorIndex + 2;
+      dmaMotors[motorIndex].Channel = 12 - (motorIndex * 4);
+      dmaMotors[motorIndex].DMA_Channel = 1 << (12 - motorIndex);
+      dmaMotors[motorIndex].TimHandle->hdma[4 - motorIndex]->XferCpltCallback = motor_DMA_IRQHandler;
+      dmaMotors[motorIndex].dmaRef = dmaMotors[motorIndex].TimHandle->hdma[4 - motorIndex];
+      dmaMotors[motorIndex].io = 5 - motorIndex;
       dmaMotors[motorIndex].index = 4 - motorIndex;
       pwmProtocolType = MOTOR_PROTOCOL_DSHOT600;
       dmaMotors[motorIndex].dshotTelemetryDeadtimeUs = DSHOT_TELEMETRY_DEADTIME_US + 1000000 *
