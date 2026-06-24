@@ -49,7 +49,6 @@
 //#include "drivers/vtx_rtc6705.h"
 //#include "drivers/vtx_table.h"
 #include "drivers/dshot.h"
-#include "drivers/sdcard/sdcard.h"
 
 //#include "io/displayport_max7456.h"
 #include "io/ledstrip.h"
@@ -128,20 +127,11 @@
 
 static void Param_Config_Init(void);
 
-#ifdef USE_SDCARD
-static void sdCardAndFSInit(void)
-{
-    sdcard_init(&sdcardConfig);
-    afatfs_init();
-}
-#endif
-
 void init(void)
 {
   debugMode = DEBUG_NONE;//DEBUG_FLOW;//DEBUG_POS_EST;// DEBUG_NONE; //DEBUG_PIDLOOP
   Param_Config_Init();
 
-  sdCardAndFSInit();
 
 //  bool existing = loadFromSDCard();
 //  if(existing)
@@ -318,7 +308,7 @@ void Param_Config_Init(void)
 //	systemConfig_Init();
 //	pilotConfig_Init();
 	boardConfig_Init();
-	sdcardConfig_Init();
+//	sdcardConfig_Init();
 
 	boardAlignment_Init(0, 0, 0);
 //	failsafeConfig_Init();

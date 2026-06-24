@@ -5,7 +5,6 @@
  *      Author: WANG
  */
 
-#ifdef _USE_HW_FATFS
 
 #include "config/sdcard.h"
 
@@ -891,4 +890,3 @@ bool readSDCard(void)
   return result;
 }
 
-#endif

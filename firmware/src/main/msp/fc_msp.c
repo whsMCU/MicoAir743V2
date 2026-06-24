@@ -2386,17 +2386,17 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
     case MSP_SET_INAV_PID:
         if(!ARMING_FLAG(ARMED))
         {
-//          writeSDCard(PID_Roll_in);
-//          writeSDCard(PID_Roll_out);
-//          writeSDCard(PID_pitch_in);
-//          writeSDCard(PID_pitch_out);
-//          writeSDCard(PID_yaw_heading);
-//          writeSDCard(PID_yaw_rate);
-//          writeSDCard(ACC_offset);
-//          writeSDCard(PID_ALT_in);
-//          writeSDCard(PID_ALT_out);
-//          writeSDCard(PID_POS_in);
-//          writeSDCard(PID_POS_out);
+          writeSDCard(PID_Roll_in);
+          writeSDCard(PID_Roll_out);
+          writeSDCard(PID_pitch_in);
+          writeSDCard(PID_pitch_out);
+          writeSDCard(PID_yaw_heading);
+          writeSDCard(PID_yaw_rate);
+          writeSDCard(ACC_offset);
+          writeSDCard(PID_ALT_in);
+          writeSDCard(PID_ALT_out);
+          writeSDCard(PID_POS_in);
+          writeSDCard(PID_POS_out);
         }
         break;
 

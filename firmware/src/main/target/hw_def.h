@@ -9,11 +9,12 @@
 
 
 #define _USE_HW_SD
-//#define _USE_HW_FATFS
+#define _USE_HW_FATFS
 //#define _USE_HW_FILES
 #define _USE_HW_FLASH
 #define _USE_HW_RTC
-//#define USE_SDCARD
+#define USE_SDCARD
+#define USE_SDCARD_SDIO
 //#define USE_SDCARD_SPI
 
 #define USE_ACCGYRO_BMI270

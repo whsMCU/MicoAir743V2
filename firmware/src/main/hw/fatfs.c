@@ -9,9 +9,9 @@
 #include "fatfs.h"
 
 #ifdef _USE_HW_FATFS
-//#include "ff_gen_drv.h"
-//#include "diskio.h"
-//#include <drivers/sdcard/sd_diskio.h>
+#include "ff_gen_drv.h"
+#include "diskio.h"
+#include <drivers/sdcard/sd_diskio.h>
 
 #include "ini/iniparser.h"
 
@@ -19,6 +19,7 @@ static bool is_init = false;
 
 FATFS SDFatFs;  /* File system object for SD card logical drive */
 char SDPath[4]; /* SD card logical drive path */
+FIL SDFile;       /* File object for SD */
 
 
 #ifdef _USE_HW_CLI
