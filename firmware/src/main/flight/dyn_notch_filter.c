@@ -163,6 +163,16 @@ static FAST_DATA_ZERO_INIT float   pt1LooptimeS;
 
 void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeUs)
 {
+    // dynNotchUpdate() is running at looprateHz (which is the PID looprate aka. 1e6f / gyro.targetLooptime)
+    const float looprateHz = 1.0f / targetLooptimeUs * 1e6f;
+    const float nyquistHz = looprateHz / 2.0f;
+
+    // Disable dynamic notch if dynNotchUpdate() would run at less than 2kHz
+    if (looprateHz < DYN_NOTCH_UPDATE_MIN_HZ) {
+        dynNotch.count = 0;
+        return;
+    }
+
     // always initialise, since the dynamic notch could be activated at any time
     dynNotch.q = config->dyn_notch_q / 100.0f;
     dynNotch.minHz = config->dyn_notch_min_hz;
@@ -171,15 +181,7 @@ void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeU
     dynNotch.looptimeUs = targetLooptimeUs;
     dynNotch.maxCenterFreq = 0;
 
-    // dynNotchUpdate() is running at looprateHz (which is PID looprate aka. 1e6f / gyro.targetLooptime)
-    const float looprateHz = 1.0f / dynNotch.looptimeUs * 1e6f;
-
-    // Disable dynamic notch if dynNotchUpdate() would run at less than 2kHz
-    if (looprateHz < DYN_NOTCH_UPDATE_MIN_HZ) {
-        dynNotch.count = 0;
-    }
-
-    sampleCount = MAX(1, looprateHz / (2 * dynNotch.maxHz)); // 600hz, 8k looptime, 6.00
+    sampleCount = MAX(1, nyquistHz / dynNotch.maxHz); // maxHz = 600 & looprateHz = 8000 -> sampleCount = 6
     sampleCountRcp = 1.0f / sampleCount;
 
     sdftSampleRateHz = looprateHz / sampleCount;
@@ -191,8 +193,8 @@ void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeU
     // the upper limit of DN is always going to be the Nyquist frequency (= sampleRate / 2)
 
     sdftResolutionHz = sdftSampleRateHz / SDFT_SAMPLE_SIZE; // 18.5hz per bin at 8k and 600Hz maxHz
-    sdftStartBin = MAX(2, dynNotch.minHz / sdftResolutionHz + 0.5f); // can't use bin 0 because it is DC.
-    sdftEndBin = MIN(SDFT_BIN_COUNT - 1, dynNotch.maxHz / sdftResolutionHz + 0.5f); // can't use more than SDFT_BIN_COUNT bins.
+    sdftStartBin = MAX(1, lrintf(dynNotch.minHz / sdftResolutionHz)); // can't use bin 0 because it is DC.
+    sdftEndBin = MIN(SDFT_BIN_COUNT - 1, lrintf(dynNotch.maxHz / sdftResolutionHz)); // can't use more than SDFT_BIN_COUNT bins.
     pt1LooptimeS = DYN_NOTCH_CALC_TICKS / looprateHz;
 
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {

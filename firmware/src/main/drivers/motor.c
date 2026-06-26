@@ -163,44 +163,30 @@ FAST_CODE void motorWriteAll(void)
     motor[L_R] = 10500;
     motor[L_F] = 10500;
   }
-  TIM4->CCR1 = motor[R_R];
-  TIM4->CCR2 = motor[R_F];
-  TIM4->CCR3 = motor[L_R];
-  TIM4->CCR4 = motor[L_F];
 
-  if (motorDevice.enabled) {
-		// Perform the decode of the last data received
-		// New data will be received once the send of motor data, triggered above, completes
-	#if defined(USE_DSHOT) && defined(USE_DSHOT_TELEMETRY)
-		if (motorDevice.vTable->decodeTelemetry) {
-				motorDevice.vTable->decodeTelemetry();
-		}
-	#endif
-		motor[R_R] = 0;
-		motor[R_F] = 0;
-		motor[L_R] = 0;
-		motor[L_F] = 0;
-	  if(ARMING_FLAG(ARMED))
-	  {
-			motor[R_R] = applyCommand[THROTTLE];
-			motor[R_F] = applyCommand[THROTTLE];
-			motor[L_R] = applyCommand[THROTTLE];
-			motor[L_F] = applyCommand[THROTTLE];
-	  }
-		// Update the motor data
-		for (int i = 0; i < motorDevice.count; i++) {
-				motorDevice.vTable->write(i, motor[i]);
-		}
+    motor[R_R]  = scaleRangef(motor[R_R], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[R_F]  = scaleRangef(motor[R_F], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[L_R]  = scaleRangef(motor[L_R], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[L_F]  = scaleRangef(motor[L_F], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
 
-		// Trigger the transmission of the motor data
-		motorDevice.vTable->updateComplete();
+    if (motorDevice.enabled) {
+    // Perform the decode of the last data received
+    // New data will be received once the send of motor data, triggered above, completes
+#if defined(USE_DSHOT) && defined(USE_DSHOT_TELEMETRY)
+    if (motorDevice.vTable->decodeTelemetry) {
+            motorDevice.vTable->decodeTelemetry();
+    }
+#endif
+
+    // Update the motor data
+    for (int i = 0; i < motorDevice.count; i++) {
+            motorDevice.vTable->write(i, motor[i]);
+    }
+
+    // Trigger the transmission of the motor data
+    motorDevice.vTable->updateComplete();
   }
 }
-
-//TIM4->CCR1 // RR
-//TIM4->CCR2 // RF
-//TIM4->CCR3 // LR
-//TIM4->CCR4 // LF
 
 void motorRequestTelemetry(unsigned index)
 {
@@ -216,12 +202,8 @@ void motorRequestTelemetry(unsigned index)
 void motorDisable(void)
 {
   motorDevice.vTable->disable();
-	motorDevice.enabled = false;
+  motorDevice.enabled = false;
   motorDevice.motorEnableTimeMs = 0;
-  TIM4->CCR1 = 10500;
-  TIM4->CCR2 = 10500;
-  TIM4->CCR3 = 10500;
-  TIM4->CCR4 = 10500;
 }
 
 void motorEnable(void)

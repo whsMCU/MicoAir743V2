@@ -468,6 +468,8 @@ void taskAccUpdate(timeUs_t currentTimeUs)
   const timeDelta_t deltaT = currentTimeUs - previousIMUUpdateTime;
   previousIMUUpdateTime = currentTimeUs;
 
+
+
 	UNUSED(currentTimeUs);
 	if (!bmi270SpiAccRead(&bmi270)) {
 			return;
@@ -500,12 +502,17 @@ void taskAccUpdate(timeUs_t currentTimeUs)
   DEBUG_SET(DEBUG_ACCELEROMETER, 5, (bmi270.accADC[Y]));
   DEBUG_SET(DEBUG_ACCELEROMETER, 6, (bmi270.accADC[Z]));
 
+  static vector3_t accAdcPrev;
   vector3_t accADC;
-  accADC.x = bmi270.accADC[X];
-  accADC.y = bmi270.accADC[Y];
-  accADC.z = bmi270.accADC[Z];
+
+  for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+    accADC.v[axis] = bmi270.accADC[axis];
+    bmi270.jerk.v[axis] = (bmi270.accADC[axis] - accAdcPrev.v[axis]) * bmi270.sampleRateHz;
+    accAdcPrev.v[axis] = bmi270.accADC[axis];
+  }
 
   bmi270.accMagnitude = vector3Norm(&accADC) * bmi270.acc_1G_rec;
+  bmi270.jerkMagnitude = vector3Norm(&bmi270.jerk) * bmi270.acc_1G_rec;
 
   // Calculate acceleration readings in G's
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {

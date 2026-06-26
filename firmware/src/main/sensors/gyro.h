@@ -149,7 +149,9 @@ typedef struct gyro_s {
     acc_extremes_t extremes[XYZ_AXIS_COUNT];
     float maxG;
 
+    vector3_t jerk;
     float accMagnitude;                     // in multiples of 1G
+    float jerkMagnitude;                    // in multiples of 1G/s (measure of collision strength)
 
     uint16_t acc_lpf_hz;                    // cutoff frequency for the low pass filter used on the acc z-axis for althold in Hz
     uint16_t accLpfCutHz;
