@@ -165,11 +165,6 @@ FAST_CODE void motorWriteAll(void)
     motor[L_F] = 10500;
   }
 
-    motor[R_R]  = (motor[R_R] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[R_R], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-    motor[R_F]  = (motor[R_F] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[R_F], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-    motor[L_R]  = (motor[L_R] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[L_R], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-    motor[L_F]  = (motor[L_F] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[L_F], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-
     if (motorDevice.enabled) {
     // Perform the decode of the last data received
     // New data will be received once the send of motor data, triggered above, completes
@@ -181,7 +176,8 @@ FAST_CODE void motorWriteAll(void)
 
     // Update the motor data
     for (int i = 0; i < motorDevice.count; i++) {
-            motorDevice.vTable->write(i, motor[i]);
+    	motor[i] = (motor[i] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[i], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+      motorDevice.vTable->write(i, motor[i]);
     }
 
     // Trigger the transmission of the motor data

@@ -97,17 +97,6 @@ int main(void)
 
   hwInit();
 
-//  TIM4->CCR1 = 21000;
-//  TIM4->CCR2 = 21000;
-//  TIM4->CCR3 = 21000;
-//  TIM4->CCR4 = 21000;
-//  HAL_Delay(7000);
-//  TIM4->CCR1 = 10500;
-//  TIM4->CCR2 = 10500;
-//  TIM4->CCR3 = 10500;
-//  TIM4->CCR4 = 10500;
-//  HAL_Delay(8000);
-
   init();
 
   run();
