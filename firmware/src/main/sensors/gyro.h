@@ -24,6 +24,7 @@
 #include "common/filter.h"
 #include "common/time.h"
 #include "common/utils.h"
+#include "common/vector.h"
 
 #include "flight/dyn_notch_filter.h"
 

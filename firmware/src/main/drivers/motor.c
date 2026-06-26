@@ -35,6 +35,7 @@
 
 #include "drivers/dshot.h"
 #include "drivers/motor.h"
+#include "drivers/dshot_command.h"
 
 #include "rx/rx.h"
 
@@ -164,10 +165,10 @@ FAST_CODE void motorWriteAll(void)
     motor[L_F] = 10500;
   }
 
-    motor[R_R]  = scaleRangef(motor[R_R], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-    motor[R_F]  = scaleRangef(motor[R_F], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-    motor[L_R]  = scaleRangef(motor[L_R], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-    motor[L_F]  = scaleRangef(motor[L_F], 10500, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[R_R]  = (motor[R_R] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[R_R], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[R_F]  = (motor[R_F] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[R_F], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[L_R]  = (motor[L_R] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[L_R], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    motor[L_F]  = (motor[L_F] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[L_F], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
 
     if (motorDevice.enabled) {
     // Perform the decode of the last data received

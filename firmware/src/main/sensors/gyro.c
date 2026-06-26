@@ -30,7 +30,6 @@
 #include "common/maths.h"
 #include "common/filter.h"
 #include "common/sensor_alignment.h"
-#include "common/vector.h"
 
 //#include "config/feature.h"
 //#include "config/config.h"

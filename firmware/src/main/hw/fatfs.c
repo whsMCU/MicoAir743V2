@@ -262,8 +262,6 @@ void cliFatfs(cli_args_t *args)
       f_close(&ini_file);
 
       parse_ini_file("cfg.ini");
-
-      //f_close(&ini_file);
     }
     else
     {

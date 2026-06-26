@@ -354,7 +354,6 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
     }
   }
 
-	applyCommand[THROTTLE]  = (rcCommand[THROTTLE] == PWM_RANGE_MIN) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(rcCommand[THROTTLE], PWM_RANGE_MIN + 1, PWM_RANGE_MAX, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
   motorWriteAll();
 
 #if defined(USE_GPS) || defined(USE_MAG)
