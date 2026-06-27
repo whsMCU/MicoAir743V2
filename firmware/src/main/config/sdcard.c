@@ -588,7 +588,7 @@ static bool write_ini_pos_in(const char * ini_name)
   dictionary = iniparser_load(ini_name);
   if (!dictionary) {
       fprintf(stderr, "cannot parse file: %s\n", ini_name);
-      return -1 ;
+      return -2 ;
   }
 
   /* set key/value pair */
@@ -596,7 +596,7 @@ static bool write_ini_pos_in(const char * ini_name)
   ret = iniparser_set(dictionary, "pid:pos.in.kp", str);
   if (ret < 0) {
       fprintf(stderr, "cannot set key/value in: %s\n", ini_name);
-      ret = -1;
+      ret = -3;
       goto free_dict;
   }
 
@@ -604,7 +604,7 @@ static bool write_ini_pos_in(const char * ini_name)
   ret = iniparser_set(dictionary, "pid:pos.in.ki", str);
   if (ret < 0) {
       fprintf(stderr, "cannot set key/value in: %s\n", ini_name);
-      ret = -1;
+      ret = -4;
       goto free_dict;
   }
 
@@ -612,7 +612,7 @@ static bool write_ini_pos_in(const char * ini_name)
   ret = iniparser_set(dictionary, "pid:pos.in.kd", str);
   if (ret < 0) {
       fprintf(stderr, "cannot set key/value in: %s\n", ini_name);
-      ret = -1;
+      ret = -5;
       goto free_dict;
   }
 
@@ -620,7 +620,7 @@ static bool write_ini_pos_in(const char * ini_name)
 
   if (fp_ret != FR_OK) {
       fprintf(stderr, "iniparser: cannot create example.ini\n");
-      ret = -1;
+      ret = -6;
       goto free_dict;
   }
 
