@@ -2400,14 +2400,6 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
         }
         break;
 
-    case MSP_TEST_PID:
-        {
-          _PID_Test.pid_test_flag = (uint8_t)sbufReadU8(src);
-          _PID_Test.pid_test_throttle = (int)sbufReadU32(src);
-          _PID_Test.pid_test_deg = (int)sbufReadU32(src);
-        }
-        break;
-
     case MSP_SET_SENSOR_CONFIG:
 //        if (dataSize == 6) {
 //            accelerometerConfigMutable()->acc_hardware = sbufReadU8(src);

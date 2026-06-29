@@ -136,7 +136,14 @@ void init(void)
   bool existing = loadFromSDCard();
   if(existing)
   {
-    readSDCard();
+  	for(int i = 0; i < 5; i++)
+  	{
+			if(readSDCard())
+			{
+				break;
+			}
+			delay(100);
+  	}
   }
 
   activeAdjustmentRangeReset();

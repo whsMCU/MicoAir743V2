@@ -134,7 +134,7 @@ FAST_CODE void motorWriteAll(void)
   {
     if(failsafeFlags == 0)
     {
-      if(rcData[THROTTLE] > 1030 || _PID_Test.pid_test_flag == 1)
+      if(rcData[THROTTLE] > 1030)
       {
         motor[R_R] = RR > 21000 ? 21000 : RR < 11000 ? 11000 : RR;
         motor[R_F] = RF > 21000 ? 21000 : RF < 11000 ? 11000 : RF;

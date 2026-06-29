@@ -67,8 +67,6 @@ FAST_DATA_ZERO_INIT DoublePID _POS;
 FAST_DATA_ZERO_INIT PID _YAW_Heading;
 FAST_DATA_ZERO_INIT PID _YAW_Rate;
 
-FAST_DATA_ZERO_INIT PID_Test _PID_Test;
-
 int16_t headFreeModeHold;
 static float headingHoldCosZLimit;
 static FAST_DATA_ZERO_INIT int16_t headingHoldTarget;
@@ -141,10 +139,6 @@ void pidInit(void)
   _POS.out.ki = 0;
   _POS.out.kd = 0;
   _POS.out.integral_windup = 300;
-
-  _PID_Test.pid_test_flag = 0;
-  _PID_Test.pid_test_throttle = 0;
-  _PID_Test.pid_test_deg = 0;
 }
 
 void PID_Calculation(PID* axis, float set_point, float measured1, float measured2, float dt)
@@ -293,13 +287,8 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
   PID_Calculation(&_ROLL.out, applyCommand[ROLL], imu_roll, bmi270.gyroADCf[X], dT);
   PID_Calculation(&_ROLL.in, _ROLL.out.result, bmi270.gyroADCf[X], 0, dT);
 
-  if(_PID_Test.pid_test_flag == 1)
-  {
-    PID_Calculation(&_PITCH.out, _PID_Test.pid_test_deg, imu_pitch, bmi270.gyroADCf[Y], dT);
-  }else
-  {
-    PID_Calculation(&_PITCH.out, applyCommand[PITCH], imu_pitch, bmi270.gyroADCf[Y], dT);
-  }
+
+  PID_Calculation(&_PITCH.out, applyCommand[PITCH], imu_pitch, bmi270.gyroADCf[Y], dT);
   PID_Calculation(&_PITCH.in, _PITCH.out.result, bmi270.gyroADCf[Y], 0, dT);
 
 //  DEBUG_SET(DEBUG_PIDLOOP, 0, (_PID_Test.pid_test_deg));
@@ -311,7 +300,7 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
 //  DEBUG_SET(DEBUG_PIDLOOP, 6, (bmi270.gyroADCf[Y]));
 //  DEBUG_SET(DEBUG_PIDLOOP, 7, (_PITCH.in.error));
 
-  if((rcData[THROTTLE] < 1030 || !ARMING_FLAG(ARMED))&& _PID_Test.pid_test_flag == 0)
+  if((rcData[THROTTLE] < 1030 || !ARMING_FLAG(ARMED)))
   {
 	  Reset_All_PID_Integrator();
   }
@@ -339,19 +328,10 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
 //    DEBUG_SET(DEBUG_PIDLOOP, 5, (_YAW_Heading.result_d));
 //	  DEBUG_SET(DEBUG_PIDLOOP, 6, (_YAW_Heading.result));
 
-    if(_PID_Test.pid_test_flag == 1)
-    {
-      LF = 10500 + 500 + (_PID_Test.pid_test_throttle - 1000) * 10 - _PITCH.in.result + _ROLL.in.result - _YAW_Heading.result;
-      LR = 10500 + 500 + (_PID_Test.pid_test_throttle - 1000) * 10 + _PITCH.in.result + _ROLL.in.result + _YAW_Heading.result;
-      RR = 10500 + 500 + (_PID_Test.pid_test_throttle - 1000) * 10 + _PITCH.in.result - _ROLL.in.result - _YAW_Heading.result;
-      RF = 10500 + 500 + (_PID_Test.pid_test_throttle - 1000) * 10 - _PITCH.in.result - _ROLL.in.result + _YAW_Heading.result;
-    }else
-    {
-      LF = 10500 + 500 + applyCommand[THROTTLE] * 10 - _PITCH.in.result + _ROLL.in.result - _YAW_Heading.result;
-      LR = 10500 + 500 + applyCommand[THROTTLE] * 10 + _PITCH.in.result + _ROLL.in.result + _YAW_Heading.result;
-      RR = 10500 + 500 + applyCommand[THROTTLE] * 10 + _PITCH.in.result - _ROLL.in.result - _YAW_Heading.result;
-      RF = 10500 + 500 + applyCommand[THROTTLE] * 10 - _PITCH.in.result - _ROLL.in.result + _YAW_Heading.result;
-    }
+		LF = 10500 + 500 + applyCommand[THROTTLE] * 10 - _PITCH.in.result + _ROLL.in.result - _YAW_Heading.result;
+		LR = 10500 + 500 + applyCommand[THROTTLE] * 10 + _PITCH.in.result + _ROLL.in.result + _YAW_Heading.result;
+		RR = 10500 + 500 + applyCommand[THROTTLE] * 10 + _PITCH.in.result - _ROLL.in.result - _YAW_Heading.result;
+		RF = 10500 + 500 + applyCommand[THROTTLE] * 10 - _PITCH.in.result - _ROLL.in.result + _YAW_Heading.result;
   }
 
   motorWriteAll();

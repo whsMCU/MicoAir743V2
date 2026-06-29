@@ -51,17 +51,8 @@ namespace SpeedyBeeF405V3S_GUI
         bool mag_cal_remain_time_flag = false;
         bool RP_Coupling = true;
         int mag_cal_remain_time = 0;
-        bool pid_test_flag = false;
-        bool pid_test_flag_temp = false;
-        bool pid_test_request_flag = false;
         bool debug_flag = false;
         int debugValue = 0;
-        int pid_test_time = 0;
-        int pid_test_setting_time_temp = 0;
-        int pid_test_setting_deg_temp = 0;
-        int pid_test_setting_time = 0;
-        int pid_test_setting_deg = 0;
-        int pid_test_setting_throttle = 0;
 
         double lat = 35.1965882;
         double lng = 126.8295163;
@@ -654,8 +645,6 @@ namespace SpeedyBeeF405V3S_GUI
             }
         }
 
-        pidState_e pidState = pidState_e.TEST_IDLE;
-
         private void OnTimedEvent(object source, ElapsedEventArgs e)
         {
             //stopwatch.Stop();
@@ -978,285 +967,6 @@ namespace SpeedyBeeF405V3S_GUI
                     //Console.WriteLine("지자계 캘리브레이션 명령 전송 완료");
                 }
                 catch { Console.WriteLine("MAG Calibration Requset Error"); }
-            }
-
-            if (pid_test_flag == true)
-            {
-                if (pid_test_request_flag == true)
-                {
-                    byte[] pid_buff = new byte[9];
-                    byte[] tmp = new byte[4];
-                    pid_test_request_flag = false;
-                    drone_status_flag = true;
-                    try
-                    {
-                        pid_buff[0] = Convert.ToByte(pid_test_flag_temp);
-
-                        tmp = BitConverter.GetBytes(pid_test_setting_throttle);
-                        pid_buff[1] = tmp[0];
-                        pid_buff[2] = tmp[1];
-                        pid_buff[3] = tmp[2];
-                        pid_buff[4] = tmp[3];
-
-                        tmp = BitConverter.GetBytes(pid_test_setting_deg_temp);
-                        pid_buff[5] = tmp[0];
-                        pid_buff[6] = tmp[1];
-                        pid_buff[7] = tmp[2];
-                        pid_buff[8] = tmp[3];
-
-                        mspProtocol.SendMspCommand(8, pid_buff);
-
-                        //Console.WriteLine($"PID 테스트 Step flag : {pid_test_flag_temp}, throttle : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp} 신호 전송");
-                    }
-                    catch { Console.WriteLine("PID 테스트 Step1 Signal Requset Error"); }
-                }
-
-            }
-
-            if (pid_test_flag == true)
-            {
-                pid_test_time++;
-                this.BeginInvoke((MethodInvoker)delegate
-                {
-                    lb_PID_Test_Status.Text = "PID_Control_Testing...";
-                    lb_PID_Test_Progress_Time.Text = (pid_test_time * 50).ToString();
-                    lb_PID_Test_Target_Time.Text = (pid_test_setting_time_temp * 50).ToString();
-                });
-                switch (pidState)
-                {
-                    case pidState_e.TEST_IDLE:
-                        this.BeginInvoke((MethodInvoker)delegate
-                        {
-                            tb_PID_ms.Enabled = false;
-                            tb_PID_Deg.Enabled = false;
-                            tb_PID_Throttle.Enabled = false;
-                        });
-                        pid_test_time = 0;
-                        pid_test_setting_time = int.Parse(tb_PID_ms.Text) / 50;
-                        pid_test_setting_time_temp = pid_test_setting_time;
-                        pid_test_setting_deg = int.Parse(tb_PID_Deg.Text);
-                        pid_test_setting_deg_temp = 0;
-                        pid_test_setting_throttle = int.Parse(tb_PID_Throttle.Text);
-                        pid_test_flag_temp = pid_test_flag;
-                        pid_test_request_flag = true;
-
-                        this.BeginInvoke((MethodInvoker)delegate
-                        {
-                            lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 0";
-                        });
-
-                        //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 0");
-                        pidState = pidState_e.TEST_Step1;
-                        break;
-
-                    case pidState_e.TEST_Step1:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_deg_temp = pid_test_setting_deg;
-                            pid_test_request_flag = true;
-                            temp = DateTime.Now;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 1";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 1");
-                            pidState = pidState_e.TEST_Step2;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step2:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_deg_temp = 0;
-                            pid_test_request_flag = true;
-                            end = DateTime.Now;
-                            Console.WriteLine($"DT: {(end - temp).TotalMilliseconds}");
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 2";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 2");
-                            pidState = pidState_e.TEST_Step3;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step3:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_deg_temp = -pid_test_setting_deg;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 3";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 3");
-                            pidState = pidState_e.TEST_Step4;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step4:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_deg_temp = 0;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 4";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 4");
-                            pidState = pidState_e.TEST_Step5;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step5:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time / 50;
-                            pid_test_setting_deg_temp = pid_test_setting_deg;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 5";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 5");
-                            pidState = pidState_e.TEST_Step6;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step6:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_deg_temp = 0;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 6";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 6");
-                            pidState = pidState_e.TEST_Step7;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step7:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time / 50;
-                            pid_test_setting_deg_temp = -pid_test_setting_deg;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 7";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 7");
-                            pidState = pidState_e.TEST_Step8;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step8:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_deg_temp = 0;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 8";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 8");
-                            pidState = pidState_e.TEST_Step9;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step9:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_time_temp += pid_test_setting_time;
-                            pid_test_setting_throttle = 0;
-                            pid_test_setting_deg_temp = 0;
-                            pid_test_flag_temp = false;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 9";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 9");
-                            pidState = pidState_e.TEST_Step10;
-                        }
-                        break;
-
-                    case pidState_e.TEST_Step10:
-                        if (pid_test_time >= pid_test_setting_time_temp)
-                        {
-                            pid_test_setting_throttle = 0;
-                            pid_test_setting_deg_temp = 0;
-                            pid_test_flag_temp = false;
-                            pid_test_request_flag = true;
-
-                            this.BeginInvoke((MethodInvoker)delegate
-                            {
-                                lb_PID_Test_Progress.Text = $"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 10";
-                            });
-
-                            //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : 10");
-                            pidState = pidState_e.TEST_FINISH;
-                        }
-                        break;
-
-                    case pidState_e.TEST_FINISH:
-                        this.BeginInvoke((MethodInvoker)delegate
-                        {
-                            tb_PID_ms.Enabled = true;
-                            tb_PID_Deg.Enabled = true;
-                            tb_PID_Throttle.Enabled = true;
-                        });
-
-                        pid_test_flag = false;
-                        pid_test_time = 0;
-                        pid_test_setting_time_temp = 0;
-                        pid_test_request_flag = false;
-
-                        this.BeginInvoke((MethodInvoker)delegate
-                        {
-                            lb_PID_Test_Status.Text = "PID_Control_Testing_Finished!";
-                        });
-
-                        //Console.WriteLine($"Thr : {pid_test_setting_throttle}, Deg : {pid_test_setting_deg_temp}, Step : FINISH");
-                        pidState = pidState_e.TEST_IDLE;
-                        break;
-
-                    default:
-                        tb_PID_ms.Enabled = true;
-                        tb_PID_Deg.Enabled = true;
-                        tb_PID_Throttle.Enabled = true;
-                        pid_test_flag = false;
-                        pid_test_time = 0;
-                        pid_test_setting_time_temp = 0;
-                        pid_test_request_flag = false;
-                        pidState = pidState_e.TEST_IDLE;
-                        break;
-                }
             }
         }
 
@@ -2265,8 +1975,6 @@ namespace SpeedyBeeF405V3S_GUI
 
             PID_log_filePath = Path.Combine(folderPath, fileName);
             InitLogger(PID_log_filePath);
-
-            pid_test_flag = true;
         }
 
         private void cb_record_CheckedChanged(object sender, EventArgs e)
@@ -2463,14 +2171,9 @@ namespace SpeedyBeeF405V3S_GUI
 
             if (rb_pitch_setpoint.Checked == true)
             {
-                if (pid_test_flag == true)
-                {
-                    _rc_pitch_points.Add(time_count + 150, pid_test_setting_deg_temp);
-                }
-                else
-                {
-                    _rc_pitch_points.Add(time_count + 150, passed_data[5] / 10);
-                }
+
+                _rc_pitch_points.Add(time_count + 150, passed_data[5] / 10);
+                
                 _pitch_angle_points.Add(time_count + 150, passed_data[1] / 10);
                 if (_rc_pitch_points.Count > 1000)
                 {
