@@ -2387,15 +2387,25 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
         if(!ARMING_FLAG(ARMED))
         {
           writeSDCard(PID_Roll_in);
+          delay(1);
           writeSDCard(PID_Roll_out);
+          delay(1);
           writeSDCard(PID_pitch_in);
+          delay(1);
           writeSDCard(PID_pitch_out);
+          delay(1);
           writeSDCard(PID_yaw_heading);
+          delay(1);
           writeSDCard(PID_yaw_rate);
+          delay(1);
           writeSDCard(ACC_offset);
+          delay(1);
           writeSDCard(PID_ALT_in);
+          delay(1);
           writeSDCard(PID_ALT_out);
+          delay(1);
           writeSDCard(PID_POS_in);
+          delay(1);
           writeSDCard(PID_POS_out);
         }
         break;

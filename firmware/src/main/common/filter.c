@@ -32,6 +32,10 @@
 
 #define BIQUAD_Q 1.0f / sqrtf(2.0f)     /* quality factor - 2nd order butterworth*/
 
+// PTn cutoff correction = 1 / sqrt(2^(1/n) - 1)
+#define CUTOFF_CORRECTION_PT2 1.553773974f
+#define CUTOFF_CORRECTION_PT3 1.961459177f
+
 // NULL filter
 
 FAST_CODE float nullFilterApply(filter_t *filter, float input)
@@ -104,17 +108,8 @@ float pt1FilterGetLastOutput(pt1Filter3_t *filter) {
 
 float pt2FilterGain(float f_cut, float dT)
 {
-    const float order = 2.0f;
-    const float orderCutoffCorrection = 1 / sqrtf(powf(2, 1.0f / order) - 1);
-    float RC = 1 / (2 * orderCutoffCorrection * M_PIf * f_cut);
-    // float RC = 1 / (2 * 1.553773974f * M_PIf * f_cut);
-    // where 1.553773974 = 1 / sqrt( (2^(1 / order) - 1) ) and order is 2
-    return dT / (RC + dT);
-//    // PTn cutoff correction = 1 / sqrt(2^(1/n) - 1)
-//    #define CUTOFF_CORRECTION_PT2 1.553773974f
-//
-//    // shift f_cut to satisfy -3dB cutoff condition
-//    return pt1FilterGain(f_cut * CUTOFF_CORRECTION_PT2, dT);
+    // shift f_cut to satisfy -3dB cutoff condition
+    return pt1FilterGain(f_cut * CUTOFF_CORRECTION_PT2, dT);
 }
 
 void pt2FilterInit(pt2Filter_t *filter, float k)

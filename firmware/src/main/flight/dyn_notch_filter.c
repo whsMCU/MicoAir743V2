@@ -176,7 +176,8 @@ void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeU
     // always initialise, since the dynamic notch could be activated at any time
     dynNotch.q = config->dyn_notch_q / 100.0f;
     dynNotch.minHz = config->dyn_notch_min_hz;
-    dynNotch.maxHz = MAX(2 * dynNotch.minHz, config->dyn_notch_max_hz);
+    dynNotch.maxHz = MAX(dynNotch.minHz, config->dyn_notch_max_hz);
+    dynNotch.maxHz = MIN(dynNotch.maxHz, nyquistHz); // Ensure to not go above the nyquist limit
     dynNotch.count = config->dyn_notch_count;
     dynNotch.looptimeUs = targetLooptimeUs;
     dynNotch.maxCenterFreq = 0;
@@ -185,12 +186,12 @@ void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeU
     sampleCountRcp = 1.0f / sampleCount;
 
     sdftSampleRateHz = looprateHz / sampleCount;
-    // eg 8k, user max 600hz, int(8000/1200) = 6 (6.666), sdftSampleRateHz = 1333hz, range 666Hz
-    // eg 4k, user max 600hz, int(4000/1200) = 3 (3.333), sdftSampleRateHz = 1333hz, range 666Hz
-    // eg 2k, user max 600hz, int(2000/1200) = 1 (1.666) sdftSampleRateHz = 2000hz, range 1000Hz
-    // eg 2k, user max 400hz, int(2000/800) = 2 (2.5) sdftSampleRateHz = 1000hz, range 500Hz
-    // eg 1k, user max 600hz, int(1000/1200) = 1 (max(1,0.8333)) sdftSampleRateHz = 1000hz, range 500Hz
-    // the upper limit of DN is always going to be the Nyquist frequency (= sampleRate / 2)
+    // eg 8k, user max 600hz, int(4000/600) = 6 (6.666), sdftSampleRateHz = 1333hz, range 666Hz
+    // eg 4k, user max 600hz, int(2000/600) = 3 (3.333), sdftSampleRateHz = 1333hz, range 666Hz
+    // eg 2k, user max 600hz, int(1000/600) = 1 (1.666)  sdftSampleRateHz = 2000hz, range 1000Hz
+    // eg 2k, user max 400hz, int(1000/400) = 2 (2.5)    sdftSampleRateHz = 1000hz, range 500Hz
+    // eg 1k, user max 600hz, int(500/500)  = 1 (1.0)    sdftSampleRateHz = 1000hz, range 500Hz
+    // The upper limit of DN is always going to be the Nyquist frequency (= sampleRate / 2)
 
     sdftResolutionHz = sdftSampleRateHz / SDFT_SAMPLE_SIZE; // 18.5hz per bin at 8k and 600Hz maxHz
     sdftStartBin = MAX(1, lrintf(dynNotch.minHz / sdftResolutionHz)); // can't use bin 0 because it is DC.

@@ -156,7 +156,7 @@ typedef struct gyro_s {
 
     uint16_t acc_lpf_hz;                    // cutoff frequency for the low pass filter used on the acc z-axis for althold in Hz
     uint16_t accLpfCutHz;
-    biquadFilter_t accFilter[XYZ_AXIS_COUNT];
+    pt2Filter_t accFilter[XYZ_AXIS_COUNT];
 
     flightDynamicsTrims_t accelerationTrims;
     rollAndPitchTrims_t rollAndPitchTrims;

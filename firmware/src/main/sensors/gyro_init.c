@@ -78,7 +78,7 @@ void gyroConfig_init(void)
   bmi270.acc_1G = 512 * 4;
   bmi270.acc_1G_rec = 1.0f / bmi270.acc_1G;
   bmi270.acc_high_fsr = false;
-  bmi270.acc_lpf_hz = 10;
+  bmi270.acc_lpf_hz = 25;
 
   resetFlightDynamicsTrims(&bmi270.accelerationTrims);
   bmi270.accelerationTrims.values.roll = 21;
@@ -139,9 +139,9 @@ static void accInitFilters(void)
     // the filter initialization is not defined (sample rate = 0)
   bmi270.accLpfCutHz = (bmi270.accSampleRateHz) ? bmi270.acc_lpf_hz : 0;
     if (bmi270.accLpfCutHz) {
-        const uint32_t accSampleTimeUs = 1e6 / bmi270.accSampleRateHz;
+        const float k = pt2FilterGain(bmi270.accLpfCutHz, HZ_TO_INTERVAL(bmi270.sampleRateHz));
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-            biquadFilterInitLPF(&bmi270.accFilter[axis], bmi270.accLpfCutHz, accSampleTimeUs);
+            pt2FilterInit(&bmi270.accFilter[axis], k);
         }
     }
 }
@@ -192,7 +192,7 @@ bool gyroInit(void)
     dynNotchInit(&bmi270.dynNotchConfig, bmi270.targetLooptime);
 #endif
 
-  const float k = pt1FilterGain(GYRO_IMU_DOWNSAMPLE_CUTOFF_HZ, bmi270.targetLooptime);
+  const float k = pt1FilterGain(GYRO_IMU_DOWNSAMPLE_CUTOFF_HZ, bmi270.targetLooptime * 1e-6f);
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
       pt1FilterInit(&bmi270.imuGyroFilter[axis], k);
   }

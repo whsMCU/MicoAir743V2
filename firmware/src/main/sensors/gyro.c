@@ -481,7 +481,7 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 	}
 
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-    bmi270.accADC[axis] = biquadFilterApply(&bmi270.accFilter[axis], bmi270.accADC[axis]);
+    bmi270.accADC[axis] = pt2FilterApply(&bmi270.accFilter[axis], bmi270.accADC[axis]);
   }
 
 	alignSensorViaRotation(bmi270.accADC, CW0_DEG);
