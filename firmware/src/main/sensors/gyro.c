@@ -245,6 +245,7 @@ FAST_CODE void taskGyroUpdate(timeUs_t currentTimeUs)
   previousIMUUpdateTime = currentTimeUs;
 	UNUSED(currentTimeUs);
 	gyroUpdateSensor();
+
 	bmi270.gyroADC[X] = bmi270.gyroADC[X] * bmi270.scale;
 	bmi270.gyroADC[Y] = bmi270.gyroADC[Y] * bmi270.scale;
 	bmi270.gyroADC[Z] = bmi270.gyroADC[Z] * bmi270.scale;
