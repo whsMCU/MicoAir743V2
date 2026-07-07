@@ -36,6 +36,7 @@
 #include "flight/imu.h"
 #include "flight/position.h"
 #include "flight/pid.h"
+#include "flight/rpm_filter.h"
 
 #include "fc/rc_controls.h"
 
@@ -139,6 +140,10 @@ void pidInit(void)
   _POS.out.ki = 0;
   _POS.out.kd = 0;
   _POS.out.integral_windup = 300;
+
+#ifdef USE_RPM_FILTER
+    rpmFilterInit(&rpmFilterConfig, bmi270.targetLooptime);
+#endif
 }
 
 void PID_Calculation(PID* axis, float set_point, float measured1, float measured2, float dt)
@@ -240,6 +245,10 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
 
       //processDelayedSave();
   }
+
+#ifdef USE_RPM_FILTER
+    rpmFilterUpdate();
+#endif
 
 //  uint8_t headingHoldState = getHeadingHoldState();
 //

@@ -39,6 +39,8 @@
 #include "common/filter.h"
 #include "common/maths.h"
 
+#include "flight/rpm_filter.h"
+
 #include "config/feature.h"
 
 #include "drivers/motor_types.h"
@@ -185,10 +187,10 @@ void initDshotTelemetry(const timeUs_t looptimeUs)
     edtAlwaysDecode = motorConfig.useDshotEdt == DSHOT_EDT_FORCE;
 
 #ifdef USE_RPM_FILTER
-    if (motorConfig()->dev.useDshotTelemetry) {
+    if (motorConfig.useDshotTelemetry) {
         // init LPFs for RPM data
         for (unsigned i = 0; i < dshotMotorCount; i++) {
-            pt1FilterInit(&motorFreqLpf[i], pt1FilterGain(rpmFilterConfig()->rpm_filter_lpf_hz, looptimeUs * 1e-6f));
+            pt1FilterInit(&motorFreqLpf[i], pt1FilterGain(rpmFilterConfig.rpm_filter_lpf_hz, looptimeUs * 1e-6f));
         }
     }
 #else

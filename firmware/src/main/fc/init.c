@@ -76,6 +76,7 @@
 //#include "flight/pid_init.h"
 #include "flight/position.h"
 //#include "flight/servos.h"
+#include "flight/rpm_filter.h"
 
 //#include "msc/emfat_file.h"
 #ifdef USE_PERSISTENT_MSC_RTC
@@ -320,7 +321,9 @@ void Param_Config_Init(void)
 	boardAlignment_Init(0, 0, 0);
 //	failsafeConfig_Init();
 	gyroConfig_init();
-
+#ifdef USE_RPM_FILTER
+	rpmFilterConfig_Init();
+#endif
   pidInit();
 	statsConfig_Init();
 	motorConfig_Init();

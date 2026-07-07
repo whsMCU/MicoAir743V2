@@ -234,3 +234,4 @@ task_t *queueFirst(void);
 task_t *queueNext(void);
 
 uint16_t getAverageSystemLoadPercent(void);
+float schedulerGetCycleTimeMultiplier(void);

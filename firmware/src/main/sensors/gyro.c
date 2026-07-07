@@ -39,6 +39,7 @@
 
 #include "flight/pid.h"
 #include "flight/position.h"
+#include "flight/rpm_filter.h"
 
 #include "scheduler/scheduler.h"
 
@@ -301,7 +302,7 @@ static FAST_CODE void filterGyro(void)
         }
 
 #ifdef USE_RPM_FILTER
-        gyroADCf = rpmFilterGyro(axis, gyroADCf);
+        gyroADCf = rpmFilterApply(axis, gyroADCf);
 #endif
         // apply static notch filters and software lowpass filters
         gyroADCf = bmi270.notchFilter1ApplyFn((filter_t *)&bmi270.notchFilter1[axis], gyroADCf);
