@@ -321,12 +321,16 @@ void Param_Config_Init(void)
 	boardAlignment_Init(0, 0, 0);
 //	failsafeConfig_Init();
 	gyroConfig_init();
+
+	motorConfig_Init();
+
 #ifdef USE_RPM_FILTER
 	rpmFilterConfig_Init();
 #endif
+
   pidInit();
 	statsConfig_Init();
-	motorConfig_Init();
+
 #ifdef USE_GPS
 	//gpsConfig_Init();
 #endif

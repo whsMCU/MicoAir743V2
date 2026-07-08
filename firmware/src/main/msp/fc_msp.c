@@ -62,6 +62,7 @@
 //#include "drivers/vtx_common.h"
 #include "drivers/gps/gps.h"
 #include "drivers/motor.h"
+#include "drivers/dshot.h"
 
 //#include "fc/fc_core.h"
 //#include "fc/config.h"
@@ -527,6 +528,12 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
           sbufWriteU32(dst, (int32_t)(bmi270.gyroZero[X] * 1000.0f));
           sbufWriteU32(dst, (int32_t)(bmi270.gyroZero[Y] * 1000.0f));
           sbufWriteU32(dst, (int32_t)(bmi270.gyroZero[Z] * 1000.0f));
+
+          sbufWriteU32(dst, (int32_t)(getDshotRpm(0) * 10.0f));
+          sbufWriteU32(dst, (int32_t)(getDshotRpm(1) * 10.0f));
+          sbufWriteU32(dst, (int32_t)(getDshotRpm(2) * 10.0f));
+          sbufWriteU32(dst, (int32_t)(getDshotRpm(3) * 10.0f));
+
         }
         break;
 

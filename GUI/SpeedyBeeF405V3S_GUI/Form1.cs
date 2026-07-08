@@ -206,17 +206,17 @@ namespace SpeedyBeeF405V3S_GUI
         public void InitGauge()
         {
             System.TimeSpan timeSpan = new System.TimeSpan(0, 0, 0, 0, 50);
-            Gauge_LF.AnimationsSpeed = timeSpan;
-            Gauge_LF.To = 100;
-
-            Gauge_LR.AnimationsSpeed = timeSpan;
-            Gauge_LR.To = 100;
+            Gauge_RR.AnimationsSpeed = timeSpan;
+            Gauge_RR.To = 100;
 
             Gauge_RF.AnimationsSpeed = timeSpan;
             Gauge_RF.To = 100;
 
-            Gauge_RR.AnimationsSpeed = timeSpan;
-            Gauge_RR.To = 100;
+            Gauge_LR.AnimationsSpeed = timeSpan;
+            Gauge_LR.To = 100;
+
+            Gauge_LF.AnimationsSpeed = timeSpan;
+            Gauge_LF.To = 100;
         }
 
             public void InitGmap()
@@ -356,7 +356,7 @@ namespace SpeedyBeeF405V3S_GUI
 
                 log = "DateTime, Arming_Flag, Flight_Mode, Roll(Deg), Pitch(Deg), Yaw(Deg), Alt(CM), RollSetPoint(Deg), PitchSetPoint(Deg), Yaw SetPoint(Deg), Thorttle(%), yaw_heading_reference(Deg)," +
                     " altHold, lattitude, longitude, Sat_Num, gps_fix, POSITION_X(CM), POSITION_Y(CM), MOTOR[Right_Rear](%), MOTOR[Right_Front](%), MOTOR[Left_Rear](%), MOTOR[Left_Front](%)," +
-                    " BAT_V, BAT_A, BAT_mAh, Alt_Range(CM), Alt_Range_Hold(CM), GPS_HEADING(deg)," +
+                    " BAT_V, BAT_A, BAT_mAh, Alt_Range(CM), Alt_Range_Hold(CM), GPS_HEADING(deg), MOTOR_RPM[RR](RPM), MOTOR_RPM[RF](RPM), MOTOR_RPM[LR](RPM), MOTOR_RPM[LF](RPM)," +
                     " Debug[0], Debug[1], Debug[2], Debug[3], Debug[4], Debug[5], Debug[6], Debug[7]";
                 writer.WriteLine(log);
                 Console.WriteLine(log); // 콘솔에도 출력
@@ -390,7 +390,7 @@ namespace SpeedyBeeF405V3S_GUI
                 string log = $"{DateTime.Now:HH:mm:ss.fff}, {data[13]}, {data[11]}, {data[0]/10}, {data[1]/10}, {data[2]}, {data[3]}, {data[4]/10}, {data[5]/10}, {data[6]}, {data[7]}," +
                     $" {data[41]}, {data[42]}, {(double)data[8]/10000000}, {(double)data[9]/10000000}, {data[43]}, {data[44]}, {data[45]}, {data[46]}, {scaleRangef(data[14], 11000, 21000, 0, 100)}," +
                     $" {scaleRangef(data[15], 11000, 21000, 0, 100)}, {scaleRangef(data[16], 11000, 21000, 0, 100)}, {scaleRangef(data[17], 11000, 21000, 0, 100)}," +
-                    $" {data[10]/100}, {data[47]/100}, {data[48]}, {data[38]}, {data[49]}, {data[60]}," +
+                    $" {data[10]/100}, {data[47]/100}, {data[48]}, {data[38]}, {data[49]}, {data[60]}, {data[63]}, {data[64]}, {data[65]}, {data[66]}," +
                     $" {(double)data[18]/10000000}, {(double)data[19]/10000000}, {(double)data[20]/10000000}, {(double)data[21]/10000000}, {data[50]}, {data[51]}, {data[52]}, {data[53]}";
                 writer.WriteLine(log);
                 Console.WriteLine(log); // 콘솔에도 출력
@@ -2099,6 +2099,11 @@ namespace SpeedyBeeF405V3S_GUI
             passed_data[61] = (float)(BitConverter.ToInt32(payload, 178)) / 1000;   // gyroZero[Y]
             passed_data[62] = (float)(BitConverter.ToInt32(payload, 182)) / 1000;   // gyroZero[Z]
 
+            passed_data[63] = (float)(BitConverter.ToInt32(payload, 186)) / 10;   // dshotRPM[0]
+            passed_data[64] = (float)(BitConverter.ToInt32(payload, 190)) / 10;   // dshotRPM[1]
+            passed_data[65] = (float)(BitConverter.ToInt32(payload, 194)) / 10;   // dshotRPM[2]
+            passed_data[66] = (float)(BitConverter.ToInt32(payload, 198)) / 10;   // dshotRPM[3]
+
             lb_gps_time.Text = $"{(int)passed_data[54]:D4}-{(int)passed_data[55]:D2}-{(int)passed_data[56]:D2} {(int)passed_data[57]:D2}:{(int)passed_data[58]:D2}:{(int)passed_data[59]:D2}";
 
             if (cb_record.Checked == true)
@@ -2354,10 +2359,15 @@ namespace SpeedyBeeF405V3S_GUI
             lb_motor2.Text = passed_data[16].ToString();
             lb_motor3.Text = passed_data[17].ToString();
 
-            Gauge_RR.Value = (int)scaleRangef(passed_data[14], 11000, 21000, 0, 100);
-            Gauge_RF.Value = (int)scaleRangef(passed_data[15], 11000, 21000, 0, 100);
-            Gauge_LR.Value = (int)scaleRangef(passed_data[16], 11000, 21000, 0, 100);
-            Gauge_LF.Value = (int)scaleRangef(passed_data[17], 11000, 21000, 0, 100);
+            lb_motor_RPM_0.Text = passed_data[63].ToString();
+            lb_motor_RPM_1.Text = passed_data[64].ToString();
+            lb_motor_RPM_2.Text = passed_data[65].ToString();
+            lb_motor_RPM_3.Text = passed_data[66].ToString();
+
+            Gauge_RR.Value = (int)scaleRangef(passed_data[14], 48, 2047, 0, 100);
+            Gauge_RF.Value = (int)scaleRangef(passed_data[15], 48, 2047, 0, 100);
+            Gauge_LR.Value = (int)scaleRangef(passed_data[16], 48, 2047, 0, 100);
+            Gauge_LF.Value = (int)scaleRangef(passed_data[17], 48, 2047, 0, 100);
 
             if(debugValue == 76)
             {

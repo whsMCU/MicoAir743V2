@@ -87,7 +87,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config, const timeUs_t looptimeUs)
     rpmFilter.numHarmonics = 0; // disable RPM Filtering
 
     // if bidirectional DShot is not available
-    if (!useDshotTelemetry) {
+    if (!motorConfig.useDshotTelemetry) {
         return;
     }
 

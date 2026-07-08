@@ -109,6 +109,7 @@
 #define USE_ITCM_RAM
 #define USE_FAST_DATA
 #define USE_DYN_NOTCH_FILTER
+//#define USE_DYN_LPF
 #define USE_RPM_FILTER
 
 #define USE_LED_STRIP

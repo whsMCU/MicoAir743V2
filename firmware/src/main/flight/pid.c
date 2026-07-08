@@ -146,6 +146,26 @@ void pidInit(void)
 #endif
 }
 
+#ifdef USE_DYN_LPF
+static void updateDynLpfCutoffs(timeUs_t currentTimeUs, float throttle)
+{
+    static timeUs_t lastDynLpfUpdateUs = 0;
+    static int dynLpfPreviousQuantizedThrottle = -1;  // to allow an initial zero throttle to set the filter cutoff
+
+    if (cmpTimeUs(currentTimeUs, lastDynLpfUpdateUs) >= DYN_LPF_THROTTLE_UPDATE_DELAY_US) {
+        const int quantizedThrottle = lrintf(throttle * DYN_LPF_THROTTLE_STEPS); // quantize the throttle reduce the number of filter updates
+        if (quantizedThrottle != dynLpfPreviousQuantizedThrottle) {
+            // scale the quantized value back to the throttle range so the filter cutoff steps are repeatable
+            const float dynLpfThrottle = (float)quantizedThrottle / DYN_LPF_THROTTLE_STEPS;
+            dynLpfGyroUpdate(dynLpfThrottle);
+            dynLpfDTermUpdate(dynLpfThrottle);
+            dynLpfPreviousQuantizedThrottle = quantizedThrottle;
+            lastDynLpfUpdateUs = currentTimeUs;
+        }
+    }
+}
+#endif
+
 void PID_Calculation(PID* axis, float set_point, float measured1, float measured2, float dt)
 {
   axis->error = set_point - measured1;
@@ -248,6 +268,11 @@ void taskMainPidLoop(timeUs_t currentTimeUs)
 
 #ifdef USE_RPM_FILTER
     rpmFilterUpdate();
+#endif
+
+#ifdef USE_DYN_LPF
+    // keep the changes to dynamic lowpass clean, without unnecessary dynamic changes
+    updateDynLpfCutoffs(currentTimeUs, throttle);
 #endif
 
 //  uint8_t headingHoldState = getHeadingHoldState();
