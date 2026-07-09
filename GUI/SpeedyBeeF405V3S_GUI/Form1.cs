@@ -391,7 +391,7 @@ namespace SpeedyBeeF405V3S_GUI
                     $" {data[41]}, {data[42]}, {(double)data[8]/10000000}, {(double)data[9]/10000000}, {data[43]}, {data[44]}, {data[45]}, {data[46]}, {scaleRangef(data[14], 11000, 21000, 0, 100)}," +
                     $" {scaleRangef(data[15], 11000, 21000, 0, 100)}, {scaleRangef(data[16], 11000, 21000, 0, 100)}, {scaleRangef(data[17], 11000, 21000, 0, 100)}," +
                     $" {data[10]/100}, {data[47]/100}, {data[48]}, {data[38]}, {data[49]}, {data[60]}, {data[63]}, {data[64]}, {data[65]}, {data[66]}," +
-                    $" {(double)data[18]/10000000}, {(double)data[19]/10000000}, {(double)data[20]/10000000}, {(double)data[21]/10000000}, {data[50]}, {data[51]}, {data[52]}, {data[53]}";
+                    $" {(double)data[18]}, {(double)data[19]}, {(double)data[20]}, {(double)data[21]}, {data[50]}, {data[51]}, {data[52]}, {data[53]}";
                 writer.WriteLine(log);
                 Console.WriteLine(log); // 콘솔에도 출력
             }

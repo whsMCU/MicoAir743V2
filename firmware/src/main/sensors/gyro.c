@@ -317,6 +317,9 @@ static FAST_CODE void filterGyro(void)
 #endif
         bmi270.gyroADCf[axis] = gyroADCf;
     }
+    DEBUG_SET(DEBUG_GYRO_RAW, 4, (bmi270.gyroADCf[X]));
+    DEBUG_SET(DEBUG_GYRO_RAW, 5, (bmi270.gyroADCf[Y]));
+    DEBUG_SET(DEBUG_GYRO_RAW, 6, (bmi270.gyroADCf[Z]));
     bmi270.sampleCount = 0;
 }
 
