@@ -164,7 +164,6 @@ static void cliBmi270(cli_args_t *args);
 static void bmi270EnableSPI(uint8_t dev)
 {
 	UNUSED(dev);
-	delay(2);
   gpioPinWrite(_PIN_BMI270_CS, _DEF_LOW);
   delay(1);
   gpioPinWrite(_PIN_BMI270_CS, _DEF_HIGH);
@@ -266,6 +265,9 @@ bool bmi270_Init(void)
 {
   bool ret = false;
 	delay(35);
+
+	gpioPinWrite(_PIN_BMI270_CS, _DEF_HIGH);
+
 	while (millis() < 100);
 
 	for(int i = 0; i < 5; i++)
