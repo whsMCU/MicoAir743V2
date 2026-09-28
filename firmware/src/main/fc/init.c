@@ -40,6 +40,7 @@
 
 #include "drivers/accgyro/accgyro.h"
 #include "drivers/accgyro/accgyro_spi_bmi270.h"
+#include "drivers/accgyro/accgyro_bmi088.h"
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
 #ifdef USE_USB_MSC
@@ -158,6 +159,8 @@ void init(void)
 	motorDevInit();
 
 	bmi270_Init();
+
+	bmi088_Init();
 
 #ifdef USE_MAG
 	compassInit();

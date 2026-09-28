@@ -20,6 +20,10 @@ enum
 {
 	BMI270_CS,
 	BMI270_INT,
+	BMI080_GYRO_CS,
+	BMI080_GYRO_INT,
+	BMI080_ACCEL_CS,
+	BMI080_ACCEL_INT,
 };
 
 bool gpioInit(void);

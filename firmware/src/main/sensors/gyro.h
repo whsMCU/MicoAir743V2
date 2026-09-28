@@ -173,6 +173,7 @@ typedef struct gyro_s {
 } imu_t;
 
 extern imu_t bmi270;
+extern imu_t bmi088;
 
 void taskGyroUpdate(timeUs_t currentTimeUs);
 void gyroFiltering(timeUs_t currentTimeUs);

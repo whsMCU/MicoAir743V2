@@ -195,3 +195,14 @@ static inline float constrainf(float amt, float low, float high)
 }
 int32_t applyDeadbandRescaled(int32_t value, int32_t deadband, int32_t min, int32_t max);
 int32_t wrap_36000(int32_t angle);
+
+/*
+ * The most significat byte is placed at the lowest address
+ * in other words, the most significant byte is "first", on even indexes
+ */
+#define int16_val_big_endian(v, idx) ((int16_t)(((uint8_t)v[2 * idx] << 8) | v[2 * idx + 1]))
+/*
+ * The most significat byte is placed at the highest address
+ * in other words, the most significant byte is "last", on odd indexes
+ */
+#define int16_val_little_endian(v, idx) ((int16_t)(((uint8_t)v[2 * idx + 1] << 8) | v[2 * idx]))

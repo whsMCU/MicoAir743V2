@@ -49,8 +49,10 @@
 #include "sensors/boardalignment.h"
 
 #include "drivers/accgyro/accgyro_spi_bmi270.h"
+#include "drivers/accgyro/accgyro_bmi088.h"
 
 FAST_DATA_ZERO_INIT imu_t bmi270;
+FAST_DATA_ZERO_INIT imu_t bmi088;
 
 static bool overflowDetected;
 #ifdef USE_GYRO_OVERFLOW_CHECK
@@ -203,6 +205,7 @@ static FAST_CODE void gyroUpdateSensor()
 		return;
 	}
     bmi270.dataReady = false;
+    bmi088GyroRead(&bmi088);
 
     if (isGyroSensorCalibrationComplete(&bmi270)) {
     // move 16-bit gyro data into 32-bit variables to avoid overflows in calculations
@@ -478,6 +481,8 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 	if (!bmi270SpiAccRead(&bmi270)) {
 			return;
 	}
+
+	bmi088AccRead(&bmi088);
 
 	bmi270.isAccelUpdatedAtLeastOnce = true;
 

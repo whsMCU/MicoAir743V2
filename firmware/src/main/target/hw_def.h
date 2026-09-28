@@ -18,13 +18,18 @@
 //#define USE_SDCARD_SPI
 
 #define USE_ACCGYRO_BMI270
+#define USE_IMU_BMI088
 
 //SPI-------
-#define BMI270  0
-#define SDCARD  1
-#define MAX7456 2
+#define BMI270  			0
+#define BMI088_GYRO   1
+#define BMI088_ACCEL  2
+#define SDCARD  			3
+#define MAX7456 			4
 
 #define _PIN_BMI270_CS 0
+#define _PIN_BMI080_GYRO_CS 1
+#define _PIN_BMI080_ACCEL_CS 2
 #define _PIN_SDCARD_CS 3
 #define _PIN_MAX7456_CS 4
 //----------
@@ -41,7 +46,7 @@
 #define      HW_SPI_MAX_CH          3
 
 #define _USE_HW_GPIO
-#define      HW_GPIO_MAX_CH         6
+#define      HW_GPIO_MAX_CH         10
 
 
 #define _USE_HW_LED
