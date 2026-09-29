@@ -28,8 +28,8 @@
 #define MAX7456 			4
 
 #define _PIN_BMI270_CS 0
-#define _PIN_BMI080_GYRO_CS 1
-#define _PIN_BMI080_ACCEL_CS 2
+#define _PIN_BMI088_GYRO_CS 2
+#define _PIN_BMI088_ACCEL_CS 4
 #define _PIN_SDCARD_CS 3
 #define _PIN_MAX7456_CS 4
 //----------

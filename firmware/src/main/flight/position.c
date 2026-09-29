@@ -276,7 +276,7 @@ void calculateEstimatedAltitude(timeUs_t currentTimeUs)
 #endif
     }
 
-    vel_z += bmi270.accADCf[YAW] * US2S(dTime);
+    vel_z += bmi270.acc.accADCf[YAW] * US2S(dTime);
     pos_z += vel_z * US2S(dTime);
 
     kalmanUpdate(&kf, posEstimator.imu.accelNEU.z, estimatedAltitudeCm, US2S(dTime));

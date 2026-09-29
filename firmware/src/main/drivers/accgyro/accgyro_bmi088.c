@@ -71,6 +71,8 @@
 #define REGG_CHIPID        0x00
 #define REGG_RATE_X_LSB    0x02
 #define REGG_INT_CTRL      0x15
+#define REGG_INT_IO		     0x16
+#define REGG_INT_MAP	     0x18
 #define REGG_INT_STATUS_1  0x0A
 #define REGG_INT_STATUS_2  0x0B
 #define REGG_INT_STATUS_3  0x0C
@@ -113,7 +115,19 @@ static void bmi088GyroInit(void)
     delay(100);
 
     // ODR 2kHz, BW 532Hz
-    bmi088RegisterWrite(BMI088_GYRO, REGG_BW, 0x81, 1);
+    bmi088RegisterWrite(BMI088_GYRO, REGG_BW, 0x00, 1);
+    delay(1);
+    uint8_t befor, after;
+
+    befor = bmi088RegisterRead(BMI088_GYRO, REGG_INT_IO);
+    // INT_IO_CONFIG
+    bmi088RegisterWrite(BMI088_GYRO, REGG_INT_IO, 0x01, 1);
+    delay(1);
+
+    after = bmi088RegisterRead(BMI088_GYRO, REGG_INT_IO);
+
+    // INT_IO_MAP
+    bmi088RegisterWrite(BMI088_GYRO, REGG_INT_MAP, 0x01, 1);
     delay(1);
 
     // Enable sampling
@@ -149,7 +163,7 @@ static void bmi088AccInit(void)
 
     //busSetSpeed(acc->busDev, BUS_SPEED_STANDARD);
 
-    bmi088.acc_1G = 2048;
+    bmi088.acc.acc_1G = 2048;
 }
 
 bool bmi088GyroRead(imu_t *gyro)
@@ -157,9 +171,9 @@ bool bmi088GyroRead(imu_t *gyro)
     uint8_t gyroRaw[6];
 
     if (spiReadRegMskBufRB(BMI088_GYRO, REGG_RATE_X_LSB, gyroRaw, 6)) {
-    		gyro->gyroADCRaw[X] = (float) int16_val_little_endian(gyroRaw, 0);
-    		gyro->gyroADCRaw[Y] = (float) int16_val_little_endian(gyroRaw, 1);
-    		gyro->gyroADCRaw[Z] = (float) int16_val_little_endian(gyroRaw, 2);
+    		gyro->gyro.gyroADCRaw[X] = (float) int16_val_little_endian(gyroRaw, 0);
+    		gyro->gyro.gyroADCRaw[Y] = (float) int16_val_little_endian(gyroRaw, 1);
+    		gyro->gyro.gyroADCRaw[Z] = (float) int16_val_little_endian(gyroRaw, 2);
         return true;
     }
 
@@ -171,9 +185,9 @@ bool bmi088AccRead(imu_t *acc)
     uint8_t buffer[7];
     if (spiReadRegMskBufRB(BMI088_ACCEL, REGA_STATUS, buffer, 2) && (buffer[1] & 0x80) && spiReadRegMskBufRB(BMI088_ACCEL, REGA_X_LSB, buffer, 7)) {
       // first byte is discarded, see datasheet
-    	acc->accADCRaw[X] = (float)(((int16_t)(buffer[2] << 8) | buffer[1]) * 3 / 4);
-    	acc->accADCRaw[Y] = (float)(((int16_t)(buffer[4] << 8) | buffer[3]) * 3 / 4);
-    	acc->accADCRaw[Z] = (float)(((int16_t)(buffer[6] << 8) | buffer[5]) * 3 / 4);
+    	acc->acc.accADCRaw[X] = (float)(((int16_t)(buffer[2] << 8) | buffer[1]) * 3 / 4);
+    	acc->acc.accADCRaw[Y] = (float)(((int16_t)(buffer[4] << 8) | buffer[3]) * 3 / 4);
+    	acc->acc.accADCRaw[Z] = (float)(((int16_t)(buffer[6] << 8) | buffer[5]) * 3 / 4);
       return true;
     }
 
@@ -228,7 +242,7 @@ bool bmi088_Init(void)
   ret = gyroDeviceDetect();
   if(ret == true){
     bmi088GyroInit();
-    bmi088.scale = 1.0f / 16.4f; // 16.4 dps/lsb
+    bmi088.gyro.scale = 1.0f / 16.4f; // 16.4 dps/lsb
 
   }
 

@@ -331,17 +331,17 @@ void tasksInit(void)
     setTaskEnabled(TASK_BATTERY_ALERTS, (useBatteryVoltage || useBatteryCurrent) && useBatteryAlerts);
 
     if (sensors(SENSOR_GYRO)) {
-      rescheduleTask(TASK_GYRO, bmi270.sampleLooptime);
-      rescheduleTask(TASK_FILTER, bmi270.targetLooptime);
+      rescheduleTask(TASK_GYRO, bmi270.gyro.sampleLooptime);
+      rescheduleTask(TASK_FILTER, bmi270.gyro.targetLooptime);
       setTaskEnabled(TASK_GYRO, true);
       setTaskEnabled(TASK_FILTER, true);
       setTaskEnabled(TASK_PID, true);
     }
 
 #if defined(USE_ACC)
-	if (sensors(SENSOR_ACC) && bmi270.accSampleRateHz) {
+	if (sensors(SENSOR_ACC) && bmi270.acc.sampleRateHz) {
     setTaskEnabled(TASK_ACCEL, true);
-    rescheduleTask(TASK_ACCEL, TASK_PERIOD_HZ(bmi270.accSampleRateHz));
+    rescheduleTask(TASK_ACCEL, TASK_PERIOD_HZ(bmi270.acc.sampleRateHz));
     setTaskEnabled(TASK_ATTITUDE, true);
 	}
 #endif

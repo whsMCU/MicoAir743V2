@@ -178,7 +178,7 @@ void init(void)
 
 #if defined(USE_DSHOT_TELEMETRY) || defined(USE_ESC_SENSOR)
     // Initialize the motor frequency filter now that we have a target looptime
-    initDshotTelemetry(bmi270.targetLooptime);
+    initDshotTelemetry(bmi270.gyro.targetLooptime);
 #endif
 
   // Finally initialize the gyro filtering

@@ -409,7 +409,7 @@ static bool write_ini_acc_offset(const char * ini_name)
   }
 
   /* set key/value pair */
-  sprintf(str, "%d", bmi270.accelerationTrims.values.roll);
+  sprintf(str, "%d", bmi270.acc.accelerationTrims.values.roll);
   ret = iniparser_set(dictionary, "gyro:accOffset.roll", str);
   if (ret < 0) {
       fprintf(stderr, "cannot set key/value in: %s\n", ini_name);
@@ -417,7 +417,7 @@ static bool write_ini_acc_offset(const char * ini_name)
       goto free_dict;
   }
 
-  sprintf(str, "%d", bmi270.accelerationTrims.values.pitch);
+  sprintf(str, "%d", bmi270.acc.accelerationTrims.values.pitch);
   ret = iniparser_set(dictionary, "gyro:accOffset.pitch", str);
   if (ret < 0) {
       fprintf(stderr, "cannot set key/value in: %s\n", ini_name);
@@ -425,7 +425,7 @@ static bool write_ini_acc_offset(const char * ini_name)
       goto free_dict;
   }
 
-  sprintf(str, "%d", bmi270.accelerationTrims.values.yaw);
+  sprintf(str, "%d", bmi270.acc.accelerationTrims.values.yaw);
   ret = iniparser_set(dictionary, "gyro:accOffset.yaw", str);
   if (ret < 0) {
       fprintf(stderr, "cannot set key/value in: %s\n", ini_name);
@@ -711,11 +711,11 @@ static bool parse_ini(const char * ini_name)
   //iniparser_dump(ini, stderr);
 
   i = iniparser_getint(ini, "gyro:accOffset.roll", 0);
-  bmi270.accelerationTrims.values.roll = i;
+  bmi270.acc.accelerationTrims.values.roll = i;
   i = iniparser_getint(ini, "gyro:accOffset.pitch", 0);
-  bmi270.accelerationTrims.values.pitch = i;
+  bmi270.acc.accelerationTrims.values.pitch = i;
   i = iniparser_getint(ini, "gyro:accOffset.yaw", 0);
-  bmi270.accelerationTrims.values.yaw = i;
+  bmi270.acc.accelerationTrims.values.yaw = i;
 
   d = iniparser_getdouble(ini, "pid:roll.in.kp", 0.0);
   _ROLL.in.kp = d;

@@ -113,7 +113,6 @@ typedef struct gyro_s {
 
     pt1Filter_t imuGyroFilter[XYZ_AXIS_COUNT];
 
-    uint8_t *txBuf, *rxBuf;
     float gyroZero[XYZ_AXIS_COUNT];
     int16_t gyro_offset_yaw;
     uint16_t gyroCalibrationDuration;   // Gyro calibration duration in 1/100 second
@@ -136,40 +135,60 @@ typedef struct gyro_s {
 
     volatile bool dataReady;
 
-    uint16_t gyroSampleRateHz;
-
     bool init_gyro_cal_enabled;
-    float gravity_cmss_cal;
+} gyro_t;
 
-    float acc_1G_rec;
-    uint16_t acc_1G;
-    int16_t accADCRaw[XYZ_AXIS_COUNT];
-    float accADC[XYZ_AXIS_COUNT];
-    float accADCf[XYZ_AXIS_COUNT];
-    float accPrevious[XYZ_AXIS_COUNT];
-    acc_extremes_t extremes[XYZ_AXIS_COUNT];
-    float maxG;
+typedef struct acc_s {
+  uint16_t sampleRateHz;
 
-    vector3_t jerk;
-    float accMagnitude;                     // in multiples of 1G
-    float jerkMagnitude;                    // in multiples of 1G/s (measure of collision strength)
+  uint32_t detectedEXTI;
+  uint32_t LastEXTI;
+  uint32_t SyncEXTI;
+  int32_t ShortPeriod;
+  int32_t DmaMaxDuration;
+  uint32_t exit_callback_dt;
+  uint32_t rx_callback_dt;
 
-    uint16_t acc_lpf_hz;                    // cutoff frequency for the low pass filter used on the acc z-axis for althold in Hz
-    uint16_t accLpfCutHz;
-    pt2Filter_t accFilter[XYZ_AXIS_COUNT];
+  volatile bool dataReady;
 
-    flightDynamicsTrims_t accelerationTrims;
-    rollAndPitchTrims_t rollAndPitchTrims;
-    int acc_accumulatedMeasurementCount;
-    float acc_accumulatedMeasurements[XYZ_AXIS_COUNT];
-    uint16_t calibratingA;      // the calibration is done is the main loop. Calibrating decreases at each cycle down to 0, then we enter in a normal mode.
+  float acc_1G_rec;
+  uint16_t acc_1G;
+  int16_t accADCRaw[XYZ_AXIS_COUNT];
+  float accADC[XYZ_AXIS_COUNT];
+  float accADCf[XYZ_AXIS_COUNT];
+  float accPrevious[XYZ_AXIS_COUNT];
+  acc_extremes_t extremes[XYZ_AXIS_COUNT];
+  float maxG;
 
-    bool isAccelUpdatedAtLeastOnce;
-    uint16_t accSampleRateHz;
-    bool acc_high_fsr;
+  vector3_t jerk;
+  float accMagnitude;                     // in multiples of 1G
+  float jerkMagnitude;                    // in multiples of 1G/s (measure of collision strength)
 
-    uint32_t accClipCount;
-    bool isClipped;
+  uint16_t acc_lpf_hz;                    // cutoff frequency for the low pass filter used on the acc z-axis for althold in Hz
+  uint16_t accLpfCutHz;
+  pt2Filter_t accFilter[XYZ_AXIS_COUNT];
+
+  flightDynamicsTrims_t accelerationTrims;
+  rollAndPitchTrims_t rollAndPitchTrims;
+  int acc_accumulatedMeasurementCount;
+  float acc_accumulatedMeasurements[XYZ_AXIS_COUNT];
+  uint16_t calibratingA;      // the calibration is done is the main loop. Calibrating decreases at each cycle down to 0, then we enter in a normal mode.
+
+  bool isAccelUpdatedAtLeastOnce;
+  bool acc_high_fsr;
+
+  float gravity_cmss_cal;
+
+  uint32_t accClipCount;
+  bool isClipped;
+} acc_t;
+
+typedef struct imu_s {
+    uint8_t *txBuf, *rxBuf;
+
+  	gyro_t gyro;
+
+  	acc_t acc;
 } imu_t;
 
 extern imu_t bmi270;

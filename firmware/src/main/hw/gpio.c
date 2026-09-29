@@ -8,6 +8,7 @@
 
 #include "gpio.h"
 #include "cli.h"
+#include <accgyro_spi_bmi270.h>
 
 
 typedef struct
@@ -25,10 +26,10 @@ const gpio_tbl_t gpio_tbl[GPIO_MAX_CH] =
 {
 	{GPIOA, GPIO_PIN_15,  _DEF_OUTPUT_PULLUP,   GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 0. BMI270 CS
 	{GPIOB, GPIO_PIN_7,   _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 1. BMI270 INT
-	{GPIOD, GPIO_PIN_5,   _DEF_OUTPUT_PULLUP,   GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 2. BMI080 GYRO CS
-	{GPIOC, GPIO_PIN_15,  _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 3. BMI080 GYRO INT
-	{GPIOD, GPIO_PIN_4,   _DEF_OUTPUT_PULLUP,   GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 4. BMI080 ACCEL CS
-	{GPIOC, GPIO_PIN_14,  _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 5. BMI080 ACCEL INT
+	{GPIOD, GPIO_PIN_5,   _DEF_OUTPUT_PULLUP,   GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 2. BMI088 GYRO CS
+	{GPIOC, GPIO_PIN_15,  _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 3. BMI088 GYRO INT
+	{GPIOD, GPIO_PIN_4,   _DEF_OUTPUT_PULLUP,   GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_HIGH},    // 4. BMI088 ACCEL CS
+	{GPIOC, GPIO_PIN_14,  _DEF_INPUT_IT_RISING, GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 5. BMI088 ACCEL INT
 	{GPIOE, GPIO_PIN_9,   _DEF_OUTPUT_AF_PP,    GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 6. MOTOR4
 	{GPIOE, GPIO_PIN_11,  _DEF_OUTPUT_AF_PP,    GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 7. MOTOR3
 	{GPIOE, GPIO_PIN_13,  _DEF_OUTPUT_AF_PP,    GPIO_PIN_SET,   GPIO_PIN_RESET, _DEF_LOW},     // 8. MOTOR2
@@ -61,6 +62,9 @@ bool gpioInit(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_SET);
 
   for (int i=0; i<GPIO_MAX_CH; i++)
   {
@@ -205,6 +209,22 @@ void gpioPinToggle(uint8_t ch)
   }
 
   HAL_GPIO_TogglePin(gpio_tbl[ch].port, gpio_tbl[ch].pin);
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin==GPIO_PIN_7)
+	{
+		bmi270_data_ready();
+	}
+	if(GPIO_Pin==GPIO_PIN_14)
+	{
+		bmi088.acc.detectedEXTI++;
+	}
+	if(GPIO_Pin==GPIO_PIN_15)
+	{
+		bmi088.gyro.detectedEXTI++;
+	}
 }
 
 #ifdef _USE_HW_CLI

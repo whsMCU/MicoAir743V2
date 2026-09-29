@@ -250,7 +250,7 @@ void opflowGyroUpdateCallback(timeUs_t gyroUpdateDeltaUs)
         return;
 
     for (int axis = 0; axis < 2; axis++) {
-        opflow.gyroBodyRateAcc[axis] += bmi270.gyroADCf[axis] * gyroUpdateDeltaUs;
+        opflow.gyroBodyRateAcc[axis] += bmi270.gyro.gyroADCf[axis] * gyroUpdateDeltaUs;
     }
 
     opflow.gyroBodyRateTimeUs += gyroUpdateDeltaUs;
