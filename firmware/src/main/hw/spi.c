@@ -92,6 +92,7 @@ bool spiInit(void)
   }
   spiBegin(BMI270);
   spiBegin(BMI088_GYRO);
+  spiBegin(BMI088_ACCEL);
   //spiBegin(MAX7456);
   cliAdd("spi", cliSPI);
   return ret;
@@ -143,7 +144,7 @@ bool spiBegin(uint8_t dev)
       spi_dev_tbl[BMI088_GYRO].dev.h_spi = &hspi2;
       spi_dev_tbl[BMI088_GYRO].dev.h_dma_tx = &hdma_spi2_tx;
       spi_dev_tbl[BMI088_GYRO].dev.h_dma_rx = &hdma_spi2_rx;
-      hspi2.Instance = SPI3;
+      hspi2.Instance = SPI2;
       hspi2.Init.Mode = SPI_MODE_MASTER;
       hspi2.Init.Direction = SPI_DIRECTION_2LINES;
       hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
@@ -171,6 +172,42 @@ bool spiBegin(uint8_t dev)
       if (HAL_SPI_Init(&hspi2) == HAL_OK)
       {
       	spi_dev_tbl[BMI088_GYRO].dev.is_open = true;
+      	ret = true;
+      }
+      break;
+
+    case BMI088_ACCEL:
+      spi_dev_tbl[BMI088_ACCEL].dev.h_spi = &hspi2;
+      spi_dev_tbl[BMI088_ACCEL].dev.h_dma_tx = &hdma_spi2_tx;
+      spi_dev_tbl[BMI088_ACCEL].dev.h_dma_rx = &hdma_spi2_rx;
+      hspi2.Instance = SPI2;
+      hspi2.Init.Mode = SPI_MODE_MASTER;
+      hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+      hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+      hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
+      hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
+      hspi2.Init.NSS = SPI_NSS_SOFT;
+      hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+      hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+      hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+      hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+      hspi2.Init.CRCPolynomial = 0x0;
+      hspi2.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+      hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+      hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+      hspi2.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+      hspi2.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+      hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+      hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+      hspi2.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+      hspi2.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+      hspi2.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+
+      //HAL_SPI_DeInit(&hspi2);
+
+      if (HAL_SPI_Init(&hspi2) == HAL_OK)
+      {
+      	spi_dev_tbl[BMI088_ACCEL].dev.is_open = true;
       	ret = true;
       }
       break;
