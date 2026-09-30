@@ -32,3 +32,5 @@
 bool bmi088_Init(void);
 bool bmi088GyroRead(imu_t *gyro);
 bool bmi088AccRead(imu_t *acc);
+void bmi088_AccData_ready(void);
+void bmi088_GyroData_ready(void);

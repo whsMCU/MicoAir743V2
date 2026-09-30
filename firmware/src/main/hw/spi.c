@@ -473,9 +473,11 @@ uint8_t spiReadRegMsk(uint8_t dev, uint8_t reg)
 void spiWriteReg(uint8_t dev, uint8_t reg, uint8_t data)
 {
 	spi_t  *p_spi = &spi_dev_tbl[dev].dev;
+  uint8_t tx[2] = { reg & 0x7F, data };   /* 쓰기: bit7 = 0 */
     gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_LOW);
-    HAL_SPI_Transmit(p_spi->h_spi, &reg, sizeof(reg), 10);
-    HAL_SPI_Transmit(p_spi->h_spi, &data, sizeof(data), 10);
+    HAL_SPI_Transmit(p_spi->h_spi, tx, 2, 10);
+//    HAL_SPI_Transmit(p_spi->h_spi, &reg, sizeof(reg), 10);
+//    HAL_SPI_Transmit(p_spi->h_spi, &data, sizeof(data), 10);
     gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_HIGH);
 }
 void spiWriteReg_nocs(uint8_t dev, uint8_t reg, uint8_t data)

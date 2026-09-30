@@ -58,6 +58,9 @@
 #define REGA_TEMP_MSB      0x23
 #define REGA_CONF          0x40
 #define REGA_RANGE         0x41
+#define REGA_INT1_IO		   0x53
+#define REGA_INT2_IO		   0x54
+#define REGA_INT_MAP	     0x58
 #define REGA_PWR_CONF      0x7C
 #define REGA_PWR_CTRL      0x7D
 #define REGA_SOFTRESET     0x7E
@@ -91,10 +94,20 @@ static uint8_t bmi088RegisterRead(uint8_t dev, uint8_t registerId)
 {
     uint8_t data[2] = { 0, 0 };
 
-    if (spiReadRegMskBufRB(dev, registerId, data, 2)) {
-        return data[1];
-    } else {
-        return 0;
+    if(dev == BMI088_ACCEL)
+    {
+      if (spiReadRegMskBufRB(dev, registerId, data, 2)) {
+          return data[1];
+      } else {
+          return 0;
+      }
+    }else
+    {
+			if (spiReadRegMskBufRB(dev, registerId, data, 2)) {
+					return data[0];
+			} else {
+					return 0;
+			}
     }
 }
 
@@ -108,60 +121,45 @@ static void bmi088RegisterWrite(uint8_t dev, uint8_t registerId, uint8_t value, 
 
 static void bmi088GyroInit(void)
 {
-    //busSetSpeed(gyro->busDev, BUS_SPEED_INITIALIZATION);
-
     // Soft reset
-		bmi088RegisterWrite(BMI088_GYRO, REGG_BGW_SOFTRESET, 0xB6, 1);
-    delay(100);
+		bmi088RegisterWrite(BMI088_GYRO, REGG_BGW_SOFTRESET, 0xB6, 100);
 
     // ODR 2kHz, BW 532Hz
     bmi088RegisterWrite(BMI088_GYRO, REGG_BW, 0x00, 1);
-    delay(1);
-    uint8_t befor, after;
 
-    befor = bmi088RegisterRead(BMI088_GYRO, REGG_INT_IO);
     // INT_IO_CONFIG
     bmi088RegisterWrite(BMI088_GYRO, REGG_INT_IO, 0x01, 1);
-    delay(1);
-
-    after = bmi088RegisterRead(BMI088_GYRO, REGG_INT_IO);
 
     // INT_IO_MAP
     bmi088RegisterWrite(BMI088_GYRO, REGG_INT_MAP, 0x01, 1);
-    delay(1);
 
     // Enable sampling
     bmi088RegisterWrite(BMI088_GYRO, REGG_INT_CTRL, 0x80, 1);
-    delay(1);
-
-    //busSetSpeed(gyro->busDev, BUS_SPEED_FAST);
 }
 
 static void bmi088AccInit(void)
 {
-    //busSetSpeed(acc->busDev, BUS_SPEED_INITIALIZATION);
-
     // Soft reset
-		bmi088RegisterWrite(BMI088_ACCEL, REGA_SOFTRESET, 0xB6, 1);
-    delay(100);
+		bmi088RegisterWrite(BMI088_ACCEL, REGA_SOFTRESET, 0xB6, 100);
 
     // Active mode
-		bmi088RegisterWrite(BMI088_ACCEL, REGA_PWR_CONF, 0, 1);
-    delay(100);
+		bmi088RegisterWrite(BMI088_ACCEL, REGA_PWR_CONF, 0, 100);
 
     // ACC ON
-		bmi088RegisterWrite(BMI088_ACCEL, REGA_PWR_CTRL, 0x04, 1);
-    delay(100);
+		bmi088RegisterWrite(BMI088_ACCEL, REGA_PWR_CTRL, 0x04, 100);
 
     // OSR4, ODR 1600Hz
 		bmi088RegisterWrite(BMI088_ACCEL, REGA_CONF, 0x8C, 1);
-    delay(1);
+
 
     // Range 12g
 		bmi088RegisterWrite(BMI088_ACCEL, REGA_RANGE, 0x02, 1);
-    delay(1);
 
-    //busSetSpeed(acc->busDev, BUS_SPEED_STANDARD);
+    // INT_IO_CONFIG
+    bmi088RegisterWrite(BMI088_ACCEL, REGA_INT1_IO, 0x0A, 1);
+
+    // INT_IO_MAP
+    bmi088RegisterWrite(BMI088_ACCEL, REGA_INT_MAP, 0x04, 1);
 
     bmi088.acc.acc_1G = 2048;
 }
@@ -198,14 +196,13 @@ static bool gyroDeviceDetect(void)
 {
     uint8_t attempts;
 
-    //busSetSpeed(busDev, BUS_SPEED_INITIALIZATION);
-
     for (attempts = 0; attempts < 5; attempts++) {
         uint8_t chipId;
 
         delay(100);
 
         chipId = bmi088RegisterRead(BMI088_GYRO, REGG_CHIPID);
+        //spiReadRegMskBufRB(BMI088_GYRO, REGG_CHIPID, chipId, 2);
 
         if (chipId == 0x0F) {
             return true;
@@ -218,8 +215,6 @@ static bool gyroDeviceDetect(void)
 static bool accDeviceDetect(void)
 {
     uint8_t attempts;
-
-    //busSetSpeed(busDev, BUS_SPEED_INITIALIZATION);
 
     for (attempts = 0; attempts < 5; attempts++) {
         uint8_t chipId;
@@ -239,6 +234,9 @@ bool bmi088_Init(void)
 {
   bool ret = false;
 
+	gpioPinWrite(BMI080_ACCEL_CS, _DEF_HIGH);
+	gpioPinWrite(BMI080_GYRO_CS, _DEF_HIGH);
+
   ret = gyroDeviceDetect();
   if(ret == true){
     bmi088GyroInit();
@@ -253,6 +251,35 @@ bool bmi088_Init(void)
     //gyroInit();
 
     return ret;
+}
+
+void bmi088_AccData_ready(void)
+{
+	static uint32_t pre_time = 0;
+	bmi088.acc.exit_callback_dt = micros() - pre_time;
+	pre_time = micros();
+	// Ideally we'd use a timer to capture such information, but unfortunately the port used for EXTI interrupt does
+	// not have an associated timer
+	uint32_t nowCycles = micros();
+
+	bmi088.acc.LastEXTI = nowCycles;
+
+	bmi088.acc.dataReady = true;
+	bmi088.acc.detectedEXTI++;
+}
+
+void bmi088_GyroData_ready(void)
+{
+	static uint32_t pre_time = 0;
+	bmi088.gyro.exit_callback_dt = micros() - pre_time;
+	pre_time = micros();
+	// Ideally we'd use a timer to capture such information, but unfortunately the port used for EXTI interrupt does
+	// not have an associated timer
+	uint32_t nowCycles = micros();
+	bmi088.gyro.gyroLastEXTI = nowCycles;
+
+	bmi088.gyro.dataReady = true;
+	bmi088.gyro.detectedEXTI++;
 }
 
 #endif /* USE_IMU_BMI088 */

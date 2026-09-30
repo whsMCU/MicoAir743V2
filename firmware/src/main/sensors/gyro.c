@@ -206,6 +206,7 @@ static FAST_CODE void gyroUpdateSensor(void)
 	}
     bmi270.gyro.dataReady = false;
     bmi088GyroRead(&bmi088);
+    bmi088.gyro.dataReady = false;
 
     if (isGyroSensorCalibrationComplete(&bmi270)) {
     // move 16-bit gyro data into 32-bit variables to avoid overflows in calculations
@@ -483,6 +484,7 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 	}
 
 	bmi088AccRead(&bmi088);
+	bmi088.acc.dataReady = false;
 
 	bmi270.acc.isAccelUpdatedAtLeastOnce = true;
 

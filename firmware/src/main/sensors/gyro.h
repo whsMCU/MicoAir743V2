@@ -76,9 +76,16 @@ typedef struct gyro_s {
     uint16_t sampleRateHz;
     uint32_t targetLooptime;
     uint32_t sampleLooptime;
+
+    volatile bool dataReady;
+
     float scale;
+
+    int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
+    int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
     float gyroADC[XYZ_AXIS_COUNT];     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
     float gyroADCf[XYZ_AXIS_COUNT];    // filtered gyro data
+
     float gyro_accumulatedMeasurements[XYZ_AXIS_COUNT];
     float gyroPrevious[XYZ_AXIS_COUNT];
     int gyro_accumulatedMeasurementCount;
@@ -116,9 +123,9 @@ typedef struct gyro_s {
     float gyroZero[XYZ_AXIS_COUNT];
     int16_t gyro_offset_yaw;
     uint16_t gyroCalibrationDuration;   // Gyro calibration duration in 1/100 second
-    int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
-    int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
+
     int16_t temperature;
+
     uint8_t hardware_lpf;
     bool gyro_high_fsr;
 
@@ -133,30 +140,22 @@ typedef struct gyro_s {
     uint32_t exit_callback_dt;
     uint32_t rx_callback_dt;
 
-    volatile bool dataReady;
-
     bool init_gyro_cal_enabled;
 } gyro_t;
 
 typedef struct acc_s {
   uint16_t sampleRateHz;
 
-  uint32_t detectedEXTI;
-  uint32_t LastEXTI;
-  uint32_t SyncEXTI;
-  int32_t ShortPeriod;
-  int32_t DmaMaxDuration;
-  uint32_t exit_callback_dt;
-  uint32_t rx_callback_dt;
-
   volatile bool dataReady;
 
   float acc_1G_rec;
   uint16_t acc_1G;
+
   int16_t accADCRaw[XYZ_AXIS_COUNT];
   float accADC[XYZ_AXIS_COUNT];
   float accADCf[XYZ_AXIS_COUNT];
   float accPrevious[XYZ_AXIS_COUNT];
+
   acc_extremes_t extremes[XYZ_AXIS_COUNT];
   float maxG;
 
@@ -181,6 +180,15 @@ typedef struct acc_s {
 
   uint32_t accClipCount;
   bool isClipped;
+
+  uint32_t detectedEXTI;
+  uint32_t LastEXTI;
+  uint32_t SyncEXTI;
+  int32_t ShortPeriod;
+  int32_t DmaMaxDuration;
+  uint32_t exit_callback_dt;
+  uint32_t rx_callback_dt;
+
 } acc_t;
 
 typedef struct imu_s {

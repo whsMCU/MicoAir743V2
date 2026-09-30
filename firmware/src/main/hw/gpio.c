@@ -9,6 +9,7 @@
 #include "gpio.h"
 #include "cli.h"
 #include <accgyro_spi_bmi270.h>
+#include <accgyro_bmi088.h>
 
 
 typedef struct
@@ -219,11 +220,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 	if(GPIO_Pin==GPIO_PIN_14)
 	{
-		bmi088.acc.detectedEXTI++;
+		bmi088_AccData_ready();
 	}
 	if(GPIO_Pin==GPIO_PIN_15)
 	{
-		bmi088.gyro.detectedEXTI++;
+		bmi088_GyroData_ready();
 	}
 }
 
