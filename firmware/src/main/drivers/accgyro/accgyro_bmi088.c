@@ -148,8 +148,8 @@ static void bmi088AccInit(void)
     // ACC ON
 		bmi088RegisterWrite(BMI088_ACCEL, REGA_PWR_CTRL, 0x04, 100);
 
-    // OSR4, ODR 1600Hz
-		bmi088RegisterWrite(BMI088_ACCEL, REGA_CONF, 0x8C, 1);
+    // OSR4, ODR 800Hz
+		bmi088RegisterWrite(BMI088_ACCEL, REGA_CONF, 0x8B, 1);
 
 
     // Range 12g
@@ -166,12 +166,12 @@ static void bmi088AccInit(void)
 
 bool bmi088GyroRead(imu_t *gyro)
 {
-    uint8_t gyroRaw[6];
+    uint8_t gyroRaw[7];
 
-    if (spiReadRegMskBufRB(BMI088_GYRO, REGG_RATE_X_LSB, gyroRaw, 6)) {
-    		gyro->gyro.gyroADCRaw[X] = (float) int16_val_little_endian(gyroRaw, 0);
-    		gyro->gyro.gyroADCRaw[Y] = (float) int16_val_little_endian(gyroRaw, 1);
-    		gyro->gyro.gyroADCRaw[Z] = (float) int16_val_little_endian(gyroRaw, 2);
+    if (spiReadRegMskBufRB(BMI088_GYRO, REGG_RATE_X_LSB, gyroRaw, 7)) {
+    		gyro->gyro.gyroADCRaw[X] = (int16_t)((gyroRaw[2] << 8) | gyroRaw[1]);
+    		gyro->gyro.gyroADCRaw[Y] = (int16_t)((gyroRaw[4] << 8) | gyroRaw[3]);
+    		gyro->gyro.gyroADCRaw[Z] = (int16_t)((gyroRaw[6] << 8) | gyroRaw[5]);
         return true;
     }
 
@@ -180,12 +180,12 @@ bool bmi088GyroRead(imu_t *gyro)
 
 bool bmi088AccRead(imu_t *acc)
 {
-    uint8_t buffer[7];
-    if (spiReadRegMskBufRB(BMI088_ACCEL, REGA_X_LSB, buffer, 7)) {
+    uint8_t buffer[8];
+    if (spiReadRegMskBufRB(BMI088_ACCEL, REGA_X_LSB, buffer, 8)) {
       // first byte is discarded, see datasheet
-    	acc->acc.accADCRaw[X] = (float)(((int16_t)(buffer[2] << 8) | buffer[1]) * 3 / 4);
-    	acc->acc.accADCRaw[Y] = (float)(((int16_t)(buffer[4] << 8) | buffer[3]) * 3 / 4);
-    	acc->acc.accADCRaw[Z] = (float)(((int16_t)(buffer[6] << 8) | buffer[5]) * 3 / 4);
+    	acc->acc.accADCRaw[X] = (int16_t)((buffer[3] << 8) | buffer[2]);
+    	acc->acc.accADCRaw[Y] = (int16_t)((buffer[5] << 8) | buffer[4]);
+    	acc->acc.accADCRaw[Z] = (int16_t)((buffer[7] << 8) | buffer[6]);
       return true;
     }
 

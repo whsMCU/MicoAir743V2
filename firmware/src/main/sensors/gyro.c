@@ -205,8 +205,12 @@ static FAST_CODE void gyroUpdateSensor(void)
 		return;
 	}
     bmi270.gyro.dataReady = false;
+    if(bmi088.gyro.dataReady == true)
+    {
+      bmi088GyroRead(&bmi088);
+      //return;
+    }
 
-    bmi088GyroRead(&bmi088);
     bmi088.gyro.dataReady = false;
 
     if (isGyroSensorCalibrationComplete(&bmi270)) {
@@ -481,7 +485,12 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 	if (!bmi270SpiAccRead(&bmi270)) {
 			return;
 	}
-	bmi088AccRead(&bmi088);
+	if(bmi088.acc.dataReady == true)
+	{
+		bmi088AccRead(&bmi088);
+		//return;
+	}
+
 	bmi088.acc.dataReady = false;
 
 	bmi270.acc.isAccelUpdatedAtLeastOnce = true;

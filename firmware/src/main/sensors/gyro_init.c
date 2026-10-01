@@ -86,6 +86,43 @@ void gyroConfig_init(void)
 
   bmi270.gyro.init_gyro_cal_enabled = true;
   bmi270.acc.gravity_cmss_cal = 0;
+
+  //////////////////////////////////////////////////
+  bmi088.gyro.gyro_high_fsr = false;
+  bmi088.gyro.sampleRateHz = 2000;
+  bmi088.gyro.gyroRateKHz = GYRO_RATE_3200_Hz;
+  bmi088.gyro.hardware_lpf = GYRO_HARDWARE_LPF_NORMAL;
+  bmi088.gyro.gyro_offset_yaw = 0;
+  bmi088.gyro.gyroCalibrationDuration = 125;
+  bmi088.gyro.sampleLooptime = 500;
+  bmi088.gyro.targetLooptime = 500;
+  bmi088.gyro.scale = GYRO_SCALE_2000DPS;
+  bmi088.gyro.downsampleFilterEnabled = true;
+
+  bmi088.gyro.gyro_soft_notch_hz_1 = 0;
+  bmi088.gyro.gyro_soft_notch_cutoff_1 = 0;
+  bmi088.gyro.gyro_soft_notch_hz_2 = 0;
+  bmi088.gyro.gyro_soft_notch_cutoff_2 = 0;
+
+  bmi088.gyro.dynNotchConfig.dyn_notch_count = 3;
+  bmi088.gyro.dynNotchConfig.dyn_notch_max_hz = 600;
+  bmi088.gyro.dynNotchConfig.dyn_notch_min_hz = 150;
+  bmi088.gyro.dynNotchConfig.dyn_notch_q = 300;
+
+  bmi088.acc.sampleRateHz = 800;
+  bmi088.acc.acc_1G = 2730;
+  bmi088.acc.acc_1G_rec = 1.0f / bmi088.acc.acc_1G;
+  bmi088.acc.acc_high_fsr = false;
+  bmi088.acc.acc_lpf_hz = 25;
+
+  resetFlightDynamicsTrims(&bmi088.acc.accelerationTrims);
+  bmi088.acc.accelerationTrims.values.roll = 21;
+  bmi088.acc.accelerationTrims.values.pitch = -55;
+  bmi088.acc.accelerationTrims.values.yaw = -6;
+
+  bmi088.gyro.init_gyro_cal_enabled = true;
+  bmi088.acc.gravity_cmss_cal = 0;
+
 }
 
 static uint16_t calculateNyquistAdjustedNotchHz(uint16_t notchHz, uint16_t notchCutoffHz)
