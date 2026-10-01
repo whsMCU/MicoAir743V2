@@ -505,6 +505,7 @@ void spiReadRegBuf(uint8_t dev, uint8_t reg, uint8_t *data, uint8_t length)
 	gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_LOW);
 	HAL_SPI_Transmit(p_spi->h_spi, &reg, sizeof(reg), 10);
 	HAL_SPI_Receive(p_spi->h_spi, data, length, 10);
+	//HAL_SPI_TransmitReceive(p_spi->h_spi, &reg, data, length, 10);
 	gpioPinWrite(spi_dev_tbl[dev].csTag, _DEF_HIGH);
 
     spiWait(dev);

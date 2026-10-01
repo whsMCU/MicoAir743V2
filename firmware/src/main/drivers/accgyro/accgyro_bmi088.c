@@ -181,7 +181,7 @@ bool bmi088GyroRead(imu_t *gyro)
 bool bmi088AccRead(imu_t *acc)
 {
     uint8_t buffer[7];
-    if (spiReadRegMskBufRB(BMI088_ACCEL, REGA_STATUS, buffer, 2) && (buffer[1] & 0x80) && spiReadRegMskBufRB(BMI088_ACCEL, REGA_X_LSB, buffer, 7)) {
+    if (spiReadRegMskBufRB(BMI088_ACCEL, REGA_X_LSB, buffer, 7)) {
       // first byte is discarded, see datasheet
     	acc->acc.accADCRaw[X] = (float)(((int16_t)(buffer[2] << 8) | buffer[1]) * 3 / 4);
     	acc->acc.accADCRaw[Y] = (float)(((int16_t)(buffer[4] << 8) | buffer[3]) * 3 / 4);

@@ -71,7 +71,7 @@ void run(void);
 int main(void)
 {
 
-  memProtReset();
+ memProtReset();
 
   initialiseMemorySections();
 

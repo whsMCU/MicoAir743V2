@@ -205,6 +205,7 @@ static FAST_CODE void gyroUpdateSensor(void)
 		return;
 	}
     bmi270.gyro.dataReady = false;
+
     bmi088GyroRead(&bmi088);
     bmi088.gyro.dataReady = false;
 
@@ -476,13 +477,10 @@ void taskAccUpdate(timeUs_t currentTimeUs)
   const timeDelta_t deltaT = currentTimeUs - previousIMUUpdateTime;
   previousIMUUpdateTime = currentTimeUs;
 
-
-
 	UNUSED(currentTimeUs);
 	if (!bmi270SpiAccRead(&bmi270)) {
 			return;
 	}
-
 	bmi088AccRead(&bmi088);
 	bmi088.acc.dataReady = false;
 
