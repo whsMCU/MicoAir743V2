@@ -141,6 +141,8 @@ typedef struct gyro_s {
     uint32_t rx_callback_dt;
 
     bool init_gyro_cal_enabled;
+
+    bool done_gyro_config;
 } gyro_t;
 
 typedef struct acc_s {
@@ -189,6 +191,7 @@ typedef struct acc_s {
   uint32_t exit_callback_dt;
   uint32_t rx_callback_dt;
 
+  bool done_accel_config;
 } acc_t;
 
 typedef struct imu_s {

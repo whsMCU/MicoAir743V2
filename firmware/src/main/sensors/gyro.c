@@ -121,6 +121,7 @@ void gyroStartCalibration(bool isFirstArmingCalibration)
     }
 
     gyroSetCalibrationCycles(&bmi270);
+    //gyroSetCalibrationCycles(&bmi088);
 
     if (isFirstArmingCalibration) {
         firstArmingCalibrationWasStarted = true;
@@ -208,11 +209,15 @@ static FAST_CODE void gyroUpdateSensor(void)
     if(bmi088.gyro.dataReady == true)
     {
       bmi088GyroRead(&bmi088);
+
+      bmi088.gyro.gyroADC[X] = (float)bmi088.gyro.gyroADCRaw[X] * bmi088.gyro.scale;
+      bmi088.gyro.gyroADC[Y] = (float)bmi088.gyro.gyroADCRaw[Y] * bmi088.gyro.scale;
+      bmi088.gyro.gyroADC[Z] = (float)bmi088.gyro.gyroADCRaw[Z] * bmi088.gyro.scale;
       //return;
     }
 
     bmi088.gyro.dataReady = false;
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////
     if (isGyroSensorCalibrationComplete(&bmi270)) {
     // move 16-bit gyro data into 32-bit variables to avoid overflows in calculations
 
@@ -231,6 +236,25 @@ static FAST_CODE void gyroUpdateSensor(void)
     }else {
         performGyroCalibration(&bmi270, gyroMovementCalibrationThreshold);
     }
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//    if (isGyroSensorCalibrationComplete(&bmi088)) {
+//    // move 16-bit gyro data into 32-bit variables to avoid overflows in calculations
+//
+//#if defined(USE_GYRO_SLEW_LIMITER)
+//    	bmi088.gyro.gyroADC[X] = gyroSlewLimiter(&bmi088, X) - bmi088.gyro.gyroZero[X];
+//    	bmi088.gyro.gyroADC[Y] = gyroSlewLimiter(&bmi088, Y) - bmi088.gyro.gyroZero[Y];
+//    	bmi088.gyro.gyroADC[Z] = gyroSlewLimiter(&bmi088, Z) - bmi088.gyro.gyroZero[Z];
+//#else
+//    	bmi088.gyro.gyroADC[X] = bmi088.gyro.gyroADCRaw[X] - bmi088.gyro.gyroZero[X];
+//    	bmi088.gyro.gyroADC[Y] = bmi088.gyro.gyroADCRaw[Y] - bmi088.gyro.gyroZero[Y];
+//    	bmi088.gyro.gyroADC[Z] = bmi088.gyro.gyroADCRaw[Z] - bmi088.gyro.gyroZero[Z];
+//#endif
+//
+//			alignSensorViaRotation(bmi088.gyro.gyroADC, CW0_DEG);
+//
+//    }else {
+//        performGyroCalibration(&bmi088, gyroMovementCalibrationThreshold);
+//    }
 }
 
 #define GYRO_SAMPLES_MEDIAN 3

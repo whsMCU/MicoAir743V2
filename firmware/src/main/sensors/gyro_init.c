@@ -110,7 +110,7 @@ void gyroConfig_init(void)
   bmi088.gyro.dynNotchConfig.dyn_notch_q = 300;
 
   bmi088.acc.sampleRateHz = 800;
-  bmi088.acc.acc_1G = 2730;
+  bmi088.acc.acc_1G = 1365;
   bmi088.acc.acc_1G_rec = 1.0f / bmi088.acc.acc_1G;
   bmi088.acc.acc_high_fsr = false;
   bmi088.acc.acc_lpf_hz = 25;

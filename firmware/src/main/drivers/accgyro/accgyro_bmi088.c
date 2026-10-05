@@ -85,6 +85,7 @@
 #define REGG_LPM1          0x11
 #define REGG_RATE_HBW      0x13
 #define REGG_BGW_SOFTRESET 0x14
+#define REGG_SELF_TEST     0x3C
 #define REGG_FIFO_CONFIG_1 0x3E
 #define REGG_FIFO_DATA     0x3F
 
@@ -92,19 +93,19 @@
 // that must be ignored. The result is in the second byte.
 static uint8_t bmi088RegisterRead(uint8_t dev, uint8_t registerId)
 {
-    uint8_t data[2] = { 0, 0 };
+    uint8_t data[3] = { 0, 0, 0 };
 
     if(dev == BMI088_ACCEL)
     {
-      if (spiReadRegMskBufRB(dev, registerId, data, 2)) {
-          return data[1];
+      if (spiReadRegMskBufRB(dev, registerId, data, 3)) {
+          return data[2];
       } else {
           return 0;
       }
     }else
     {
-			if (spiReadRegMskBufRB(dev, registerId, data, 2)) {
-					return data[0];
+ 			if (spiReadRegMskBufRB(dev, registerId, data, 2)) {
+					return data[1];
 			} else {
 					return 0;
 			}
@@ -118,14 +119,23 @@ static void bmi088RegisterWrite(uint8_t dev, uint8_t registerId, uint8_t value, 
         delay(delayMs);
     }
 }
-
+uint8_t st_temp;
 static void bmi088GyroInit(void)
 {
     // Soft reset
-		bmi088RegisterWrite(BMI088_GYRO, REGG_BGW_SOFTRESET, 0xB6, 100);
+		bmi088RegisterWrite(BMI088_GYRO, REGG_BGW_SOFTRESET, 0xB6, 30);
+
+		//+- 2000dps
+    bmi088RegisterWrite(BMI088_GYRO, REGG_RANGE, 0x00, 1);
 
     // ODR 2kHz, BW 532Hz
-    bmi088RegisterWrite(BMI088_GYRO, REGG_BW, 0x00, 1);
+    bmi088RegisterWrite(BMI088_GYRO, REGG_BW, 0x80, 1);
+
+    //LPM Normal
+    bmi088RegisterWrite(BMI088_GYRO, REGG_LPM1, 0x00, 1);
+
+    //setup for filtered data
+    bmi088RegisterWrite(BMI088_GYRO, REGG_RATE_HBW, 0x00, 1);
 
     // INT_IO_CONFIG
     bmi088RegisterWrite(BMI088_GYRO, REGG_INT_IO, 0x01, 1);
@@ -135,6 +145,8 @@ static void bmi088GyroInit(void)
 
     // Enable sampling
     bmi088RegisterWrite(BMI088_GYRO, REGG_INT_CTRL, 0x80, 1);
+
+    bmi088.gyro.done_gyro_config = true;
 }
 
 static void bmi088AccInit(void)
@@ -148,12 +160,11 @@ static void bmi088AccInit(void)
     // ACC ON
 		bmi088RegisterWrite(BMI088_ACCEL, REGA_PWR_CTRL, 0x04, 100);
 
-    // OSR4, ODR 800Hz
-		bmi088RegisterWrite(BMI088_ACCEL, REGA_CONF, 0x8B, 1);
+    // OSR2, ODR 1600Hz
+		bmi088RegisterWrite(BMI088_ACCEL, REGA_CONF, 0x9C, 1);
 
-
-    // Range 12g
-		bmi088RegisterWrite(BMI088_ACCEL, REGA_RANGE, 0x02, 1);
+    // Range 24g
+		bmi088RegisterWrite(BMI088_ACCEL, REGA_RANGE, 0x03, 1);
 
     // INT_IO_CONFIG
     bmi088RegisterWrite(BMI088_ACCEL, REGA_INT1_IO, 0x0A, 1);
@@ -161,7 +172,7 @@ static void bmi088AccInit(void)
     // INT_IO_MAP
     bmi088RegisterWrite(BMI088_ACCEL, REGA_INT_MAP, 0x04, 1);
 
-    bmi088.acc.acc_1G = 2048;
+    bmi088.acc.done_accel_config = true;
 }
 
 bool bmi088GyroRead(imu_t *gyro)
@@ -240,7 +251,7 @@ bool bmi088_Init(void)
   ret = gyroDeviceDetect();
   if(ret == true){
     bmi088GyroInit();
-    bmi088.gyro.scale = 1.0f / 16.4f; // 16.4 dps/lsb
+    //bmi088.gyro.scale = 1.0f / 16.4f; // 16.4 dps/lsb
 
   }
 
