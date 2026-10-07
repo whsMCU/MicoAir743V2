@@ -56,11 +56,11 @@ bool spiDev_Init(void)
 	spi_dev_tbl[BMI270].csTag   = _PIN_BMI270_CS;
 
 	spi_dev_tbl[BMI088_GYRO].dev.ch  = _DEF_SPI2;
-	spi_dev_tbl[BMI088_GYRO].mode    = SPI_MODE3;
+	spi_dev_tbl[BMI088_GYRO].mode    = SPI_MODE0;
 	spi_dev_tbl[BMI088_GYRO].csTag   = _PIN_BMI088_GYRO_CS;
 
 	spi_dev_tbl[BMI088_ACCEL].dev.ch  = _DEF_SPI2;
-	spi_dev_tbl[BMI088_ACCEL].mode    = SPI_MODE3;
+	spi_dev_tbl[BMI088_ACCEL].mode    = SPI_MODE0;
 	spi_dev_tbl[BMI088_ACCEL].csTag   = _PIN_BMI088_ACCEL_CS;
 
 	spi_dev_tbl[SDCARD].dev.ch  = _DEF_SPI2;
