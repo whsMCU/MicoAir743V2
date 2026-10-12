@@ -272,7 +272,7 @@ static float applyGyroMedianFilter(int axis, float newGyroReading)
     return quickMedianFilter3f(gyroFilterSamples[axis]);
 }
 
-FAST_CODE void taskGyroUpdate(timeUs_t currentTimeUs)
+FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
 {
   static timeUs_t previousIMUUpdateTime;
   const timeDelta_t deltaT = currentTimeUs - previousIMUUpdateTime;
@@ -306,7 +306,7 @@ FAST_CODE void taskGyroUpdate(timeUs_t currentTimeUs)
   DEBUG_SET(DEBUG_GYRO_RAW, 2, (bmi270.gyro.gyroADC[Y]));
   DEBUG_SET(DEBUG_GYRO_RAW, 3, (bmi270.gyro.gyroADC[Z]));
 
-#ifdef USE_OPFLOW
+#ifdef USE_OPTICALFLOW
   // getTaskDeltaTime() returns delta time frozen at the moment of entering the scheduler. currentTime is frozen at the very same point.
   // To make busy-waiting timeout work we need to account for time spent within busy-waiting loop
   const timeDelta_t currentDeltaTime = getTaskDeltaTimeUs(TASK_SELF);

@@ -204,8 +204,9 @@ typedef struct imu_s {
 
 extern imu_t bmi270;
 extern imu_t bmi088;
+extern uint8_t activePidLoopDenom;
 
-void taskGyroUpdate(timeUs_t currentTimeUs);
+FAST_CODE void gyroUpdate(timeUs_t currentTimeUs);
 void gyroFiltering(timeUs_t currentTimeUs);
 float gyroGetFilteredDownsampled(int axis);
 bool gyroGetAccumulationAverage(float *accumulationAverage);

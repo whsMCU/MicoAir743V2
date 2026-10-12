@@ -260,7 +260,7 @@ void init(void)
     rangefinderInit();
 #endif
 
-#ifdef USE_OPFLOW
+#ifdef USE_OPTICALFLOW
     opflowInit();
 #endif
     navigationInit();
@@ -337,7 +337,7 @@ void Param_Config_Init(void)
 #ifdef USE_GPS
 	//gpsConfig_Init();
 #endif
-#ifdef USE_OPFLOW
+#ifdef USE_OPTICALFLOW
 	opflow_Init();
 #endif
 	barometerConfig_Init();

@@ -702,7 +702,7 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
         break;
 
     case MSP2_INAV_OPTICAL_FLOW:
-#ifdef USE_OPFLOW
+#ifdef USE_OPTICALFLOW
 //        sbufWriteU8(dst, opflow.rawQuality);
 //        sbufWriteU16(dst, RADIANS_TO_DEGREES(opflow.flowRate[X]));
 //        sbufWriteU16(dst, RADIANS_TO_DEGREES(opflow.flowRate[Y]));
@@ -2590,7 +2590,7 @@ static mspResult_e mspFcProcessInCommand(uint16_t cmdMSP, sbuf_t *src)
       }
       break;
 
-#ifdef USE_OPFLOW
+#ifdef USE_OPTICALFLOW
     case MSP2_INAV_OPFLOW_CALIBRATION:
 //        if (!ARMING_FLAG(ARMED))
 //            opflowStartCalibration();

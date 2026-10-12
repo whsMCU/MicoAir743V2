@@ -65,7 +65,7 @@
 
 opflow_t opflow;
 
-#ifdef USE_OPFLOW
+#ifdef USE_OPTICALFLOW
 static bool opflowIsCalibrating = false;
 static timeMs_t opflowCalibrationStartedAt;
 static float opflowCalibrationBodyAcc;
