@@ -124,13 +124,7 @@ static int32_t gyroCyclesNow;
 
 static timeMs_t lastFailsafeCheckMs = 0;
 
-// No need for a linked list for the queue, since items are only inserted at startup
-#ifdef UNIT_TEST
-#define TASK_QUEUE_RESERVE 1
-#else
-#define TASK_QUEUE_RESERVE 0
-#endif
-static FAST_DATA_ZERO_INIT task_t* taskQueueArray[TASK_COUNT + 1 + TASK_QUEUE_RESERVE]; // extra item for NULL pointer at end of queue (+ overflow check in UNTT_TEST)
+static FAST_DATA_ZERO_INIT task_t* taskQueueArray[TASK_COUNT + 1]; // extra item for NULL pointer at end of queue (+ overflow check in UNTT_TEST)
 
 void queueClear(void)
 {
@@ -210,16 +204,18 @@ void taskSystemLoad(timeUs_t currentTimeUs)
         schedulerIgnoreTaskExecTime();
     }
 
+		if(rxRuntimeState.RxCount == 0)
+		{
+		 ENABLE_FAILSAFE(FAILSAFE_RX_LOSS_DETECTED);
+		}
+		rxRuntimeState.RxCount = 0;
+
 #if ENABLE_SIMULATOR
     averageSystemLoadPercent = 0;
 #endif
 }
 
-// if(rxRuntimeState.RxCount == 0)
-// {
-//   ENABLE_FAILSAFE(FAILSAFE_RX_LOSS_DETECTED);
-// }
-// rxRuntimeState.RxCount = 0;
+
 
 uint32_t getCpuPercentageLate(void)
 {
@@ -490,12 +486,6 @@ FAST_CODE timeUs_t schedulerExecuteTask(task_t *selectedTask, timeUs_t currentTi
 
     return taskExecutionTimeUs;
 }
-
-//   rxRuntimeState.uartAvalable = uartAvailable(_DEF_UART6);
-//   while(uartAvailable(_DEF_UART6))
-//   {
-//     crsfDataReceive(uartRead(_DEF_UART6), (void*) &rxRuntimeState);
-//   }
 
 #if defined(UNIT_TEST)
 STATIC_UNIT_TESTED task_t *unittest_scheduler_selectedTask;

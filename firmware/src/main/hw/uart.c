@@ -1133,6 +1133,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
 //      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], MAX_SIZE);
 //      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
+
+		rxRuntimeState.uartAvalable = uartAvailable(_DEF_UART6);
+		while(uartAvailable(_DEF_UART6))
+		{
+		 crsfDataReceive(uartRead(_DEF_UART6), (void*) &rxRuntimeState);
+		}
+
     rxRuntimeState.RxCallback_Flag = false;
 	}
   if(huart->Instance == UART7)

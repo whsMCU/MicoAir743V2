@@ -240,7 +240,7 @@ static uint8_t getHeadingHoldState(void)
 float yaw_heading_reference;
 
 // Function for loop trigger
-void taskMainPidLoop(timeUs_t currentTimeUs)
+FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 {
 	float imu_roll, imu_pitch, imu_yaw;
 	imu_roll = (float)DECIDEGREES_TO_DEGREES(attitude.values.roll);

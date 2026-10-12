@@ -12,10 +12,12 @@
 
 #include "common/time.h"
 
-void taskGyroSample(timeUs_t currentTimeUs);
+FAST_CODE void taskGyroSample(timeUs_t currentTimeUs);
 
-bool gyroFilterReady(void);
+FAST_CODE bool gyroFilterReady(void);
 
-bool pidLoopReady(void);
+FAST_CODE bool pidLoopReady(void);
+
+FAST_CODE void taskMainPidLoop(timeUs_t currentTimeUs);
 
 #endif /* SRC_MAIN_FC_CORE_H_ */
