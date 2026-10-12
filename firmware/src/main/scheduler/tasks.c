@@ -288,7 +288,7 @@ task_attribute_t task_attributes[TASK_COUNT] = {
     [TASK_BARO] = DEFINE_TASK("BARO", NULL, NULL, taskUpdateBaro, TASK_PERIOD_HZ(20), TASK_PRIORITY_LOW),
 #endif
 
-#if defined(USE_BARO) || defined(USE_GPS)
+#if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
     [TASK_ALTITUDE] = DEFINE_TASK("ALTITUDE", NULL, NULL, calculateEstimatedAltitude, TASK_PERIOD_HZ(40), TASK_PRIORITY_LOW),
 #endif
 
