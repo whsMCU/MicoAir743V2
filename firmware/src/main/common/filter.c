@@ -28,7 +28,7 @@
 #include "common/filter.h"
 #include "common/maths.h"
 #include "common/utils.h"
-//#include "stm32f4xx_hal_def.h"
+
 
 #define BIQUAD_Q 1.0f / sqrtf(2.0f)     /* quality factor - 2nd order butterworth*/
 
@@ -360,4 +360,84 @@ void simpleLPFilterInit(simpleLowpassFilter_t *filter, int32_t beta, int32_t fpS
     filter->fp = 0;
     filter->beta = beta;
     filter->fpShift = fpShift;
+}
+
+void svfNotchInit(svfNotchFilter_t *filter, float filterFreq, float dt, float Q)
+{
+    svfNotchUpdate(filter, filterFreq, dt, Q);
+
+    filter->ic1q = 0.0f; // State 1 scaled by q
+    filter->ic2 = 0.0f;  // State 2 (unscaled)
+}
+
+FAST_CODE void svfNotchUpdate(svfNotchFilter_t *filter, float filterFreq, float dt, float Q)
+{
+    float sn, cs;
+    sincosf_approx(M_PIf * filterFreq * dt, &sn, &cs);
+
+    const float f = sn / cs;
+    const float q = 1.0f / Q; // Still need this for a1/a2
+    const float invDenom = 1.0f / (1.0f + f * (f + q));
+
+    filter->a1  = invDenom;
+    filter->a2q = (f * invDenom) * q;
+    filter->fq  = f * Q; // Division replaced by multiplication
+}
+
+FAST_CODE float svfNotchApply(svfNotchFilter_t *filter, float input)
+{
+    const float a1  = filter->a1;
+    const float a2q = filter->a2q;
+    const float fq  = filter->fq;
+
+    const float v3 = input - filter->ic2;
+    const float v1q = a1 * filter->ic1q + a2q * v3; // This is now (q * BP)
+    const float v2 = filter->ic2 + fq * v1q;       // Equivalent to ic2 + f * BP
+    // Update scaled states
+    filter->ic1q = 2.0f * v1q - filter->ic1q;
+    filter->ic2 = 2.0f * v2 - filter->ic2;
+
+    return input - v1q;
+}
+
+void rpmNotchInit(rpmNotch_t *filter, float filterFreq, float dt, float Q, float weight)
+{
+    rpmNotchUpdate(filter, filterFreq, dt, Q, weight);
+    // zero initial samples
+    for (int i = 0; i < 3; i++) {
+        filter->ic1[i] = 0.0f;
+        filter->ic2[i] = 0.0f;
+    }
+}
+
+FAST_CODE void rpmNotchUpdate(rpmNotch_t *filter, float filterFreq, float dt, float Q, float weight)
+{
+    float sn, cs;
+    sincosf_approx(M_PIf * filterFreq * dt, &sn, &cs);
+
+    const float f  = sn / cs;
+    const float q  = 1.0f / Q;
+    const float a1 = 1.0f / (1.0f + f * (f + q));
+
+    filter->f  = f;
+    filter->a1 = a1;
+    filter->a2 = f * a1;
+    filter->wq = q * weight;
+}
+
+FAST_CODE void rpmNotchApply(rpmNotch_t *filter, float input[3])
+{
+    const float a1 = filter->a1;
+    const float a2 = filter->a2;
+    const float f  = filter->f;
+    const float wq = filter->wq;
+
+    for (int i = 0; i < 3; i++) {
+        const float v3 = input[i] - filter->ic2[i];
+        const float v1 = a1 * filter->ic1[i] + a2 * v3;
+        const float v2 = filter->ic2[i] + f * v1;
+        filter->ic1[i] = 2.0f * v1 - filter->ic1[i];
+        filter->ic2[i] = 2.0f * v2 - filter->ic2[i];
+        input[i] -= wq * v1;
+    }
 }

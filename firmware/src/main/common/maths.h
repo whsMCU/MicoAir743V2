@@ -26,6 +26,7 @@
 #define sq(x) ((x)*(x))
 #endif
 #define power3(x) ((x)*(x)*(x))
+#define power5(x) ((x)*(x)*(x)*(x)*(x))
 
 // Undefine this for use libc sinf/cosf. Keep this defined to use fast sin/cos approximations
 #define FAST_MATH             // order 9 approximation
@@ -35,6 +36,7 @@
 #define M_PIf       3.14159265358979323846f
 #define M_EULERf    2.71828182845904523536f
 #define M_LN2f      0.69314718055994530942f
+#define INV_PIO2    (2.0f / M_PIf)
 
 #define RAD    (M_PIf / 180.0f)
 
@@ -141,11 +143,13 @@ float quickMedianFilter5f(float * v);
 float quickMedianFilter7f(float * v);
 float quickMedianFilter9f(float * v);
 
-#if defined(FAST_MATH) || defined(VERY_FAST_MATH)
+#if defined(FAST_MATH)
 float sin_approx(float x);
 float cos_approx(float x);
+void sincosf_approx(float x, float *out_s, float *out_c);
 float atan2_approx(float y, float x);
 float acos_approx(float x);
+float asin_approx(float x);
 #define tan_approx(x)       (sin_approx(x) / cos_approx(x))
 float exp_approx(float val);
 float log_approx(float val);

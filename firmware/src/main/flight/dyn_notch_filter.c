@@ -120,8 +120,8 @@ typedef struct dynNotch_s {
     int maxCenterFreq;
     float centerFreq[XYZ_AXIS_COUNT][DYN_NOTCH_COUNT_MAX];
     
-    uint32_t looptimeUs;
-    biquadFilter_t notch[XYZ_AXIS_COUNT][DYN_NOTCH_COUNT_MAX];
+    float dt;
+    svfNotchFilter_t notch[XYZ_AXIS_COUNT][DYN_NOTCH_COUNT_MAX];
 
 } dynNotch_t;
 
@@ -139,7 +139,7 @@ void dynNotchConfig_Init(void)
 // dynamic notch instance (singleton)
 static FAST_DATA_ZERO_INIT dynNotch_t dynNotch;
 
-// accumulator for oversampled data => no aliasing and less noise
+// accumulator for oversampled data => less aliasing and noise
 static FAST_DATA_ZERO_INIT int   sampleIndex;
 static FAST_DATA_ZERO_INIT int   sampleCount;
 static FAST_DATA_ZERO_INIT float sampleCountRcp;
@@ -160,11 +160,10 @@ static FAST_DATA_ZERO_INIT int     sdftEndBin;
 static FAST_DATA_ZERO_INIT float   sdftNoiseThreshold;
 static FAST_DATA_ZERO_INIT float   pt1LooptimeS;
 
-
-void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeUs)
+void dynNotchInit(const dynNotchConfig_t *config, const float dt)
 {
     // dynNotchUpdate() is running at looprateHz (which is the PID looprate aka. 1e6f / gyro.targetLooptime)
-    const float looprateHz = 1.0f / targetLooptimeUs * 1e6f;
+    const float looprateHz = 1.0f / dt;
     const float nyquistHz = looprateHz / 2.0f;
 
     // Disable dynamic notch if dynNotchUpdate() would run at less than 2kHz
@@ -173,13 +172,13 @@ void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeU
         return;
     }
 
-    // always initialise, since the dynamic notch could be activated at any time
+    // If dynamic notch is available, initialise so it can be activated at any time
     dynNotch.q = config->dyn_notch_q / 100.0f;
     dynNotch.minHz = config->dyn_notch_min_hz;
     dynNotch.maxHz = MAX(dynNotch.minHz, config->dyn_notch_max_hz);
     dynNotch.maxHz = MIN(dynNotch.maxHz, nyquistHz); // Ensure to not go above the nyquist limit
     dynNotch.count = config->dyn_notch_count;
-    dynNotch.looptimeUs = targetLooptimeUs;
+    dynNotch.dt = dt;
     dynNotch.maxCenterFreq = 0;
 
     sampleCount = MAX(1, nyquistHz / dynNotch.maxHz); // maxHz = 600 & looprateHz = 8000 -> sampleCount = 6
@@ -204,9 +203,9 @@ void dynNotchInit(const dynNotchConfig_t *config, const uint32_t targetLooptimeU
 
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
         for (int p = 0; p < dynNotch.count; p++) {
-            // any init value is fine, but evenly spreading centerFreqs across frequency range makes notch filters stick to peaks quicker
+            // any init value is fine, but evenly spreading centerFreqs across frequency range makes notches stick to peaks quicker
             dynNotch.centerFreq[axis][p] = (p + 0.5f) * (dynNotch.maxHz - dynNotch.minHz) / (float)dynNotch.count + dynNotch.minHz;
-            biquadFilterInit(&dynNotch.notch[axis][p], dynNotch.centerFreq[axis][p], dynNotch.looptimeUs, dynNotch.q, FILTER_NOTCH, 1.0f);
+            svfNotchInit(&dynNotch.notch[axis][p], dynNotch.centerFreq[axis][p], dt, dynNotch.q);
         }
     }
 }
@@ -258,7 +257,7 @@ FAST_CODE void dynNotchUpdate(void)
 }
 
 // Find frequency peaks and update filters
-static NOINLINE void dynNotchProcess(void)
+static FAST_CODE_NOINLINE void dynNotchProcess(void)
 {
     uint32_t startTime = 0;
      if (debugMode == DEBUG_FFT_TIME) {
@@ -275,8 +274,8 @@ static NOINLINE void dynNotchProcess(void)
             
             // Get total vibrational power in dyn notch range for noise floor estimate in STEP_CALC_FREQUENCIES
             sdftNoiseThreshold = 0.0f;
-            for (int bin = (sdftStartBin + 1); bin < sdftEndBin; bin++) {   // don't use startBin or endBin because they are not windowed properly
-                sdftNoiseThreshold += sdftData[bin];                        // sdftData contains power spectral density
+            for (int bin = sdftStartBin; bin <= sdftEndBin; bin++) {
+                sdftNoiseThreshold += sdftData[bin];  // sdftData contains power spectral density
             }
 
             DEBUG_SET(DEBUG_FFT_TIME, 1, micros() - startTime);
@@ -307,7 +306,7 @@ static NOINLINE void dynNotchProcess(void)
                             break;
                         }
                     }
-                    bin++; // If bin is peak, next bin can't be peak => jump it
+                    bin++; // If bin is peak, next bin can't be peak => skip it
                 }
             }
 
@@ -340,7 +339,7 @@ static NOINLINE void dynNotchProcess(void)
                     peakCount++;
                 }
             }
-            sdftNoiseThreshold /= sdftEndBin - sdftStartBin - peakCount - 1;
+            sdftNoiseThreshold /= sdftEndBin - sdftStartBin - peakCount + 1;
 
             // A noise threshold 2 times the noise floor prevents peak tracking being too sensitive to noise
             sdftNoiseThreshold *= 2.0f;
@@ -381,12 +380,13 @@ static NOINLINE void dynNotchProcess(void)
                 }
             }
 
-//            if (state.axis == gyro.gyroDebugAxis) {
-//                for (int p = 0; p < dynNotch.count && p < 3; p++) {
-//                    DEBUG_SET(DEBUG_FFT_FREQ, p, lrintf(dynNotch.centerFreq[state.axis][p]));
-//                }
-//                DEBUG_SET(DEBUG_DYN_LPF, 1, lrintf(dynNotch.centerFreq[state.axis][0]));
-//            }
+            // if (state.axis == gyro.gyroDebugAxis) {
+            //     for (int p = 0; p < dynNotch.count && p < DYN_NOTCH_COUNT_MAX; p++) {
+            //         // debug channel 0 is reserved for pre DN gyro
+            //         DEBUG_SET(DEBUG_FFT_FREQ, p + 1, lrintf(dynNotch.centerFreq[state.axis][p]));
+            //     }
+            //     DEBUG_SET(DEBUG_DYN_LPF, 1, lrintf(dynNotch.centerFreq[state.axis][0]));
+            // }
 
             DEBUG_SET(DEBUG_FFT_TIME, 1, micros() - startTime);
 
@@ -397,7 +397,7 @@ static NOINLINE void dynNotchProcess(void)
             for (int p = 0; p < dynNotch.count; p++) {
                 // Only update notch filter coefficients if the corresponding peak got its center frequency updated in the previous step
                 if (peaks[p].bin != 0 && peaks[p].value > sdftNoiseThreshold) {
-                    biquadFilterUpdate(&dynNotch.notch[state.axis][p], dynNotch.centerFreq[state.axis][p], dynNotch.looptimeUs, dynNotch.q, FILTER_NOTCH, 1.0f);
+                    svfNotchUpdate(&dynNotch.notch[state.axis][p], dynNotch.centerFreq[state.axis][p], dynNotch.dt, dynNotch.q);
                 }
             }
 
@@ -413,7 +413,7 @@ static NOINLINE void dynNotchProcess(void)
 FAST_CODE float dynNotchFilter(const int axis, float value)
 {
     for (int p = 0; p < dynNotch.count; p++) {
-        value = biquadFilterApplyDF1(&dynNotch.notch[axis][p], value);
+        value = svfNotchApply(&dynNotch.notch[axis][p], value);
     }
 
     return value;

@@ -37,6 +37,7 @@
 #include "fc/runtime_config.h"
 
 #include "flight/dyn_notch_filter.h"
+#include "flight/rpm_filter.h"
 
 #include "drivers/accgyro/accgyro_spi_bmi270.h"
 //#include "drivers/accgyro/gyro_sync.h"
@@ -185,10 +186,9 @@ static void accInitFilters(void)
 static void initGyroLPF(float cutoffHz, float gyroDt,
                         filterApplyFnPtr *applyFn, gyroLowpassFilter_t *filters)
 {
-    float gain = pt1FilterGain(cutoffHz, gyroDt);
     *applyFn = (filterApplyFnPtr) pt1FilterApply;
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-        pt1FilterInit(&filters[axis].pt1FilterState, gain);
+        pt1FilterInit(&filters[axis].pt1FilterState, pt1FilterGain(cutoffHz, gyroDt));
     }
 }
 
@@ -213,7 +213,7 @@ bool gyroInit(void)
 
   float lpf1Hz = 250.f;
   float lpf2Hz = 500.f;
-  float gyroDt = 312 * 1e-6f;
+  float gyroDt = bmi270.gyro.sampleLooptime * 1e-6f;
 
 	initGyroLPF(lpf1Hz, gyroDt, &bmi270.gyro.lowpassFilterApplyFn, bmi270.gyro.lowpassFilter);
 	initGyroLPF(lpf2Hz, gyroDt, &bmi270.gyro.lowpass2FilterApplyFn, bmi270.gyro.lowpass2Filter);
@@ -224,8 +224,13 @@ bool gyroInit(void)
 #ifdef USE_DYN_LPF
     dynLpfFilterInit();
 #endif
+
 #ifdef USE_DYN_NOTCH_FILTER
-    dynNotchInit(&bmi270.gyro.dynNotchConfig, bmi270.gyro.targetLooptime);
+    dynNotchInit(&bmi270.gyro.dynNotchConfig, bmi270.gyro.targetLooptime * 1e-6f);
+#endif
+
+#ifdef USE_RPM_FILTER
+    rpmFilterInit(&rpmFilterConfig, bmi270.gyro.targetLooptime);
 #endif
 
   const float k = pt1FilterGain(GYRO_IMU_DOWNSAMPLE_CUTOFF_HZ, bmi270.gyro.targetLooptime * 1e-6f);

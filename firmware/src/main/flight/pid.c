@@ -140,10 +140,6 @@ void pidInit(void)
   _POS.out.ki = 0;
   _POS.out.kd = 0;
   _POS.out.integral_windup = 300;
-
-#ifdef USE_RPM_FILTER
-    rpmFilterInit(&rpmFilterConfig, bmi270.gyro.targetLooptime);
-#endif
 }
 
 #ifdef USE_DYN_LPF
@@ -265,10 +261,6 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 
       //processDelayedSave();
   }
-
-#ifdef USE_RPM_FILTER
-    rpmFilterUpdate();
-#endif
 
 #ifdef USE_DYN_LPF
     // keep the changes to dynamic lowpass clean, without unnecessary dynamic changes

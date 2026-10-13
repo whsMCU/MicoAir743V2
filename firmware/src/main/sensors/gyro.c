@@ -54,23 +54,23 @@
 FAST_DATA_ZERO_INIT imu_t bmi270;
 FAST_DATA_ZERO_INIT imu_t bmi088;
 
-static bool overflowDetected;
+static FAST_DATA_ZERO_INIT bool overflowDetected = 0;
 #ifdef USE_GYRO_OVERFLOW_CHECK
-static timeUs_t overflowTimeUs;
+static FAST_DATA_ZERO_INIT timeUs_t overflowTimeUs;
 #endif
 
 #ifdef USE_YAW_SPIN_RECOVERY
-static bool yawSpinRecoveryEnabled;
-static int yawSpinRecoveryThreshold;
-static bool yawSpinDetected;
-static timeUs_t yawSpinTimeUs;
+static FAST_DATA_ZERO_INIT bool yawSpinRecoveryEnabled;
+static FAST_DATA_ZERO_INIT int yawSpinRecoveryThreshold;
+static FAST_DATA_ZERO_INIT bool yawSpinDetected;
+static FAST_DATA_ZERO_INIT timeUs_t yawSpinTimeUs;
 #endif
 
 static FAST_DATA_ZERO_INIT float gyroFilteredDownsampled[XYZ_AXIS_COUNT];
 
 static FAST_DATA_ZERO_INIT int16_t gyroSensorTemperature;
 
-uint8_t activePidLoopDenom = 1;
+FAST_DATA uint8_t activePidLoopDenom = 1;
 
 static bool firstArmingCalibrationWasStarted = false;
 
@@ -319,44 +319,51 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
 
 static FAST_CODE void filterGyro(void)
 {
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+	float gyroADCfVec[XYZ_AXIS_COUNT] = {0.0f, 0.0f, 0.0f};
 
-      // downsample the individual gyro samples
-        float gyroADCf = 0;
-        if (bmi270.gyro.downsampleFilterEnabled) {
-            // using gyro lowpass 2 filter for downsampling
-            gyroADCf = bmi270.gyro.sampleSum[axis];
-        } else {
-            // using simple average for downsampling
-            if (bmi270.gyro.sampleCount) {
-                gyroADCf = bmi270.gyro.sampleSum[axis] / bmi270.gyro.sampleCount;
-            }
-            bmi270.gyro.sampleSum[axis] = 0;
-        }
+	for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+
+		// downsample the individual gyro samples
+		if (bmi270.gyro.downsampleFilterEnabled) {
+				// using gyro lowpass 2 filter for downsampling
+			gyroADCfVec[axis] = bmi270.gyro.sampleSum[axis];
+			} else {
+					// using simple average for downsampling
+					if (bmi270.gyro.sampleCount) {
+						gyroADCfVec[axis] = bmi270.gyro.sampleSum[axis] / bmi270.gyro.sampleCount;
+					}
+					bmi270.gyro.sampleSum[axis] = 0;
+			}
 
 #ifdef USE_RPM_FILTER
-        gyroADCf = rpmFilterApply(axis, gyroADCf);
+		}
+
+		rpmFilterRun(gyroADCfVec);
+
+		for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
 #endif
-        // apply static notch filters and software lowpass filters
-        gyroADCf = bmi270.gyro.notchFilter1ApplyFn((filter_t *)&bmi270.gyro.notchFilter1[axis], gyroADCf);
-        gyroADCf = bmi270.gyro.notchFilter2ApplyFn((filter_t *)&bmi270.gyro.notchFilter2[axis], gyroADCf);
-        gyroADCf = bmi270.gyro.lowpassFilterApplyFn((filter_t *)&bmi270.gyro.lowpassFilter[axis], gyroADCf);
+      float gyroADCf = gyroADCfVec[axis];
+
+			// apply static notch filters and software lowpass filters
+			gyroADCf = bmi270.gyro.notchFilter1ApplyFn((filter_t *)&bmi270.gyro.notchFilter1[axis], gyroADCf);
+			gyroADCf = bmi270.gyro.notchFilter2ApplyFn((filter_t *)&bmi270.gyro.notchFilter2[axis], gyroADCf);
+			gyroADCf = bmi270.gyro.lowpassFilterApplyFn((filter_t *)&bmi270.gyro.lowpassFilter[axis], gyroADCf);
 
 #ifdef USE_DYN_NOTCH_FILTER
-        if (isDynNotchActive()) {
-            dynNotchPush(axis, gyroADCf);
-            gyroADCf = dynNotchFilter(axis, gyroADCf);
-        }
+			if (isDynNotchActive()) {
+					dynNotchPush(axis, gyroADCf);
+					gyroADCf = dynNotchFilter(axis, gyroADCf);
+			}
 #endif
-        bmi270.gyro.gyroADCf[axis] = gyroADCf;
-    }
-    DEBUG_SET(DEBUG_GYRO_RAW, 4, (bmi270.gyro.gyroADCf[X]));
-    DEBUG_SET(DEBUG_GYRO_RAW, 5, (bmi270.gyro.gyroADCf[Y]));
-    DEBUG_SET(DEBUG_GYRO_RAW, 6, (bmi270.gyro.gyroADCf[Z]));
-    bmi270.gyro.sampleCount = 0;
+			bmi270.gyro.gyroADCf[axis] = gyroADCf;
+	}
+	DEBUG_SET(DEBUG_GYRO_RAW, 4, (bmi270.gyro.gyroADCf[X]));
+	DEBUG_SET(DEBUG_GYRO_RAW, 5, (bmi270.gyro.gyroADCf[Y]));
+	DEBUG_SET(DEBUG_GYRO_RAW, 6, (bmi270.gyro.gyroADCf[Z]));
+	bmi270.gyro.sampleCount = 0;
 }
 
-void gyroFiltering(timeUs_t currentTimeUs)
+FAST_CODE void gyroFiltering(timeUs_t currentTimeUs)
 {
   filterGyro();
 

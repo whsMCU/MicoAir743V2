@@ -91,6 +91,29 @@ typedef enum {
     FILTER_BPF,
 } biquadFilterType_e;
 
+// SVF filter in TPT form
+// this version will have issues if you change Q on the fly
+// Q must remain constant across updates as Q is baked into ic1q
+// heavily optimized to work as a notch filter
+typedef struct svfNotchFilter_s {
+    float a1;
+    float a2q;  // a2 * q
+    float fq;   // f * Q
+    float ic1q; // State 1 scaled by q
+    float ic2;  // State 2 (unscaled)
+} svfNotchFilter_t;
+
+// SVF filter in TPT form
+// heavily optimized to work as a notch filter with a weight
+typedef struct rpmNotch_s {
+    float f;
+    float a1;
+    float a2;
+    float wq;          // q * weight — fully precomputed notch+weight term
+    float ic1[3];
+    float ic2[3];
+} rpmNotch_t;
+
 typedef float (*filterApplyFnPtr)(filter_t *filter, float input);
 
 float nullFilterApply(filter_t *filter, float input);
@@ -141,3 +164,11 @@ typedef struct simpleLowpassFilter_s {
 
 int32_t simpleLPFilterUpdate(simpleLowpassFilter_t *filter, int32_t newVal);
 void simpleLPFilterInit(simpleLowpassFilter_t *filter, int32_t beta, int32_t fpShift);
+
+void svfNotchInit(svfNotchFilter_t *filter, float filterFreq, float dt, float Q);
+void svfNotchUpdate(svfNotchFilter_t *filter, float filterFreq, float dt, float Q);
+float svfNotchApply(svfNotchFilter_t *filter, float input);
+
+void rpmNotchInit(rpmNotch_t *filter, float filterFreq, float dt, float Q, float weight);
+void rpmNotchUpdate(rpmNotch_t *filter, float filterFreq, float dt, float Q, float weight);
+void rpmNotchApply(rpmNotch_t *filter, float input[3]);
