@@ -210,9 +210,9 @@ static FAST_CODE void gyroUpdateSensor(void)
     {
       bmi088GyroRead(&bmi088);
 
-      bmi088.gyro.gyroADC[X] = (float)bmi088.gyro.gyroADCRaw[X] * bmi088.gyro.scale;
-      bmi088.gyro.gyroADC[Y] = (float)bmi088.gyro.gyroADCRaw[Y] * bmi088.gyro.scale;
-      bmi088.gyro.gyroADC[Z] = (float)bmi088.gyro.gyroADCRaw[Z] * bmi088.gyro.scale;
+      bmi088.gyro.gyroADC.x = (float)bmi088.gyro.gyroADCRaw[X] * bmi088.gyro.scale;
+      bmi088.gyro.gyroADC.y = (float)bmi088.gyro.gyroADCRaw[Y] * bmi088.gyro.scale;
+      bmi088.gyro.gyroADC.z = (float)bmi088.gyro.gyroADCRaw[Z] * bmi088.gyro.scale;
       //return;
     }
 
@@ -226,12 +226,12 @@ static FAST_CODE void gyroUpdateSensor(void)
       bmi270.gyro.gyroADC[Y] = gyroSlewLimiter(&bmi270, Y) - bmi270.gyro.gyroZero[Y];
       bmi270.gyro.gyroADC[Z] = gyroSlewLimiter(&bmi270, Z) - bmi270.gyro.gyroZero[Z];
 #else
-    	bmi270.gyro.gyroADC[X] = bmi270.gyro.gyroADCRaw[X] - bmi270.gyro.gyroZero[X];
-    	bmi270.gyro.gyroADC[Y] = bmi270.gyro.gyroADCRaw[Y] - bmi270.gyro.gyroZero[Y];
-    	bmi270.gyro.gyroADC[Z] = bmi270.gyro.gyroADCRaw[Z] - bmi270.gyro.gyroZero[Z];
+    	bmi270.gyro.gyroADC.x = bmi270.gyro.gyroADCRaw[X] - bmi270.gyro.gyroZero[X];
+    	bmi270.gyro.gyroADC.y = bmi270.gyro.gyroADCRaw[Y] - bmi270.gyro.gyroZero[Y];
+    	bmi270.gyro.gyroADC.z = bmi270.gyro.gyroADCRaw[Z] - bmi270.gyro.gyroZero[Z];
 #endif
 
-			alignSensorViaRotation(bmi270.gyro.gyroADC, CW0_DEG);
+			alignSensorViaRotation(&bmi270.gyro.gyroADC, CW0_DEG);
 
     }else {
         performGyroCalibration(&bmi270, gyroMovementCalibrationThreshold);
@@ -280,9 +280,9 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
 	UNUSED(currentTimeUs);
 	gyroUpdateSensor();
 
-	bmi270.gyro.gyroADC[X] = bmi270.gyro.gyroADC[X] * bmi270.gyro.scale;
-	bmi270.gyro.gyroADC[Y] = bmi270.gyro.gyroADC[Y] * bmi270.gyro.scale;
-	bmi270.gyro.gyroADC[Z] = bmi270.gyro.gyroADC[Z] * bmi270.gyro.scale;
+	bmi270.gyro.gyroADC.x = bmi270.gyro.gyroADC.x * bmi270.gyro.scale;
+	bmi270.gyro.gyroADC.y = bmi270.gyro.gyroADC.y * bmi270.gyro.scale;
+	bmi270.gyro.gyroADC.z = bmi270.gyro.gyroADC.z * bmi270.gyro.scale;
 
 //  for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
 //    bmi270.gyroADCf[axis] = applyGyroMedianFilter(axis, bmi270.gyroADC[axis]);
@@ -290,21 +290,21 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
 
   if (bmi270.gyro.downsampleFilterEnabled) {
       // using gyro lowpass 2 filter for downsampling
-    bmi270.gyro.sampleSum[X] = bmi270.gyro.lowpass2FilterApplyFn((filter_t *)&bmi270.gyro.lowpass2Filter[X], bmi270.gyro.gyroADC[X]);
-    bmi270.gyro.sampleSum[Y] = bmi270.gyro.lowpass2FilterApplyFn((filter_t *)&bmi270.gyro.lowpass2Filter[Y], bmi270.gyro.gyroADC[Y]);
-    bmi270.gyro.sampleSum[Z] = bmi270.gyro.lowpass2FilterApplyFn((filter_t *)&bmi270.gyro.lowpass2Filter[Z], bmi270.gyro.gyroADC[Z]);
+    bmi270.gyro.sampleSum[X] = bmi270.gyro.lowpass2FilterApplyFn((filter_t *)&bmi270.gyro.lowpass2Filter[X], bmi270.gyro.gyroADC.x);
+    bmi270.gyro.sampleSum[Y] = bmi270.gyro.lowpass2FilterApplyFn((filter_t *)&bmi270.gyro.lowpass2Filter[Y], bmi270.gyro.gyroADC.y);
+    bmi270.gyro.sampleSum[Z] = bmi270.gyro.lowpass2FilterApplyFn((filter_t *)&bmi270.gyro.lowpass2Filter[Z], bmi270.gyro.gyroADC.z);
   } else {
       // using simple averaging for downsampling
-    bmi270.gyro.sampleSum[X] += bmi270.gyro.gyroADC[X];
-    bmi270.gyro.sampleSum[Y] += bmi270.gyro.gyroADC[Y];
-    bmi270.gyro.sampleSum[Z] += bmi270.gyro.gyroADC[Z];
+    bmi270.gyro.sampleSum[X] += bmi270.gyro.gyroADC.x;
+    bmi270.gyro.sampleSum[Y] += bmi270.gyro.gyroADC.y;
+    bmi270.gyro.sampleSum[Z] += bmi270.gyro.gyroADC.z;
     bmi270.gyro.sampleCount++;
   }
 
   DEBUG_SET(DEBUG_GYRO_RAW, 0, (deltaT));
-  DEBUG_SET(DEBUG_GYRO_RAW, 1, (bmi270.gyro.gyroADC[X]));
-  DEBUG_SET(DEBUG_GYRO_RAW, 2, (bmi270.gyro.gyroADC[Y]));
-  DEBUG_SET(DEBUG_GYRO_RAW, 3, (bmi270.gyro.gyroADC[Z]));
+  DEBUG_SET(DEBUG_GYRO_RAW, 1, (bmi270.gyro.gyroADC.x));
+  DEBUG_SET(DEBUG_GYRO_RAW, 2, (bmi270.gyro.gyroADC.y));
+  DEBUG_SET(DEBUG_GYRO_RAW, 3, (bmi270.gyro.gyroADC.z));
 
 #ifdef USE_OPTICALFLOW
   // getTaskDeltaTime() returns delta time frozen at the moment of entering the scheduler. currentTime is frozen at the very same point.
@@ -428,9 +428,9 @@ bool gyroGetAccumulationAverage(float *accumulationAverage)
 
 static void applyAccelerationTrims(const flightDynamicsTrims_t *accelerationTrims)
 {
-    bmi270.acc.accADC[X] -= accelerationTrims->raw[X];
-    bmi270.acc.accADC[Y] -= accelerationTrims->raw[Y];
-    bmi270.acc.accADC[Z] -= accelerationTrims->raw[Z];
+    bmi270.acc.accADC.x -= accelerationTrims->raw[X];
+    bmi270.acc.accADC.y -= accelerationTrims->raw[Y];
+    bmi270.acc.accADC.z -= accelerationTrims->raw[Z];
 }
 
 static void setConfigCalibrationCompleted(void)
@@ -483,10 +483,10 @@ void performAcclerationCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
         }
 
         // Sum up CALIBRATING_ACC_CYCLES readings
-        a[axis] += bmi270.acc.accADC[axis];
+        a[axis] += bmi270.acc.accADC.v[axis];
 
         // Reset global variables to prevent other code from using un-calibrated data
-        bmi270.acc.accADC[axis] = 0;
+        bmi270.acc.accADC.v[axis] = 0;
         bmi270.acc.accelerationTrims.raw[axis] = 0;
     }
 
@@ -527,19 +527,19 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 	bmi270.acc.isAccelUpdatedAtLeastOnce = true;
 
 	for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-			bmi270.acc.accADC[axis] = bmi270.acc.accADCRaw[axis];
+			bmi270.acc.accADC.v[axis] = bmi270.acc.accADCRaw[axis];
 	}
 
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-    bmi270.acc.accADC[axis] = pt2FilterApply(&bmi270.acc.accFilter[axis], bmi270.acc.accADC[axis]);
+    bmi270.acc.accADC.v[axis] = pt2FilterApply(&bmi270.acc.accFilter[axis], bmi270.acc.accADC.v[axis]);
   }
 
-	alignSensorViaRotation(bmi270.acc.accADC, CW0_DEG);
+	alignSensorViaRotation(&bmi270.acc.accADC, CW0_DEG);
 
   DEBUG_SET(DEBUG_ACCELEROMETER, 0, (deltaT));
-  DEBUG_SET(DEBUG_ACCELEROMETER, 1, (bmi270.acc.accADC[X]));
-  DEBUG_SET(DEBUG_ACCELEROMETER, 2, (bmi270.acc.accADC[Y]));
-  DEBUG_SET(DEBUG_ACCELEROMETER, 3, (bmi270.acc.accADC[Z]));
+  DEBUG_SET(DEBUG_ACCELEROMETER, 1, (bmi270.acc.accADC.x));
+  DEBUG_SET(DEBUG_ACCELEROMETER, 2, (bmi270.acc.accADC.y));
+  DEBUG_SET(DEBUG_ACCELEROMETER, 3, (bmi270.acc.accADC.z));
 
   if (!accIsCalibrationComplete()) {
       performAcclerationCalibration(&bmi270.acc.rollAndPitchTrims);
@@ -547,17 +547,17 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 
   applyAccelerationTrims(&bmi270.acc.accelerationTrims);
 
-  DEBUG_SET(DEBUG_ACCELEROMETER, 4, (bmi270.acc.accADC[X]));
-  DEBUG_SET(DEBUG_ACCELEROMETER, 5, (bmi270.acc.accADC[Y]));
-  DEBUG_SET(DEBUG_ACCELEROMETER, 6, (bmi270.acc.accADC[Z]));
+  DEBUG_SET(DEBUG_ACCELEROMETER, 4, (bmi270.acc.accADC.x));
+  DEBUG_SET(DEBUG_ACCELEROMETER, 5, (bmi270.acc.accADC.y));
+  DEBUG_SET(DEBUG_ACCELEROMETER, 6, (bmi270.acc.accADC.z));
 
   static vector3_t accAdcPrev;
   vector3_t accADC;
 
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-    accADC.v[axis] = bmi270.acc.accADC[axis];
-    bmi270.acc.jerk.v[axis] = (bmi270.acc.accADC[axis] - accAdcPrev.v[axis]) * bmi270.acc.sampleRateHz;
-    accAdcPrev.v[axis] = bmi270.acc.accADC[axis];
+    accADC.v[axis] = bmi270.acc.accADC.v[axis];
+    bmi270.acc.jerk.v[axis] = (bmi270.acc.accADC.v[axis] - accAdcPrev.v[axis]) * bmi270.acc.sampleRateHz;
+    accAdcPrev.v[axis] = bmi270.acc.accADC.v[axis];
   }
 
   bmi270.acc.accMagnitude = vector3Norm(&accADC) * bmi270.acc.acc_1G_rec;
@@ -565,7 +565,7 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 
   // Calculate acceleration readings in G's
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-    bmi270.acc.accADCf[axis] = (float)bmi270.acc.accADC[axis] / bmi270.acc.acc_1G;
+    bmi270.acc.accADCf[axis] = (float)bmi270.acc.accADC.v[axis] / bmi270.acc.acc_1G;
   }
 
   // Before filtering check for clipping and vibration levels
@@ -588,7 +588,7 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 
   ++bmi270.acc.acc_accumulatedMeasurementCount;
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-  	bmi270.acc.acc_accumulatedMeasurements[axis] += bmi270.acc.accADC[axis];
+  	bmi270.acc.acc_accumulatedMeasurements[axis] += bmi270.acc.accADC.v[axis];
   }
 }
 

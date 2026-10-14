@@ -19,13 +19,18 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <math.h>
 
-#include "axis.h"
+#include "hw.h"
+
+//#include "build/build_config.h"
+
+#include "common/axis.h"
+
 #include "maths.h"
 
 #if defined(FAST_MATH)
-
 static inline float sin_poly5_r(float r, float s)
 {
     // Pre-scaled for u = r*(π/2)
@@ -170,6 +175,7 @@ float asin_approx(float x)
 {
     return (M_PIf * 0.5f) - acos_approx(x);
 }
+
 #endif
 
 int gcd(int num, int denom)
@@ -183,7 +189,7 @@ int gcd(int num, int denom)
 
 int32_t applyDeadband(const int32_t value, const int32_t deadband)
 {
-    if (ABS(value) < deadband) {
+    if (abs(value) < deadband) {
         return 0;
     }
 
@@ -233,54 +239,31 @@ float degreesToRadians(int16_t degrees)
     return degrees * RAD;
 }
 
-int scaleRange(int x, int srcFrom, int srcTo, int destFrom, int destTo) {
+int scaleRange(int x, int srcFrom, int srcTo, int destFrom, int destTo)
+{
     long int a = ((long int) destTo - (long int) destFrom) * ((long int) x - (long int) srcFrom);
     long int b = (long int) srcTo - (long int) srcFrom;
     return (a / b) + destFrom;
 }
 
-float scaleRangef(float x, float srcFrom, float srcTo, float destFrom, float destTo) {
+float scaleRangef(float x, float srcFrom, float srcTo, float destFrom, float destTo)
+{
     float a = (destTo - destFrom) * (x - srcFrom);
     float b = srcTo - srcFrom;
     return (a / b) + destFrom;
 }
 
-void buildRotationMatrix(fp_angles_t *delta, fp_rotationMatrix_t *rotation)
+void scaleRangefInit(scaleRangef_t *scale, float srcFrom, float srcTo, float destFrom, float destTo)
 {
-    float cosx, sinx, cosy, siny, cosz, sinz;
-    float coszcosx, sinzcosx, coszsinx, sinzsinx;
-
-    cosx = cos_approx(delta->angles.roll);
-    sinx = sin_approx(delta->angles.roll);
-    cosy = cos_approx(delta->angles.pitch);
-    siny = sin_approx(delta->angles.pitch);
-    cosz = cos_approx(delta->angles.yaw);
-    sinz = sin_approx(delta->angles.yaw);
-
-    coszcosx = cosz * cosx;
-    sinzcosx = sinz * cosx;
-    coszsinx = sinx * cosz;
-    sinzsinx = sinx * sinz;
-
-    rotation->m[0][X] = cosz * cosy;
-    rotation->m[0][Y] = -cosy * sinz;
-    rotation->m[0][Z] = siny;
-    rotation->m[1][X] = sinzcosx + (coszsinx * siny);
-    rotation->m[1][Y] = coszcosx - (sinzsinx * siny);
-    rotation->m[1][Z] = -sinx * cosy;
-    rotation->m[2][X] = (sinzsinx) - (coszcosx * siny);
-    rotation->m[2][Y] = (coszsinx) + (sinzcosx * siny);
-    rotation->m[2][Z] = cosy * cosx;
+    float range_src = srcTo - srcFrom;
+    float range_dest = destTo - destFrom;
+    scale->scale = range_dest / range_src;
+    scale->offset = destFrom - (srcFrom * scale->scale);
 }
 
-void applyMatrixRotation(float *v, fp_rotationMatrix_t *rotationMatrix)
+float scaleRangefApply(scaleRangef_t *scale, float x)
 {
-    struct fp_vector *vDest = (struct fp_vector *)v;
-    struct fp_vector vTmp = *vDest;
-
-    vDest->X = (rotationMatrix->m[0][X] * vTmp.X + rotationMatrix->m[1][X] * vTmp.Y + rotationMatrix->m[2][X] * vTmp.Z);
-    vDest->Y = (rotationMatrix->m[0][Y] * vTmp.X + rotationMatrix->m[1][Y] * vTmp.Y + rotationMatrix->m[2][Y] * vTmp.Z);
-    vDest->Z = (rotationMatrix->m[0][Z] * vTmp.X + rotationMatrix->m[1][Z] * vTmp.Y + rotationMatrix->m[2][Z] * vTmp.Z);
+    return (x * scale->scale) + scale->offset;
 }
 
 // Quick median filter implementation
@@ -292,7 +275,7 @@ void applyMatrixRotation(float *v, fp_rotationMatrix_t *rotationMatrix)
 #define QMF_SORTF(a,b) { if ((a)>(b)) QMF_SWAPF((a),(b)); }
 #define QMF_SWAPF(a,b) { float temp=(a);(a)=(b);(b)=temp; }
 
-int32_t quickMedianFilter3(int32_t * v)
+int32_t quickMedianFilter3(const int32_t * v)
 {
     int32_t p[3];
     QMF_COPY(p, v, 3);
@@ -301,7 +284,7 @@ int32_t quickMedianFilter3(int32_t * v)
     return p[1];
 }
 
-int32_t quickMedianFilter5(int32_t * v)
+int32_t quickMedianFilter5(const int32_t * v)
 {
     int32_t p[5];
     QMF_COPY(p, v, 5);
@@ -312,7 +295,7 @@ int32_t quickMedianFilter5(int32_t * v)
     return p[2];
 }
 
-int32_t quickMedianFilter7(int32_t * v)
+int32_t quickMedianFilter7(const int32_t * v)
 {
     int32_t p[7];
     QMF_COPY(p, v, 7);
@@ -325,7 +308,7 @@ int32_t quickMedianFilter7(int32_t * v)
     return p[3];
 }
 
-int32_t quickMedianFilter9(int32_t * v)
+int32_t quickMedianFilter9(const int32_t * v)
 {
     int32_t p[9];
     QMF_COPY(p, v, 9);
@@ -340,7 +323,7 @@ int32_t quickMedianFilter9(int32_t * v)
     return p[4];
 }
 
-float quickMedianFilter3f(float * v)
+float quickMedianFilter3f(const float * v)
 {
     float p[3];
     QMF_COPY(p, v, 3);
@@ -349,7 +332,7 @@ float quickMedianFilter3f(float * v)
     return p[1];
 }
 
-float quickMedianFilter5f(float * v)
+float quickMedianFilter5f(const float * v)
 {
     float p[5];
     QMF_COPY(p, v, 5);
@@ -360,7 +343,7 @@ float quickMedianFilter5f(float * v)
     return p[2];
 }
 
-float quickMedianFilter7f(float * v)
+float quickMedianFilter7f(const float * v)
 {
     float p[7];
     QMF_COPY(p, v, 7);
@@ -373,7 +356,7 @@ float quickMedianFilter7f(float * v)
     return p[3];
 }
 
-float quickMedianFilter9f(float * v)
+float quickMedianFilter9f(const float * v)
 {
     float p[9];
     QMF_COPY(p, v, 9);
@@ -388,23 +371,49 @@ float quickMedianFilter9f(float * v)
     return p[4];
 }
 
-void arraySubInt32(int32_t *dest, int32_t *array1, int32_t *array2, int count)
+void arraySubInt32(int32_t *dest, const int32_t *array1, const int32_t *array2, int count)
 {
     for (int i = 0; i < count; i++) {
         dest[i] = array1[i] - array2[i];
     }
 }
 
-int16_t qPercent(fix12_t q) {
+int16_t qPercent(fix12_t q)
+{
     return (100 * q) >> 12;
 }
 
-int16_t qMultiply(fix12_t q, int16_t input) {
+int16_t qMultiply(fix12_t q, int16_t input)
+{
     return (input *  q) >> 12;
 }
 
-fix12_t  qConstruct(int16_t num, int16_t den) {
+fix12_t  qConstruct(int16_t num, int16_t den)
+{
     return (num << 12) / den;
+}
+
+// Cubic polynomial blending function
+static float cubicBlend(const float t)
+{
+    return t * t * (3.0f - 2.0f * t);
+}
+
+// Smooth step-up transition function from 0 to 1
+float smoothStepUpTransition(const float x, const float center, const float width)
+{
+    const float half_width = width * 0.5f;
+    const float left_limit = center - half_width;
+    const float right_limit = center + half_width;
+
+    if (x < left_limit) {
+        return 0.0f;
+    } else if (x > right_limit) {
+        return 1.0f;
+    } else {
+        const float t = (x - left_limit) / width; // Normalize x within the range
+        return cubicBlend(t);
+    }
 }
 
 float bellCurve(const float x, const float curveWidth)
@@ -425,6 +434,44 @@ float fast_fsqrtf(const double value) {
     }
     return ret;
 }
+
+// void buildRotationMatrix(fp_angles_t *delta, fp_rotationMatrix_t *rotation)
+// {
+//     float cosx, sinx, cosy, siny, cosz, sinz;
+//     float coszcosx, sinzcosx, coszsinx, sinzsinx;
+
+//     cosx = cos_approx(delta->angles.roll);
+//     sinx = sin_approx(delta->angles.roll);
+//     cosy = cos_approx(delta->angles.pitch);
+//     siny = sin_approx(delta->angles.pitch);
+//     cosz = cos_approx(delta->angles.yaw);
+//     sinz = sin_approx(delta->angles.yaw);
+
+//     coszcosx = cosz * cosx;
+//     sinzcosx = sinz * cosx;
+//     coszsinx = sinx * cosz;
+//     sinzsinx = sinx * sinz;
+
+//     rotation->m[0][X] = cosz * cosy;
+//     rotation->m[0][Y] = -cosy * sinz;
+//     rotation->m[0][Z] = siny;
+//     rotation->m[1][X] = sinzcosx + (coszsinx * siny);
+//     rotation->m[1][Y] = coszcosx - (sinzsinx * siny);
+//     rotation->m[1][Z] = -sinx * cosy;
+//     rotation->m[2][X] = (sinzsinx) - (coszcosx * siny);
+//     rotation->m[2][Y] = (coszsinx) + (sinzcosx * siny);
+//     rotation->m[2][Z] = cosy * cosx;
+// }
+
+// void applyMatrixRotation(float *v, fp_rotationMatrix_t *rotationMatrix)
+// {
+//     struct fp_vector *vDest = (struct fp_vector *)v;
+//     struct fp_vector vTmp = *vDest;
+
+//     vDest->X = (rotationMatrix->m[0][X] * vTmp.X + rotationMatrix->m[1][X] * vTmp.Y + rotationMatrix->m[2][X] * vTmp.Z);
+//     vDest->Y = (rotationMatrix->m[0][Y] * vTmp.X + rotationMatrix->m[1][Y] * vTmp.Y + rotationMatrix->m[2][Y] * vTmp.Z);
+//     vDest->Z = (rotationMatrix->m[0][Z] * vTmp.X + rotationMatrix->m[1][Z] * vTmp.Y + rotationMatrix->m[2][Z] * vTmp.Z);
+// }
 
 // function to calculate the normalization (pythagoras) of a 2-dimensional vector
 float calc_length_pythagorean_2D(const float firstElement, const float secondElement)

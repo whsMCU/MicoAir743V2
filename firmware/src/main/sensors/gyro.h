@@ -83,7 +83,7 @@ typedef struct gyro_s {
 
     int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
     int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
-    float gyroADC[XYZ_AXIS_COUNT];     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
+    vector3_t gyroADC;     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
     float gyroADCf[XYZ_AXIS_COUNT];    // filtered gyro data
 
     float gyro_accumulatedMeasurements[XYZ_AXIS_COUNT];
@@ -154,7 +154,7 @@ typedef struct acc_s {
   uint16_t acc_1G;
 
   int16_t accADCRaw[XYZ_AXIS_COUNT];
-  float accADC[XYZ_AXIS_COUNT];
+  vector3_t accADC;
   float accADCf[XYZ_AXIS_COUNT];
   float accPrevious[XYZ_AXIS_COUNT];
 

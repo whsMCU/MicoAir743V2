@@ -215,9 +215,9 @@ static void imuMahonyAHRSupdate(float dt,
 
 #ifdef USE_MAG
     // Use measured magnetic field vector
-    float mx = mag.magADC[X];
-    float my = mag.magADC[Y];
-    float mz = mag.magADC[Z];
+    float mx = mag.magADC.x;
+    float my = mag.magADC.y;
+    float mz = mag.magADC.z;
     float recipMagNorm = sq(mx) + sq(my) + sq(mz);
     if (useMag && recipMagNorm > 0.01f) {
         // Normalise magnetometer measurement
@@ -547,9 +547,9 @@ void imuUpdateAttitude(timeUs_t currentTimeUs)
 
     updatePositionEstimator();
   } else {
-    bmi270.acc.accADC[X] = 0;
-    bmi270.acc.accADC[Y] = 0;
-    bmi270.acc.accADC[Z] = 0;
+    bmi270.acc.accADC.x = 0;
+    bmi270.acc.accADC.y = 0;
+    bmi270.acc.accADC.z = 0;
     schedulerIgnoreTaskStateTime();
   }
 }

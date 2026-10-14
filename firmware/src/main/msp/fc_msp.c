@@ -479,9 +479,9 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
           sbufWriteU16(dst, compassConfig.magZero.raw[Y]);
           sbufWriteU16(dst, compassConfig.magZero.raw[Z]);
 
-          sbufWriteU32(dst, (int32_t)(mag.magADC[X] * 1000.0f));
-          sbufWriteU32(dst, (int32_t)(mag.magADC[Y] * 1000.0f));
-          sbufWriteU32(dst, (int32_t)(mag.magADC[Z] * 1000.0f));
+          sbufWriteU32(dst, (int32_t)(mag.magADC.x * 1000.0f));
+          sbufWriteU32(dst, (int32_t)(mag.magADC.y * 1000.0f));
+          sbufWriteU32(dst, (int32_t)(mag.magADC.z * 1000.0f));
 
           sbufWriteU32(dst, (int32_t)(opflow.flowRate[X] * 1000.0f));
           sbufWriteU32(dst, (int32_t)(opflow.flowRate[Y] * 1000.0f));
