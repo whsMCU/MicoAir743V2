@@ -28,8 +28,9 @@ static void cliFatfs(cli_args_t *args);
 
 bool fatfsInit(void)
 {
-  bool ret = true;
+  bool ret = false;
 
+  is_init = false;
 
   if(FATFS_LinkDriver(&SD_Driver, SDPath) == 0)
   {

@@ -772,6 +772,8 @@ void cliMemoryDump(cli_args_t *args)
 void cliTaskList(cli_args_t *args)
 {
   int averageLoadSum = 0;
+  static timeUs_t lastTasksTimeUs;
+  timeDelta_t timeSinceTasksUs = cmpTimeUs(micros(), lastTasksTimeUs);
 
   cliPrintf("Task list             rate/hz  max/us  avg/us maxload avgload  total/ms   late    run reqd/us\r\n");
 
@@ -781,26 +783,35 @@ void cliTaskList(cli_args_t *args)
         if (taskInfo.isEnabled) {
             int taskFrequency = taskInfo.averageDeltaTime10thUs == 0 ? 0 : lrintf(1e7f / taskInfo.averageDeltaTime10thUs);
             cliPrintf("%02d - (%15s) ", taskId, taskInfo.taskName);
-            const int maxLoad = taskInfo.maxExecutionTimeUs == 0 ? 0 : (taskInfo.maxExecutionTimeUs * taskFrequency) / 1000;
-            const int averageLoad = taskInfo.averageExecutionTime10thUs == 0 ? 0 : (taskInfo.averageExecutionTime10thUs * taskFrequency) / 10000;
-            if (taskId != TASK_SERIAL) {
-                averageLoadSum += averageLoad;
-            }
+            const int maxLoad = taskInfo.maxLoad10thPct;
+            const int averageLoad = taskInfo.movingAverageLoad10thPct;
+            averageLoadSum += averageLoad;
+
             if (true) { //systemConfig.task_statistics
               cliPrintf("%6d %7d %7d %4d.%1d%% %4d.%1d%% %9d %6d %6d %7d\r\n",
                       taskFrequency, taskInfo.maxExecutionTimeUs, taskInfo.averageExecutionTime10thUs / 10,
                       maxLoad/10, maxLoad%10, averageLoad/10, averageLoad%10,
                       taskInfo.totalExecutionTimeUs / 1000,
                       taskInfo.lateCount, taskInfo.runCount, taskInfo.execTime);
-              schedulerResetTaskMaxExecutionTime(taskId);
             }
-    }
+            schedulerResetTaskMaxExecutionTime(taskId);
+        }
     }
     if (true) { //systemConfig.task_statistics
-        cfCheckFuncInfo_t checkFuncInfo;
-        getCheckFuncInfo(&checkFuncInfo);
-        cliPrintf("RX Check Function %19d %7d %25d\r\n", checkFuncInfo.maxExecutionTimeUs, checkFuncInfo.averageExecutionTimeUs, checkFuncInfo.totalExecutionTimeUs / 1000);
-        cliPrintf("Total (excluding SERIAL) %33d.%1d%%\r\n", averageLoadSum/10, averageLoadSum%10);
-        schedulerResetCheckFunctionMaxExecutionTime();
+    	static timeUs_t lastCheckFuncTotalUs;
+			cfCheckFuncInfo_t checkFuncInfo;
+			getCheckFuncInfo(&checkFuncInfo);
+      timeDelta_t checkFuncTotalSinceUs = checkFuncInfo.totalExecutionTimeUs - lastCheckFuncTotalUs;
+      lastCheckFuncTotalUs = checkFuncInfo.totalExecutionTimeUs;
+      uint32_t checkFuncAvgLoad10 = timeSinceTasksUs ? (uint32_t)((checkFuncTotalSinceUs * 1000.0f) / timeSinceTasksUs) : 0;
+			cliPrintf("Check Functions (RX, ...) %11d %7d %12d.%1d%% %9d\r\n", checkFuncInfo.maxExecutionTimeUs, checkFuncInfo.averageExecutionTimeUs,
+                checkFuncAvgLoad10 / 10, checkFuncAvgLoad10 %10, checkFuncInfo.totalExecutionTimeUs / 1000);
+			cliPrintf("Total %52d.%1d%%\r\n", averageLoadSum/10, averageLoadSum%10);
+
+			extern int32_t schedLoopStartCycles, taskGuardCycles;
+			cliPrintf("Scheduler start cycles %d guard cycles %d\r\n", schedLoopStartCycles, taskGuardCycles);
+
+			schedulerResetCheckFunctionMaxExecutionTime();
     }
+    lastTasksTimeUs = micros();
 }

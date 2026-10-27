@@ -575,10 +575,10 @@ FAST_CODE void scheduler(void)
                 taskExecutionTimeUs += schedulerExecuteTask(getTask(TASK_PID), currentTimeUs);
             }
 
-  // Check for incoming RX data. Don't do this in the checker as that is called repeatedly within
-  // a given gyro loop, and ELRS takes a long time to process this and so can only be safely processed
-  // before the checkers
-  rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
+						// Check for incoming RX data. Don't do this in the checker as that is called repeatedly within
+						// a given gyro loop, and ELRS takes a long time to process this and so can only be safely processed
+						// before the checkers
+						rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
 
             // Check for failsafe conditions without reliance on the RX task being well behaved
 //            if (cmp32(millis(), lastFailsafeCheckMs) > PERIOD_RXDATA_FAILURE) {
