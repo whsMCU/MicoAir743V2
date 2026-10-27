@@ -37,6 +37,7 @@ bool fatfsInit(void)
     if(f_mount(&SDFatFs, (TCHAR const*)SDPath, 0) == FR_OK)
     {
       is_init = true;
+      ret = true;
     }
   }
 
