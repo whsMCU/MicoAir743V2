@@ -81,9 +81,9 @@ void gyroConfig_init(void)
   bmi270.acc.acc_lpf_hz = 25;
 
   resetFlightDynamicsTrims(&bmi270.acc.accelerationTrims);
-  bmi270.acc.accelerationTrims.values.roll = 21;
-  bmi270.acc.accelerationTrims.values.pitch = -55;
-  bmi270.acc.accelerationTrims.values.yaw = -6;
+  bmi270.acc.accelerationTrims.values.roll = -52;
+  bmi270.acc.accelerationTrims.values.pitch = -49;
+  bmi270.acc.accelerationTrims.values.yaw = -4;
 
   bmi270.gyro.init_gyro_cal_enabled = true;
   bmi270.acc.gravity_cmss_cal = 0;

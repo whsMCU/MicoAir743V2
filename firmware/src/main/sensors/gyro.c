@@ -45,7 +45,7 @@
 
 #include "sensors/gyro.h"
 #include "sensors/gyro_init.h"
-#include "sensors/opflow.h"
+#include "sensors/opticalflow.h"
 #include "sensors/boardalignment.h"
 
 #include "drivers/accgyro/accgyro_spi_bmi270.h"
@@ -311,7 +311,7 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
   // To make busy-waiting timeout work we need to account for time spent within busy-waiting loop
   const timeDelta_t currentDeltaTime = getTaskDeltaTimeUs(TASK_SELF);
 
-    if (sensors(SENSOR_OPFLOW)) {
+    if (sensors(SENSOR_OPTICALFLOW)) {
         opflowGyroUpdateCallback(currentDeltaTime);
     }
 #endif

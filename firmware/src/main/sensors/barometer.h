@@ -26,15 +26,22 @@
 #include "drivers/barometer/barometer.h"
 
 typedef enum {
-    BARO_DEFAULT = 0,
-    BARO_NONE = 1,
-    BARO_BMP085 = 2,
-    BARO_MS5611 = 3,
-    BARO_BMP280 = 4,
-    BARO_LPS = 5,
-    BARO_QMP6988 = 6,
-    BARO_BMP388 = 7,
-    BARO_DPS310 = 8,
+  BARO_DEFAULT = 0,
+  BARO_NONE = 1,
+  BARO_BMP085 = 2,
+  BARO_MS5611 = 3,
+  BARO_BMP280 = 4,
+  BARO_LPS = 5,
+  BARO_QMP6988 = 6,
+  BARO_BMP388 = 7,
+  BARO_DPS310 = 8,
+  BARO_2SMPB_02B = 9,
+  BARO_LPS22DF = 10,
+  BARO_BMP580 = 11,
+  BARO_BMP581 = 12,
+  BARO_VIRTUAL = 13,
+  BARO_SPA06_003 = 14,
+  BARO_HARDWARE_COUNT
 } baroSensor_e;
 
 #define BARO_SAMPLE_COUNT_MAX   48
@@ -53,11 +60,15 @@ typedef struct barometerConfig_s {
 //    ioTag_t baro_xclr_tag;
 } barometerConfig_t;
 
+#ifndef TASK_BARO_RATE_HZ
+#define TASK_BARO_RATE_HZ 40                // Will be overwritten by the baro device driver
+#endif
+
 typedef struct baro_s {
     baroDev_t dev;
-    int32_t BaroAlt;
-    int32_t baroTemperature;             // Use temperature for telemetry
-    int32_t baroPressure;                // Use pressure for telemetry
+    float altitude;
+    int32_t temperature;                    // Use temperature for telemetry
+    int32_t pressure;                       // Use pressure for telemetry
 } baro_t;
 
 extern baro_t baro;
@@ -67,12 +78,11 @@ void barometerConfig_Init(void);
 
 void Baro_Init(void);
 bool baroDetect(baroDev_t *dev);
-bool baroIsCalibrationComplete(void);
+bool baroIsCalibrated(void);
 void baroStartCalibration(void);
 void baroSetGroundLevel(void);
 void taskUpdateBaro(timeUs_t currentTimeUs);
 uint32_t baroUpdate(timeUs_t currentTimeUs);
 bool isBaroReady(void);
-int32_t baroCalculateAltitude(void);
-void performBaroCalibrationCycle(void);
-//void calculateEstimatedAltitude(uint32_t currentTimeUs);
+float getBaroAltitude(void);
+

@@ -124,7 +124,7 @@
 //#include "sensors/pitotmeter.h"
 #include "sensors/compass.h"
 #include "sensors/gyro.h"
-#include "sensors/opflow.h"
+#include "sensors/opticalflow.h"
 //#include "sensors/temperature.h"
 #include "sensors/esc_sensor.h"
 #include "sensors/adcinternal.h"

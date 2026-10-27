@@ -70,6 +70,7 @@
 #define MR_RTH_CLIMB_OVERSHOOT_CM   100  // target this amount of cm *above* the target altitude to ensure it is actually reached (Vz > 0 at target alt)
 #define MR_RTH_CLIMB_MARGIN_MIN_CM  100  // start cruising home this amount of cm *before* reaching the cruise altitude (while continuing the ascend)
 #define MR_RTH_CLIMB_MARGIN_PERCENT 15   // on high RTH altitudes use even bigger margin - percent of the altitude set
+#define MR_RTH_LAND_MARGIN_CM       2000 // pause landing if this amount of cm *before* remaining to the home point (2D distance)
 
 // Planes:
 #define FW_RTH_CLIMB_OVERSHOOT_CM   100

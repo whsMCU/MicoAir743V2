@@ -391,7 +391,7 @@ static void performSanityChecks(void)
     // Handle events that set a failure mode to other than healthy.
     // Disarm via Abort when sanity on, or for hard Rx loss in FS_ONLY mode
     // Otherwise allow 20s of semi-controlled descent with impact disarm detection
-    const bool hardFailsafe = !rxIsReceivingSignal();
+    const bool hardFailsafe = !isRxReceivingSignal();
 
     if (rescueState.failure != RESCUE_HEALTHY) {
         // Default to 20s semi-controlled descent with impact detection, then abort
@@ -521,7 +521,7 @@ static void sensorUpdate(bool newGpsData)
     DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 3, rescueState.sensor.directionToHome); // computed from current GPS position in relation to home
     rescueState.sensor.healthy = GpsNav.flags.validEPE;//gpsIsHealthy();
 
-    rescueState.sensor.directionToHome = GpsNav.GPS_directionToHome; // extern value from gps.c using current position relative to home
+    rescueState.sensor.directionToHome = GPS_directionToHome; // extern value from gps.c using current position relative to home
     rescueState.sensor.errorAngle = (attitude.values.yaw - rescueState.sensor.directionToHome) / 10.0f;
     // both attitude and direction are in degrees * 10, errorAngle is degrees
     if (rescueState.sensor.errorAngle <= -180) {
@@ -539,7 +539,7 @@ static void sensorUpdate(bool newGpsData)
         // GPS ground speed, velocity and distance to home will be held at last good values if no new packets
     }
 
-    rescueState.sensor.distanceToHomeCm = GpsNav.GPS_distanceToHomeCm;
+    rescueState.sensor.distanceToHomeCm = GPS_distanceToHomeCm;
     rescueState.sensor.distanceToHomeM = rescueState.sensor.distanceToHomeCm / 100.0f;
     rescueState.sensor.groundSpeedCmS = GpsNav.GPS_ground_course; // cm/s
 

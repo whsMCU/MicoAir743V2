@@ -34,9 +34,8 @@
 #include "fc/core.h"
 
 #include "flight/imu.h"
-#include "flight/position.h"
 #include "flight/failsafe.h"
-
+#include "flight/position.h"
 
 #include "drivers/accgyro/accgyro.h"
 #include "drivers/compass/compass.h"
@@ -59,7 +58,7 @@
 #include "sensors/compass.h"
 #include "sensors/gyro.h"
 #include "sensors/sensors.h"
-#include "sensors/opflow.h"
+#include "sensors/opticalflow.h"
 #include "sensors/rangefinder.h"
 
 #include "rx/rx.h"
@@ -161,7 +160,7 @@ void taskUpdateRangefinder(timeUs_t currentTimeUs)
 #ifdef USE_OPTICALFLOW
 void taskUpdateOpticalFlow(timeUs_t currentTimeUs)
 {
-    if (!sensors(SENSOR_OPFLOW))
+    if (!sensors(SENSOR_OPTICALFLOW))
         return;
 
     opflowUpdate(currentTimeUs);
@@ -446,7 +445,7 @@ void tasksInit(void)
 #endif
 
 #ifdef USE_OPTICALFLOW
-    setTaskEnabled(TASK_OPTICALFLOW, sensors(SENSOR_OPFLOW));
+    setTaskEnabled(TASK_OPTICALFLOW, sensors(SENSOR_OPTICALFLOW));
 #endif
 
 //#ifdef USE_PINIOBOX

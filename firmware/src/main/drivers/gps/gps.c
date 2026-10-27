@@ -66,8 +66,6 @@ void reset_PID(struct PID_* pid) {
   pid->lastderivative = 0;
 }
 
-uint8_t gps_set_home_point_once;
-
 const unsigned char UBX_CFG_PRT[] = {
 	0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00,
 	0xD0, 0x08, 0x00, 0x00, 0x80, 0x25, 0x00, 0x00, 0x01, 0x00,
@@ -111,7 +109,39 @@ UbxNavPosllh_t posllh;
 UbxNavSat_t sat;
 UbxNavStatus_t nav_status;
 nav_pvt_t pvt;
+/////////////////////////////////////////////
+gpsLocation_t GPS_home_llh;
+gpsSolutionData_t gpsSol;
 
+uint16_t GPS_distanceToHome;        // distance to home point in meters
+uint32_t GPS_distanceToHomeCm;
+int16_t GPS_directionToHome;        // direction to home or hol point in degrees * 10
+uint32_t GPS_distanceFlownInCm;     // distance flown since armed in centimeters
+
+#define GPS_DISTANCE_FLOWN_MIN_SPEED_THRESHOLD_CM_S 15 // 0.54 km/h 0.335 mph
+
+gpsSolutionData_t gpsSol;
+
+uint8_t GPS_update = 0;             // toogle to distinct a GPS position update (directly or via MSP)
+
+uint8_t GPS_numCh;
+
+GPS_svinfo_t GPS_svinfo[GPS_SV_MAXSATS_M8N];
+
+typedef enum {
+    NAV_VALID_DATE = 1,
+    NAV_VALID_TIME = 2
+} ubxNavPvtValid_e;
+
+// Do we have a new valid fix?
+static bool ubxHaveNewValidFix = false;
+
+// Do we have new position information?
+static bool ubxHaveNewPosition = false;
+
+// Do we have new speed information?
+static bool ubxHaveNewSpeed = false;
+///////////////////////////////////////////////////
 static bool next_fix;
 
 static float gpsDataIntervalSeconds = 0.1f;
@@ -169,7 +199,7 @@ void gpsInit(void)
   gpsResetSolution();
 	GpsNav.nav_mode = NAV_MODE_NONE;
 	GpsNav.GPS_wp_radius = GPS_WP_RADIUS;
-	gps_set_home_point_once = false;
+	GpsNav.gps_set_home_point_once = false;
 
   posholdPID_PARAM.kP   = (float)0.11f;
   posholdPID_PARAM.kI   = (float)0.0f;
@@ -212,6 +242,230 @@ static void GPS_Filter(int32_t *GPS_coord)
   }
 }
 
+// GPS epoch is Jan 6, 1980. Unix epoch is Jan 1, 1970.
+// Offset in seconds from Unix epoch to GPS epoch
+#define GPS_EPOCH_OFFSET_SECONDS 315964800
+// Current GPS-UTC leap seconds offset (as of 2017, 18 leap seconds)
+#define GPS_LEAP_SECONDS 18
+
+// Days from start of year for each month (non-leap year first row, leap year second row)
+static const uint16_t gpsMonthDays[2][12] = {
+    { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 }, // Non-leap year
+    { 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335 }  // Leap year
+};
+
+// Convert Unix seconds and milliseconds to gpsDateTime_t
+void gpsUnixSecondsToDateTime(gpsDateTime_t *dt, int64_t unixSeconds, uint16_t millis)
+{
+    dt->sec = unixSeconds % 60;
+    unixSeconds /= 60;
+    dt->min = unixSeconds % 60;
+    unixSeconds /= 60;
+    dt->hour = unixSeconds % 24;
+    int32_t days = unixSeconds / 24;
+
+    // Calculate year and day of year from 1970
+    int year = 1970;
+    while (true) {
+        int daysInYear = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 366 : 365;
+        if (days < daysInYear) {
+            break;
+        }
+        days -= daysInYear;
+        year++;
+    }
+    dt->year = year;
+
+    int isLeap = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 1 : 0;
+
+    int month;
+    for (month = 11; month > 0; month--) {
+        if (days >= gpsMonthDays[isLeap][month]) {
+            break;
+        }
+    }
+    dt->month = month + 1;
+    dt->day = days - gpsMonthDays[isLeap][month] + 1;
+
+    dt->millis = millis;
+}
+
+// Convert date/time to Unix seconds (UTC)
+static int64_t dateTimeToUnixSeconds(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t min, uint8_t sec)
+{
+    int32_t days = 0;
+    for (int y = 1970; y < year; y++) {
+        days += (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 366 : 365;
+    }
+    int isLeap = (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 1 : 0;
+    days += gpsMonthDays[isLeap][month - 1] + (day - 1);
+    return (int64_t)days * 86400 + hour * 3600 + min * 60 + sec;
+}
+
+// Convert gpsDateTime_t to Unix epoch seconds; returns 0 if not valid
+uint32_t gpsDateTimeToEpoch(const gpsDateTime_t *dt)
+{
+    if (!dt || !dt->valid) {
+        return 0;
+    }
+
+    if (dt->year < 1980 || dt->month < 1 || dt->month > 12 || dt->day < 1 ||
+        dt->day > 31 || dt->hour > 23 || dt->min > 59 || dt->sec > 60) {
+        return 0;
+    }
+
+    return (uint32_t)dateTimeToUnixSeconds(dt->year, dt->month, dt->day, dt->hour, dt->min, dt->sec);
+}
+
+// NAV-PVT already carries UTC calendar fields; only the nanosecond correction can
+// require a one-second calendar adjustment.
+static bool gpsDateTimeIsLeapYear(uint16_t year)
+{
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+
+static uint8_t gpsDateTimeDaysInMonth(uint16_t year, uint8_t month)
+{
+    static const uint8_t daysInMonth[] = {
+        31, 28, 31, 30, 31, 30,
+        31, 31, 30, 31, 30, 31
+    };
+
+    if (month == 2 && gpsDateTimeIsLeapYear(year)) {
+        return 29;
+    }
+
+    return daysInMonth[month - 1];
+}
+
+static void gpsDateTimeAddOneSecond(gpsDateTime_t *dt)
+{
+    if (++dt->sec <= 59) {
+        return;
+    }
+
+    dt->sec = 0;
+    if (++dt->min <= 59) {
+        return;
+    }
+
+    dt->min = 0;
+    if (++dt->hour <= 23) {
+        return;
+    }
+
+    dt->hour = 0;
+    if (++dt->day <= gpsDateTimeDaysInMonth(dt->year, dt->month)) {
+        return;
+    }
+
+    dt->day = 1;
+    if (++dt->month <= 12) {
+        return;
+    }
+
+    dt->month = 1;
+    dt->year++;
+}
+
+static void gpsDateTimeSubtractOneSecond(gpsDateTime_t *dt)
+{
+    if (dt->sec > 0) {
+        dt->sec--;
+        return;
+    }
+
+    dt->sec = 59;
+    if (dt->min > 0) {
+        dt->min--;
+        return;
+    }
+
+    dt->min = 59;
+    if (dt->hour > 0) {
+        dt->hour--;
+        return;
+    }
+
+    dt->hour = 23;
+    if (dt->day > 1) {
+        dt->day--;
+        return;
+    }
+
+    if (dt->month > 1) {
+        dt->month--;
+    } else {
+        dt->month = 12;
+        dt->year--;
+    }
+    dt->day = gpsDateTimeDaysInMonth(dt->year, dt->month);
+}
+
+static void gpsDateTimeFromNavPvt(gpsDateTime_t *dt, const nav_pvt_t *navPvt)
+{
+    dt->valid = (navPvt->valid & NAV_VALID_DATE) && (navPvt->valid & NAV_VALID_TIME);
+    if (!dt->valid) {
+        return;
+    }
+
+    dt->year = navPvt->year;
+    dt->month = navPvt->month;
+    dt->day = navPvt->day;
+    dt->hour = navPvt->hour;
+    dt->min = navPvt->min;
+    dt->sec = navPvt->sec;
+
+    const int32_t nanoMs = navPvt->nano / 1000000;
+    if (nanoMs < 0) {
+        dt->millis = (uint16_t)(nanoMs + 1000);
+        gpsDateTimeSubtractOneSecond(dt);
+    } else if (nanoMs >= 1000) {
+        dt->millis = (uint16_t)(nanoMs - 1000);
+        gpsDateTimeAddOneSecond(dt);
+    } else {
+        dt->millis = (uint16_t)nanoMs;
+    }
+}
+
+// Convert GPS week number and time-of-week to gpsDateTime_t
+static void gpsWeekTimeToDateTime(gpsDateTime_t *dt, int16_t week, uint32_t timeOfWeekMs, int32_t timeOfWeekNs)
+{
+    int64_t gpsSeconds = (int64_t)week * 7 * 24 * 3600 + timeOfWeekMs / 1000;
+
+    // Calculate milliseconds including nanosecond adjustment (can be negative)
+    int32_t millis = (int32_t)(timeOfWeekMs % 1000) + timeOfWeekNs / 1000000;
+
+    // Handle carry/borrow from nanosecond adjustment
+    if (millis < 0) {
+        millis += 1000;
+        gpsSeconds--;
+    } else if (millis >= 1000) {
+        millis -= 1000;
+        gpsSeconds++;
+    }
+
+    int64_t unixSeconds = gpsSeconds + GPS_EPOCH_OFFSET_SECONDS - GPS_LEAP_SECONDS;
+    gpsUnixSecondsToDateTime(dt, unixSeconds, (uint16_t)millis);
+}
+
+#ifdef USE_RTC_TIME
+// Set system clock once when GPS time is available
+static void setRtcDateTimeFromGps(void) {
+    if (!rtcHasTime() && gpsSol.dateTime.valid) {
+        dateTime_t dt;
+        dt.year = gpsSol.dateTime.year;
+        dt.month = gpsSol.dateTime.month;
+        dt.day = gpsSol.dateTime.day;
+        dt.hours = gpsSol.dateTime.hour;
+        dt.minutes = gpsSol.dateTime.min;
+        dt.seconds = gpsSol.dateTime.sec;
+        dt.millis = gpsSol.dateTime.millis;
+        rtcSetDateTime(&dt);
+    }
+}
+#endif
+
 static void calculateNavInterval(void)
 {
     // calculate the interval between nav packets, handling iTow wraparound at the end of the week
@@ -247,12 +501,22 @@ void Ubx_HandleMessage(uint8_t cls, uint8_t id, uint8_t *payload, uint16_t lengt
         GpsNav.altCm = posllh.height / 10;
 
         GpsNav.time = posllh.iTOW;
-        calculateNavInterval();
+        //calculateNavInterval();
 
         GpsNav.eph = gpsConstrainEPE(posllh.hAcc / 10);
         GpsNav.epv = gpsConstrainEPE(posllh.vAcc / 10);
 
         GpsNav.flags.validEPE = true;
+
+        //////////////////////////////////////////////////////
+        gpsSol.llh.lon = posllh.lon;
+        gpsSol.llh.lat = posllh.lat;
+        gpsSol.llh.altCm = posllh.hMSL / 10;  //alt in cm
+        gpsSol.time = posllh.iTOW;
+        calculateNavInterval();
+        gpsSetFixState(ubxHaveNewValidFix);
+        ubxHaveNewPosition = true;
+        //////////////////////////////////////////////////////
         #if defined(GPS_FILTERING)
           GPS_Filter(GpsNav.GPS_coord);
         #endif
@@ -274,10 +538,25 @@ void Ubx_HandleMessage(uint8_t cls, uint8_t id, uint8_t *payload, uint16_t lengt
             sat.sv[i].cno = p[2];
             sat.sv[i].elev = p[3];
             sat.sv[i].azim = p[4] | (p[5]<<8);
-            sat.sv[i].prRes = p[6] | (p[7]<<8) | (p[8]<<16) | (p[9]<<24);
+            sat.sv[i].prRes = p[6] | (p[7]<<8);
+            sat.sv[i].flags = p[8] | (p[9]<<8) | (p[10]<<16) | (p[11]<<24);
             p += 12;
             // 여기서 위성 정보 활용 가능 (신호 세기, PRN 등)
         }
+
+        GPS_numCh = MIN(sat.numSvs, GPS_SV_MAXSATS_M8N);
+
+        for (unsigned i = 0; i < ARRAYLEN(GPS_svinfo); i++) {
+            if (i < GPS_numCh) {
+                GPS_svinfo[i].chn = sat.sv[i].gnssId;
+                GPS_svinfo[i].svid = sat.sv[i].svId;
+                GPS_svinfo[i].cno = sat.sv[i].cno;
+                GPS_svinfo[i].quality = sat.sv[i].flags;
+            } else {
+                GPS_svinfo[i] = (GPS_svinfo_t){ .chn = 255 };
+            }
+        }
+        GPS_numCh = GPS_SV_MAXSATS_M8N;
         //GpsNav.GPS_numSat = sat.numSvs;
 
     } else if (cls == 0x01 && id == 0x03) { // NAV-STATUS
@@ -299,6 +578,14 @@ void Ubx_HandleMessage(uint8_t cls, uint8_t id, uint8_t *payload, uint16_t lengt
           DISABLE_STATE(GPS_FIX);
         }
         gpsSetFixState(next_fix);
+
+        ////////////////////////////////////////////////////////////////////////
+        ubxHaveNewValidFix = (nav_status.flags & NAV_STATUS_FIX_VALID) && (nav_status.gpsFix == FIX_3D);
+        if (!ubxHaveNewValidFix)
+            DISABLE_STATE(GPS_FIX);
+        ////////////////////////////////////////////////////////////////////////
+
+
     } else if (cls == 0x01 && id == 0x07) { // NAV-PVT
       if (length < 92) return;  // 최소 메시지 길이 확인
 
@@ -328,11 +615,13 @@ void Ubx_HandleMessage(uint8_t cls, uint8_t id, uint8_t *payload, uint16_t lengt
       pvt.velD = (int32_t)(payload[56] | (payload[57]<<8) | (payload[58]<<16) | (payload[59]<<24));
       pvt.gSpeed = (int32_t)(payload[60] | (payload[61]<<8) | (payload[62]<<16) | (payload[63]<<24));
       pvt.headMot = (int32_t)(payload[64] | (payload[65]<<8) | (payload[66]<<16) | (payload[67]<<24));
+      pvt.sAcc = (int32_t)(payload[68] | (payload[69]<<8) | (payload[70]<<16) | (payload[71]<<24));
+      pvt.headAcc = (int32_t)(payload[72] | (payload[73]<<8) | (payload[74]<<16) | (payload[75]<<24));
       pvt.pDOP = (uint16_t)(payload[76] | (payload[77]<<8));
       pvt.headVeh = (int32_t)(payload[84] | (payload[85]<<8) | (payload[86]<<16) | (payload[87]<<24));
     }
     GpsNav.time = pvt.iTOW;
-    calculateNavInterval();
+    //calculateNavInterval();
     GpsNav.GPS_numSat = pvt.numSV;
     GpsNav.GPS_headVeh = pvt.headVeh;
     GpsNav.eph = gpsConstrainEPE(pvt.hAcc / 10);
@@ -343,11 +632,46 @@ void Ubx_HandleMessage(uint8_t cls, uint8_t id, uint8_t *payload, uint16_t lengt
     GpsNav.flags.validEPE = true;
     GpsNav.groundSpeed = pvt.gSpeed / 10; // cm/s
     GpsNav.groundCourse = (uint16_t) (pvt.headMot / 10000); // Heading 2D deg * 100000 rescaled to deg * 10
-    GpsNav.velned.velN = (int16_t)(pvt.velN / 10); // cm/s
-    GpsNav.velned.velE = (int16_t)(pvt.velE / 10); // cm/s
-    GpsNav.velned.velD = (int16_t)(pvt.velD / 10); // cm/s
+//    GpsNav.velned.velN = (int16_t)(pvt.velN / 10); // cm/s
+//    GpsNav.velned.velE = (int16_t)(pvt.velE / 10); // cm/s
+//    GpsNav.velned.velD = (int16_t)(pvt.velD / 10); // cm/s
     GpsNav.ubxHaveNewPositionAndNewSpeed = true;
 
+    ///////////////////////////////////////////////////////////
+    ubxHaveNewValidFix = (pvt.flags & NAV_STATUS_FIX_VALID) && (pvt.fixType == FIX_3D);
+    gpsSol.time = pvt.iTOW;
+    calculateNavInterval();
+    gpsSol.llh.lon = pvt.lon;
+    gpsSol.llh.lat = pvt.lat;
+    gpsSol.llh.altCm = pvt.hMSL / 10;  //alt in cm
+    gpsSetFixState(ubxHaveNewValidFix);
+    ubxHaveNewPosition = true;
+    gpsSol.numSat = pvt.numSV;
+    gpsSol.acc.hAcc = pvt.hAcc;
+    gpsSol.acc.vAcc = pvt.vAcc;
+    gpsSol.acc.sAcc = pvt.sAcc;
+    gpsSol.acc.headAcc = pvt.headAcc;
+    // gSpeed & velD are in mm/s (int32_t), gpsSol.speed3d in cm/s (uint16_t)
+    float gs = (float)pvt.gSpeed;
+    float vd = (float)pvt.velD;
+    gpsSol.speed3d = (uint16_t)(sqrtf(sq(gs) + sq(vd)) * 0.1f);     // mm/s -> cm/s
+    // Update 2D ground speed (mm/s -> cm/s) for NAV-PVT when NAV-VELNED is disabled
+    gpsSol.groundSpeed = (uint16_t)(pvt.gSpeed / 10);    // cm/s
+    gpsSol.groundCourse = (uint16_t)(pvt.headMot / 10000);     // Heading 2D deg * 100000 rescaled to deg * 10
+    gpsSol.dop.pdop = pvt.pDOP;
+    // NAV-PVT doesn't provide hDOP/vDOP, estimate from pDOP (pDOP >= hDOP/vDOP, so this is conservative)
+    gpsSol.dop.hdop = pvt.pDOP;
+    gpsSol.dop.vdop = pvt.pDOP;
+    gpsSol.velned.velN = (int16_t)(pvt.velN / 10); // cm/s
+    gpsSol.velned.velE = (int16_t)(pvt.velE / 10); // cm/s
+    gpsSol.velned.velD = (int16_t)(pvt.velD / 10); // cm/s
+    ubxHaveNewSpeed = true;
+    // Store GPS date/time for telemetry, applying nano correction per u-blox spec.
+    gpsDateTimeFromNavPvt(&gpsSol.dateTime, &pvt);
+#ifdef USE_RTC_TIME
+    setRtcDateTimeFromGps();
+#endif
+    ///////////////////////////////////////////////////////////
 #ifdef USE_RTC_TIME
         //set clock, when gps time is available
         if (!rtcHasTime() && (_buffer.pvt.valid & NAV_VALID_DATE) && (_buffer.pvt.valid & NAV_VALID_TIME)) {
@@ -364,183 +688,10 @@ void Ubx_HandleMessage(uint8_t cls, uint8_t id, uint8_t *payload, uint16_t lengt
 #endif
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-// this is used to offset the shrinking longitude as we go towards the poles
-// It's ok to calculate this once per waypoint setting, since it changes a little within the reach of a multicopter
-//
-float GPS_scaleLonDown = 1.0f;  // this is used to offset the shrinking longitude as we go towards the poles
-void GPS_calc_longitude_scaling(int32_t lat) {
-  GPS_scaleLonDown = cos_approx(DEGREES_TO_RADIANS((float)lat / GPS_DEGREES_DIVIDER));
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-// Calculate the distance flown from gps position data
-//
-static void GPS_calculateDistanceFlown(bool initialize)
+// Check for healthy communications
+bool gpsIsHealthy(void)
 {
-    static gpsLocation_t lastLLH = {0};
-
-    if (initialize) {
-        GpsNav.GPS_distanceFlownInCm = 0;
-    } else if (STATE(GPS_FIX_HOME) && ARMING_FLAG(ARMED)) {
-        uint16_t speed = GpsNav.groundSpeed;
-        // Only add up movement when speed is faster than minimum threshold
-        if (speed > GPS_DISTANCE_FLOWN_MIN_SPEED_THRESHOLD_CM_S) {
-            uint32_t dist;
-            int32_t dir;
-
-            GPS_distance_cm_bearing(&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON],&lastLLH.lat,&lastLLH.lon,&dist,&dir);
-            GpsNav.GPS_distanceFlownInCm += dist;
-        }
-    }
-    lastLLH.lat = GpsNav.GPS_coord[LAT];
-    lastLLH.lon = GpsNav.GPS_coord[LON];
-
-}
-
-//*******************************************************************************************************
-// calc_velocity_and_filtered_position - velocity in lon and lat directions calculated from GPS position
-//       and accelerometer data
-// lon_speed expressed in cm/s.  positive numbers mean moving east
-// lat_speed expressed in cm/s.  positive numbers when moving north
-// Note: we use gps locations directly to calculate velocity instead of asking gps for velocity because
-//       this is more accurate below 1.5m/s
-// Note: even though the positions are projected using a lead filter, the velocities are calculated
-//       from the unaltered gps locations.  We do not want noise from our lead filter affecting velocity
-//*******************************************************************************************************
-static void GPS_calc_velocity(){
-  static int16_t speed_old[2] = {0,0};
-  static int32_t last[2] = {0,0};
-  static uint8_t init = 0;
-
-  if (init) {
-    float tmp = 1.0/GpsNav.dTnav;
-    GpsNav.actual_speed[GPS_X] = (float)(GpsNav.GPS_coord[LON] - last[LON]) *  GPS_scaleLonDown * tmp;
-    GpsNav.actual_speed[GPS_Y] = (float)(GpsNav.GPS_coord[LAT]  - last[LAT])  * tmp;
-
-#if !defined(GPS_LEAD_FILTER)
-    GpsNav.actual_speed[GPS_X] = (GpsNav.actual_speed[GPS_X] + speed_old[GPS_X]) / 2;
-    GpsNav.actual_speed[GPS_Y] = (GpsNav.actual_speed[GPS_Y] + speed_old[GPS_Y]) / 2;
-
-    speed_old[GPS_X] = GpsNav.actual_speed[GPS_X];
-    speed_old[GPS_Y] = GpsNav.actual_speed[GPS_Y];
-
-#endif
-  }
-  init=1;
-
-  last[LON] = GpsNav.GPS_coord[LON];
-  last[LAT] = GpsNav.GPS_coord[LAT];
-
-#if defined(GPS_LEAD_FILTER)
-  GPS_coord_lead[LON] = xLeadFilter.get_position(GpsNav.GPS_coord[LON], GpsNav.actual_speed[GPS_X], GPS_LAG);
-  GPS_coord_lead[LAT] = yLeadFilter.get_position(GpsNav.GPS_coord[LAT], GpsNav.actual_speed[GPS_Y], GPS_LAG);
-#endif
-
-}
-
-// Calculate a location error between two gps coordinates
-// Because we are using lat and lon to do our distance errors here's a quick chart:
-//   100  = 1m
-//  1000  = 11m    = 36 feet
-//  1800  = 19.80m = 60 feet
-//  3000  = 33m
-// 10000  = 111m
-//
-static void GPS_calc_location_error( int32_t* target_lat, int32_t* target_lng, int32_t* gps_lat, int32_t* gps_lng ) {
-  GpsNav.error[LON] = (float)(*target_lng - *gps_lng) * GPS_scaleLonDown;  // X Error
-  GpsNav.error[LAT] = *target_lat - *gps_lat; // Y Error
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-// Sets the waypoint to navigate, reset neccessary variables and calculate initial values
-//
-void GPS_set_next_wp(int32_t* lat, int32_t* lon) {
-  GpsNav.GPS_WP[LAT] = *lat;
-  GpsNav.GPS_WP[LON] = *lon;
-
-  GPS_calc_longitude_scaling(*lat);
-  GPS_distance_cm_bearing(&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON],&GpsNav.GPS_WP[LAT],&GpsNav.GPS_WP[LON],&GpsNav.wp_distance,&GpsNav.target_bearing);
-
-  GpsNav.nav_bearing = GpsNav.target_bearing;
-  GPS_calc_location_error(&GpsNav.GPS_WP[LAT],&GpsNav.GPS_WP[LON],&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON]);
-  GpsNav.original_target_bearing = GpsNav.target_bearing;
-  GpsNav.waypoint_speed_gov = NAV_SPEED_MIN;
-}
-
-// Get distance between two points in cm
-// Get bearing from pos1 to pos2, returns an 1deg = 100 precision
-void GPS_distance_cm_bearing(int32_t *currentLat1, int32_t *currentLon1, int32_t *destinationLat2, int32_t *destinationLon2, uint32_t *dist, int32_t *bearing)
-{
-    float dLat = (*destinationLat2 - *currentLat1) * EARTH_ANGLE_TO_CM; // difference of latitude in 1/10 000 000 degrees
-    float dLon = (float)(*destinationLon2 - *currentLon1) * GPS_scaleLonDown * EARTH_ANGLE_TO_CM;
-    float dAlt = 0;
-
-    *dist = sqrtf(sq(dLat) + sq(dLon) + sq(dAlt));
-
-    int32_t bearing_temp = 9000.0f - RADIANS_TO_DEGREES(atan2_approx(dLat, dLon)) * 100.0f;      // Convert the output to 100xdeg / adjust to clockwise from North
-    if (bearing_temp < 0)
-        bearing_temp += 36000;
-
-    *bearing = bearing_temp;
-}
-
-////////////////////////////////////////////////////////////////////////////////////
-// Calculate the distance flown and vertical speed from gps position data
-//
-//static void GPS_calculateDistanceFlownVerticalSpeed(bool initialize)
-//{
-//    static int32_t lastCoord[2] = { 0, 0 };
-//    static int32_t lastAlt;
-//    static int32_t lastMillis;
-//
-//    int currentMillis = millis();
-//
-//    if (initialize) {
-//      GpsNav.GPS_distanceFlownInCm = 0;
-//      GpsNav.GPS_verticalSpeedInCmS = 0;
-//    } else {
-//        if (STATE(GPS_FIX_HOME) && ARMING_FLAG(ARMED)) {
-//            uint16_t speed = gpsConfig()->gps_use_3d_speed ? gpsSol.speed3d : gpsSol.groundSpeed;
-//            // Only add up movement when speed is faster than minimum threshold
-//            if (speed > GPS_DISTANCE_FLOWN_MIN_SPEED_THRESHOLD_CM_S) {
-//                uint32_t dist;
-//                int32_t dir;
-//                GPS_distance_cm_bearing(&gpsSol.llh.lat, &gpsSol.llh.lon, &lastCoord[GPS_LATITUDE], &lastCoord[GPS_LONGITUDE], &dist, &dir);
-//                if (gpsConfig()->gps_use_3d_speed) {
-//                    dist = sqrtf(powf(gpsSol.llh.altCm - lastAlt, 2.0f) + powf(dist, 2.0f));
-//                }
-//                GPS_distanceFlownInCm += dist;
-//            }
-//        }
-//        GPS_verticalSpeedInCmS = (gpsSol.llh.altCm - lastAlt) * 1000 / (currentMillis - lastMillis);
-//        GPS_verticalSpeedInCmS = constrain(GPS_verticalSpeedInCmS, -1500, 1500);
-//    }
-//    lastCoord[GPS_LONGITUDE] = gpsSol.llh.lon;
-//    lastCoord[GPS_LATITUDE] = gpsSol.llh.lat;
-//    lastAlt = gpsSol.llh.altCm;
-//    lastMillis = currentMillis;
-//}
-
-void GPS_reset_home_position(void) {
-  if (STATE(GPS_FIX) && GpsNav.GPS_numSat >= 5) {
-    GpsNav.GPS_home[LAT] = GpsNav.GPS_coord[LAT];
-    GpsNav.GPS_home[LON] = GpsNav.GPS_coord[LON];
-    GPS_calc_longitude_scaling(GpsNav.GPS_coord[LAT]);  //need an initial value for distance and bearing calc
-    GpsNav.nav_takeoff_bearing = DECIDEGREES_TO_DEGREES(attitude.values.yaw);             //save takeoff heading
-    //Set ground altitude
-    ENABLE_STATE(GPS_FIX_HOME);
-  }
-  GPS_calculateDistanceFlown(true); // Initialize
-}
-
-void gpsSetFixState(bool state)
-{
-    if (state) {
-        ENABLE_STATE(GPS_FIX);
-    } else {
-        DISABLE_STATE(GPS_FIX);
-    }
+    return (ubxHaveNewValidFix);
 }
 
 //It was mobed here since even i2cgps code needs it
@@ -676,21 +827,112 @@ static uint16_t GPS_calc_desired_speed(uint16_t max_speed, bool _slow) {
   return max_speed;
 }
 
-void GPS_calculateDistanceAndDirectionToHome(void)
+static float GPS_cosLat = 1.0f;
+    // this is used to offset the shrinking longitude as we go towards the poles
+    // longitude difference * scale is approximate distance in degrees
+
+void GPS_calc_longitude_scaling(int32_t lat)
 {
-  //calculate distance and bearings for gui and other stuff continously - From home to copter
-    if (STATE(GPS_FIX_HOME)) {      // If we don't have home set, do not display anything
+    GPS_cosLat = cos_approx(DEGREES_TO_RADIANS((float)lat / GPS_DEGREES_DIVIDER));
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// Calculate the distance flown from gps position data
+//
+static void GPS_calculateDistanceFlown(bool initialize)
+{
+    static gpsLocation_t lastLLH = {0};
+
+    if (initialize) {
+        GPS_distanceFlownInCm = 0;
+    } else if (STATE(GPS_FIX_HOME) && ARMING_FLAG(ARMED)) {
+        uint16_t speed = GpsNav.groundSpeed;
+        // Only add up movement when speed is faster than minimum threshold
+        if (speed > GPS_DISTANCE_FLOWN_MIN_SPEED_THRESHOLD_CM_S) {
+            uint32_t dist;
+            GPS_distance_cm_bearing(&gpsSol.llh, &lastLLH, false, &dist, NULL);
+            GPS_distanceFlownInCm += dist;
+        }
+    }
+    lastLLH = gpsSol.llh;
+}
+
+void GPS_reset_home_position(void) {
+  if (!STATE(GPS_FIX_HOME) || !GpsNav.gps_set_home_point_once) {
+    if (STATE(GPS_FIX) && GpsNav.GPS_numSat >= 5) {
+      GPS_home_llh = gpsSol.llh;
+      GPS_calc_longitude_scaling(gpsSol.llh.lat);
+      ENABLE_STATE(GPS_FIX_HOME);
+      // no point beeping success here since:
+      // when triggered by tryArm, the arming beep is modified to indicate the GPS home fix status on arming, and
+      // when triggered by gyro cal, the gyro cal beep takes priority over the GPS beep, so we won't hear the GPS beep
+      // PS: to test for gyro cal, check for !ARMED, since we cannot be here while disarmed other than via gyro cal
+      GpsNav.GPS_home[LAT] = GpsNav.GPS_coord[LAT];
+      GpsNav.GPS_home[LON] = GpsNav.GPS_coord[LON];
+      GPS_calc_longitude_scaling(GpsNav.GPS_coord[LAT]);  //need an initial value for distance and bearing calc
+      GpsNav.nav_takeoff_bearing = DECIDEGREES_TO_DEGREES(attitude.values.yaw);             //save takeoff heading
+      //Set ground altitude
+
+    }
+  }
+  GPS_calculateDistanceFlown(true); // Initialize
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// Get distance between two points in cm using spherical to Cartesian transform
+// One one latitude unit, or one longitude unit at the equator, equals 1.113195 cm.
+// Get bearing from pos1 to pos2, returns values with 0.01 degree precision
+void GPS_distance_cm_bearing(const gpsLocation_t *from, const gpsLocation_t *to, bool dist3d, uint32_t *pDist, int32_t *pBearing)
+{
+    // TO DO : handle crossing the 180 degree meridian, as in `GPS_distance2d()`
+    float dLat = (to->lat - from->lat) * EARTH_ANGLE_TO_CM;
+    float dLon = (to->lon - from->lon) * GPS_cosLat * EARTH_ANGLE_TO_CM; // convert to local angle
+    float dAlt = dist3d ? to->altCm - from->altCm : 0;
+
+    if (pDist)
+        *pDist = sqrtf(sq(dLat) + sq(dLon) + sq(dAlt));
+
+    if (pBearing) {
+        int32_t bearing = 9000.0f - RADIANS_TO_DEGREES(atan2_approx(dLat, dLon)) * 100.0f;      // Convert the output to 100xdeg / adjust to clockwise from North
+        if (bearing < 0)
+            bearing += 36000;
+        *pBearing = bearing;
+    }
+}
+
+static void GPS_calculateDistanceAndDirectionToHome(void)
+{
+    if (STATE(GPS_FIX_HOME)) {
         uint32_t dist;
         int32_t dir;
-        GPS_distance_cm_bearing(&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON],&GpsNav.GPS_home[LAT],&GpsNav.GPS_home[LON],&dist,&dir);
-        GpsNav.GPS_distanceToHome = dist/100; //m
-        GpsNav.GPS_distanceToHomeCm = dist; //cm
-        GpsNav.GPS_directionToHome = dir/100;
+        GPS_distance_cm_bearing(&gpsSol.llh, &GPS_home_llh, false, &dist, &dir);
+        GPS_distanceToHome = dist / 100; // m
+        GPS_distanceToHomeCm = dist; // cm
+        GPS_directionToHome = dir / 10; // degrees * 10 or decidegrees
     } else {
-      GpsNav.GPS_distanceToHome = 0;
-      GpsNav.GPS_distanceToHomeCm = 0;
-      GpsNav.GPS_directionToHome = 0;
+        // If we don't have home set, do not display anything
+        GPS_distanceToHome = 0;
+        GPS_distanceToHomeCm = 0;
+        GPS_directionToHome = 0;
     }
+}
+
+// return distance vector in local, cartesian ENU coordinates
+// note that parameter order is from, to
+void GPS_distance2d(const gpsLocation_t *from, const gpsLocation_t *to, vector2_t *distance)
+{
+    int32_t deltaLon = to->lon - from->lon;
+    // In case we crossed the 180° meridian
+    const int32_t deg180 = 180 * GPS_DEGREES_DIVIDER; // number of integer longitude steps in 180 degrees
+    if (deltaLon > deg180) {
+        deltaLon -= deg180;  // 360 * GPS_DEGREES_DIVIDER overflows int32_t, so use 180 twice
+        deltaLon -= deg180;
+    } else if (deltaLon <= -deg180) {
+        deltaLon += deg180;
+        deltaLon += deg180;
+    }
+    distance->x = deltaLon * GPS_cosLat * EARTH_ANGLE_TO_CM; // East-West distance, positive East
+    distance->y = (float)(to->lat - from->lat) * EARTH_ANGLE_TO_CM;  // North-South distance, positive North
 }
 
 uint16_t gpsConstrainEPE(uint32_t epe)
@@ -712,6 +954,7 @@ void gpsUpdate(uint32_t currentTimeUs)
     {
       // Set sensor as ready and available
       sensorsSet(SENSOR_GPS);
+      GpsNav.Healthy = true;
 
       currentGpsStamp++; // new GPS data available
 
@@ -733,7 +976,7 @@ void gpsUpdate(uint32_t currentTimeUs)
       }
 
       //calculate the current velocity based on gps coordinates continously to get a valid speed at the moment when we start navigating
-      GPS_calc_velocity();
+      //GPS_calc_velocity();
 
       if (STATE(NAV_POSHOLD_MODE) || STATE(NAV_RTH_MODE)){    //ok we are navigating
         //do gps nav calculations here, these are common for nav and poshold
@@ -741,8 +984,8 @@ void gpsUpdate(uint32_t currentTimeUs)
           GPS_distance_cm_bearing(&GPS_coord_lead[LAT],&GPS_coord_lead[LON],&GPS_WP[LAT],&GPS_WP[LON],&wp_distance,&target_bearing);
           GPS_calc_location_error(&GPS_WP[LAT],&GPS_WP[LON],&GPS_coord_lead[LAT],&GPS_coord_lead[LON]);
         #else
-          GPS_distance_cm_bearing(&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON],&GpsNav.GPS_WP[LAT],&GpsNav.GPS_WP[LON],&GpsNav.wp_distance,&GpsNav.target_bearing);
-          GPS_calc_location_error(&GpsNav.GPS_WP[LAT],&GpsNav.GPS_WP[LON],&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON]);
+          //GPS_distance_cm_bearing(&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON],&GpsNav.GPS_WP[LAT],&GpsNav.GPS_WP[LON],&GpsNav.wp_distance,&GpsNav.target_bearing);
+          //GPS_calc_location_error(&GpsNav.GPS_WP[LAT],&GpsNav.GPS_WP[LON],&GpsNav.GPS_coord[LAT],&GpsNav.GPS_coord[LON]);
         #endif
         switch (GpsNav.nav_mode) {
           case NAV_MODE_POSHOLD:
@@ -778,15 +1021,25 @@ void gpsUpdate(uint32_t currentTimeUs)
   DEBUG_SET(DEBUG_GPS_DATA, 1, (GpsNav.GPS_coord[LON]));
   DEBUG_SET(DEBUG_GPS_DATA, 2, (GpsNav.GPS_home[LAT]));
   DEBUG_SET(DEBUG_GPS_DATA, 3, (GpsNav.GPS_home[LON]));
-  DEBUG_SET(DEBUG_GPS_DATA, 4, (GpsNav.GPS_distanceToHomeCm));
-  DEBUG_SET(DEBUG_GPS_DATA, 5, (GpsNav.GPS_directionToHome));
+  DEBUG_SET(DEBUG_GPS_DATA, 4, (GPS_distanceToHomeCm));
+  DEBUG_SET(DEBUG_GPS_DATA, 5, (GPS_directionToHome));
   DEBUG_SET(DEBUG_GPS_DATA, 6, (GpsNav.actual_speed[GPS_X]));
-  DEBUG_SET(DEBUG_GPS_DATA, 7, (GpsNav.GPS_distanceFlownInCm));
+  DEBUG_SET(DEBUG_GPS_DATA, 7, (GPS_distanceFlownInCm));
 }
 
 bool isGPSHeadingValid(void)
 {
     return sensors(SENSOR_GPS) && STATE(GPS_FIX) && GpsNav.GPS_numSat >= 6;// && gpsSol.groundSpeed >= 300;
+}
+
+void gpsSetFixState(bool state)
+{
+    if (state) {
+        ENABLE_STATE(GPS_FIX);
+        //ENABLE_STATE(GPS_FIX_EVER);
+    } else {
+        DISABLE_STATE(GPS_FIX);
+    }
 }
 
 // check if new data has been received since last check
@@ -811,4 +1064,8 @@ float getGpsDataFrequencyHz(void)
     return gpsDataFrequencyHz;
 }
 
+float getGpsCosLat(void)
+{
+    return GPS_cosLat; // note this scaling factor is set only when the home point is updated
+}
 #endif

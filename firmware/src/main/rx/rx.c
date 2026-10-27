@@ -49,8 +49,8 @@
 #include "flight/failsafe.h"
 #include "flight/imu.h"
 #include "flight/pid.h"
-#include "flight/position.h"
 #include "flight/dyn_notch_filter.h"
+#include "flight/position.h"
 
 #include "navigation/navigation.h"
 #include "navigation/navigation_private.h"
@@ -60,7 +60,7 @@
 #include "scheduler/tasks.h"
 
 #include "sensors/sensors.h"
-#include "sensors/opflow.h"
+#include "sensors/opticalflow.h"
 #include "sensors/rangefinder.h"
 
 const char rcChannelLetters[] = "AERT12345678abcdefgh";
@@ -270,7 +270,7 @@ void rxInit(void)
     #endif
 }
 
-bool rxIsReceivingSignal(void)
+bool isRxReceivingSignal(void)
 {
     return rxSignalReceived;
 }
@@ -808,12 +808,12 @@ void processRxModes(uint32_t currentTimeUs)
 
   if(rcData[SF] == 2000)
   {
-//    writeSDCard(PID_Roll_in);
-//    writeSDCard(PID_Roll_out);
-//    writeSDCard(PID_pitch_in);
-//    writeSDCard(PID_pitch_out);
-//    writeSDCard(PID_yaw_heading);
-//    writeSDCard(PID_yaw_rate);
+    writeSDCard(PID_Roll_in);
+    writeSDCard(PID_Roll_out);
+    writeSDCard(PID_pitch_in);
+    writeSDCard(PID_pitch_out);
+    writeSDCard(PID_yaw_heading);
+    writeSDCard(PID_yaw_rate);
   }
 }
 

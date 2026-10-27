@@ -106,7 +106,7 @@
 #include "sensors/esc_sensor.h"
 #include "sensors/gyro.h"
 #include "sensors/gyro_init.h"
-#include "sensors/opflow.h"
+#include "sensors/opticalflow.h"
 #include "sensors/rangefinder.h"
 //#include "sensors/initialisation.h"
 
