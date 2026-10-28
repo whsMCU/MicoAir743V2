@@ -181,19 +181,19 @@ void gpsInit(void)
 {
 	uartOpen(_DEF_UART3, 9600);
 
-	uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_PRT[0], sizeof(UBX_CFG_PRT));
+	uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_PRT[0], sizeof(UBX_CFG_PRT));
 	HAL_Delay(100);
-	uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_MSG_POSLLH[0], sizeof(UBX_CFG_MSG_POSLLH));
+	uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_MSG_POSLLH[0], sizeof(UBX_CFG_MSG_POSLLH));
 	HAL_Delay(100);
-  uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_MSG_SAT[0], sizeof(UBX_CFG_MSG_SAT));
+  uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_MSG_SAT[0], sizeof(UBX_CFG_MSG_SAT));
   HAL_Delay(100);
-  uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_MSG_STATUS[0], sizeof(UBX_CFG_MSG_SAT));
+  uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_MSG_STATUS[0], sizeof(UBX_CFG_MSG_SAT));
   HAL_Delay(100);
-  uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_MSG_PVT[0], sizeof(UBX_CFG_MSG_PVT));
+  uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_MSG_PVT[0], sizeof(UBX_CFG_MSG_PVT));
   HAL_Delay(100);
-	uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_RATE[0], sizeof(UBX_CFG_RATE));
+	uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_RATE[0], sizeof(UBX_CFG_RATE));
 	HAL_Delay(100);
-	uartWrite(_DEF_UART1, (uint8_t*)&UBX_CFG_CFG[0], sizeof(UBX_CFG_CFG));
+	uartWrite(_DEF_UART3, (uint8_t*)&UBX_CFG_CFG[0], sizeof(UBX_CFG_CFG));
 
   // Reset solution, timeout and prepare to start
   gpsResetSolution();
