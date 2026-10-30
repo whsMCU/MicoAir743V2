@@ -60,7 +60,6 @@
 //#include "drivers/time.h"
 //#include "drivers/timer.h"
 //#include "drivers/vtx_common.h"
-#include "drivers/gps/gps.h"
 #include "drivers/motor.h"
 #include "drivers/dshot.h"
 
@@ -89,7 +88,7 @@
 
 //#include "io/asyncfatfs/asyncfatfs.h"
 //#include "io/flashfs.h"
-//#include "io/gps.h"
+#include "io/gps.h"
 #include "io/opflow.h"
 #include "io/rangefinder.h"
 #include "io/ledstrip.h"
@@ -445,8 +444,8 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
           sbufWriteU16(dst, (int16_t)(rcCommand[YAW]));
           sbufWriteU16(dst, rcCommand[THROTTLE]);
 
-          sbufWriteU32(dst, GpsNav.GPS_coord[LAT]);
-          sbufWriteU32(dst, GpsNav.GPS_coord[LON]);
+          sbufWriteU32(dst, gpsSol.llh.lat);
+          sbufWriteU32(dst, gpsSol.llh.lon);
 
           sbufWriteU16(dst, getBatteryVoltage());
 
@@ -496,9 +495,9 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
 
           sbufWriteU32(dst, (int32_t)(yaw_heading_reference) * 1000.0f);
 
-          sbufWriteU32(dst, GpsNav.GPS_headVeh);
+          sbufWriteU32(dst, gpsSol.groundCourse);
 
-          sbufWriteU16(dst, GpsNav.GPS_numSat);
+          sbufWriteU16(dst, gpsSol.numSat);
 
           sbufWriteU16(dst, STATE(GPS_FIX));
 
@@ -521,9 +520,9 @@ static bool mspFcProcessOutCommand(uint16_t cmdMSP, sbuf_t *dst, mspPostProcessF
           sbufWriteU32(dst, debug[6]);
           sbufWriteU32(dst, debug[7]);
 
-          sbufWriteU16(dst, pvt.year);
-          sbufWriteU16(dst, pvt.month);
-          sbufWriteU32(dst, ((pvt.day) | (pvt.hour<<8) | (pvt.min<<16) | (pvt.sec<<24)));
+          sbufWriteU16(dst, gpsSol.dateTime.day);
+          sbufWriteU16(dst, gpsSol.dateTime.month);
+          sbufWriteU32(dst, ((gpsSol.dateTime.day) | (gpsSol.dateTime.hour<<8) | (gpsSol.dateTime.min<<16) | (gpsSol.dateTime.sec<<24)));
 
           sbufWriteU32(dst, (int32_t)(bmi270.gyro.gyroZero[X] * 1000.0f));
           sbufWriteU32(dst, (int32_t)(bmi270.gyro.gyroZero[Y] * 1000.0f));

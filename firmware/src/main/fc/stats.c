@@ -24,16 +24,13 @@
 
 #include "common/time.h"
 
-#include "drivers/gps/gps.h"
-
-
 //#include "config/config.h"
 #include "fc/dispatch.h"
 #include "fc/runtime_config.h"
 #include "fc/stats.h"
 
 //#include "io/beeper.h"
-//#include "io/gps.h"
+#include "io/gps.h"
 
 
 #define STATS_SAVE_DELAY_US 500000 // Let disarming complete and save stats after this time

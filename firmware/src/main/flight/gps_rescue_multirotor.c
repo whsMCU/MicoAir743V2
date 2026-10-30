@@ -45,8 +45,7 @@
 #include "flight/pid.h"
 #include "flight/position.h"
 
-//#include "io/gps.h"
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 #include "rx/rx.h"
 //#include "pg/autopilot.h"
 //#include "sensors/acceleration.h"
@@ -458,7 +457,7 @@ static void performSanityChecks(void)
         }
     }
 
-    secondsLowSats += (!STATE(GPS_FIX) || (GpsNav.GPS_numSat < GPS_MIN_SAT_COUNT)) ? 1 : -1;
+    secondsLowSats += (!STATE(GPS_FIX) || (gpsSol.numSat < GPS_MIN_SAT_COUNT)) ? 1 : -1;
     secondsLowSats = constrain(secondsLowSats, 0, 10);
 
     if (secondsLowSats == 10) {
@@ -516,10 +515,10 @@ static void sensorUpdate(bool newGpsData)
     const float altitudeCurrentCm = getEstimatedAltitudeCm();
     DEBUG_SET(DEBUG_GPS_RESCUE_TRACKING, 2, lrintf(altitudeCurrentCm));
     DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 0, rescueState.sensor.groundSpeedCmS);  // groundspeed cm/s
-    DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 1, GpsNav.GPS_ground_course);                // degrees * 10
+    DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 1, gpsSol.groundCourse);                // degrees * 10
     DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 2, attitude.values.yaw);                // degrees * 10
     DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 3, rescueState.sensor.directionToHome); // computed from current GPS position in relation to home
-    rescueState.sensor.healthy = GpsNav.flags.validEPE;//gpsIsHealthy();
+    rescueState.sensor.healthy = gpsIsHealthy();
 
     rescueState.sensor.directionToHome = GPS_directionToHome; // extern value from gps.c using current position relative to home
     rescueState.sensor.errorAngle = (attitude.values.yaw - rescueState.sensor.directionToHome) / 10.0f;
@@ -541,7 +540,7 @@ static void sensorUpdate(bool newGpsData)
 
     rescueState.sensor.distanceToHomeCm = GPS_distanceToHomeCm;
     rescueState.sensor.distanceToHomeM = rescueState.sensor.distanceToHomeCm / 100.0f;
-    rescueState.sensor.groundSpeedCmS = GpsNav.GPS_ground_course; // cm/s
+    rescueState.sensor.groundSpeedCmS = gpsSol.groundCourse; // cm/s
 
     rescueState.sensor.gpsDataIntervalSeconds = getGpsDataIntervalSeconds();
     // Range from 50ms (20hz) to 2500ms (0.4Hz). Intended to cover common GPS data rates and exclude unusual values.
@@ -618,9 +617,9 @@ static bool checkGPSRescueIsAvailable(void)
     static bool noGPSfix = false;
     bool result = true;
 
-    if (!GpsNav.flags.validEPE || !STATE(GPS_FIX_HOME)) {
-        return false;
-    }
+//    if (!GpsNav.flags.validEPE || !STATE(GPS_FIX_HOME)) {
+//        return false;
+//    }
 
     //  Things that should run at a low refresh rate >> ~1hz
     const timeDelta_t dTime = cmpTimeUs(currentTimeUs, previousTimeUs);
@@ -640,7 +639,7 @@ static bool checkGPSRescueIsAvailable(void)
         noGPSfix = false;
     }
 
-    secondsLowSats = constrain(secondsLowSats + ((GpsNav.GPS_numSat < GPS_MIN_SAT_COUNT) ? 1 : -1), 0, 2);
+    secondsLowSats = constrain(secondsLowSats + ((gpsSol.numSat < GPS_MIN_SAT_COUNT) ? 1 : -1), 0, 2);
     if (secondsLowSats == 2) {
         lowsats = true;
         result = false;

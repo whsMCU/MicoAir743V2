@@ -30,7 +30,7 @@
 #include "common/filter.h"
 #include "common/utils.h"
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 #include "drivers/motor.h"
 
 #include "sensors/sensors.h"

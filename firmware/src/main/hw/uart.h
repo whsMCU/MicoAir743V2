@@ -32,7 +32,7 @@ typedef enum {
     BAUD_COUNT
 } baudRate_e;
 
-extern const uint32_t baudRates[];
+extern const uint32_t baudRates[BAUD_COUNT];
 extern bool tx_done;
 
 extern uint32_t overren_cnt;

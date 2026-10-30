@@ -54,6 +54,7 @@
 //#include "io/displayport_max7456.h"
 #include "io/ledstrip.h"
 #include "io/asyncfatfs/asyncfatfs.h"
+#include "io/gps.h"
 
 #include "fc/board_info.h"
 #include "fc/dispatch.h"
@@ -115,7 +116,6 @@
 #include "flight/pid.h"
 #include "flight/gps_rescue_multirotor.h"
 
-//#include "drivers/gps/gps.h"
 #include "drivers/motor.h"
 //#include "drivers/pwm_output.h"
 #include "drivers/osd/osd.h"
@@ -335,7 +335,7 @@ void Param_Config_Init(void)
 	statsConfig_Init();
 
 #ifdef USE_GPS
-	//gpsConfig_Init();
+	gpsConfig_Init();
 #endif
 #ifdef USE_OPTICALFLOW
 	opflow_Init();

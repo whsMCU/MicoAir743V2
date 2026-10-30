@@ -40,7 +40,7 @@
 
 #include "flight/imu.h"
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 
 #include "navigation/navigation.h"
 #include "navigation/navigation_private.h"

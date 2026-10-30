@@ -25,7 +25,7 @@
 #include "common/vector.h"
 #include "common/time.h"
 
-#include "gps/gps.h"
+#include "io/gps.h"
 
 // Unified position estimate from Kalman-filter sensor fusion.
 // All values in local ENU (East-North-Up) centimeters, zeroed at arm point.

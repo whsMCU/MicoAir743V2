@@ -27,7 +27,7 @@
 #include "common/filter.h"
 #include "common/time.h"
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 #include "drivers/dshot.h"
 #include "drivers/dshot_command.h"
 
@@ -278,25 +278,6 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 //  if (headingHoldState == HEADING_HOLD_UPDATE_HEADING) {
 //      updateHeadingHoldTarget(DECIDEGREES_TO_DEGREES(attitude.values.yaw));
 //  }
-
-#ifdef USE_GPS1
-  if ( (FLIGHT_MODE(NAV_RTH_MODE) || FLIGHT_MODE(NAV_POSHOLD_MODE)) && STATE(GPS_FIX_HOME) ) {
-    float sin_yaw_y = sin(heading*0.0174532925f);
-    float cos_yaw_x = cos(heading*0.0174532925f);
-    #if defined(NAV_SLEW_RATE)
-      GpsNav.nav_rated[LON]   += constrain(wrap_18000(GpsNav.nav[LON]-GpsNav.nav_rated[LON]),-NAV_SLEW_RATE,NAV_SLEW_RATE);
-      GpsNav.nav_rated[LAT]   += constrain(wrap_18000(GpsNav.nav[LAT]-GpsNav.nav_rated[LAT]),-NAV_SLEW_RATE,NAV_SLEW_RATE);
-      GpsNav.GPS_angle[ROLL]   = (GpsNav.nav_rated[LON]*cos_yaw_x - GpsNav.nav_rated[LAT]*sin_yaw_y) /10;
-      GpsNav.GPS_angle[PITCH]  = (GpsNav.nav_rated[LON]*sin_yaw_y + GpsNav.nav_rated[LAT]*cos_yaw_x) /10;
-    #else
-      GpsNav.GPS_angle[ROLL]   = (GpsNav.nav[LON]*cos_yaw_x - GpsNav.nav[LAT]*sin_yaw_y) /10;
-      GpsNav.GPS_angle[PITCH]  = (GpsNav.nav[LON]*sin_yaw_y + GpsNav.nav[LAT]*cos_yaw_x) /10;
-    #endif
-  } else {
-    GpsNav.GPS_angle[ROLL]  = 0;
-    GpsNav.GPS_angle[PITCH] = 0;
-  }
-#endif
 
   if (isRXDataNew) {
       updateWaypointsAndNavigationMode();

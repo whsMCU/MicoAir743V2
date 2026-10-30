@@ -40,7 +40,7 @@
 #include "drivers/accgyro/accgyro.h"
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 #include "drivers/motor.h"
 #include "drivers/dshot.h"
 

@@ -29,7 +29,7 @@
 
 #include "common/quaternion.h"
 #include "common/vector.h"
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 
 #include "fc/runtime_config.h"
 #include "fc/core.h"
@@ -479,15 +479,15 @@ static void imuCalculateEstimatedAttitude(timeUs_t currentTimeUs)
 #endif
 
 #if defined(USE_GPS)
-    if (!useMag && STATE(GPS_FIX) && GpsNav.GPS_numSat >= 5 && GpsNav.groundSpeed >= GPS_COG_MIN_GROUNDSPEED) {
+    if (!useMag && STATE(GPS_FIX) && gpsSol.numSat >= 5 && gpsSol.groundSpeed >= GPS_COG_MIN_GROUNDSPEED) {
         // Use GPS course over ground to correct attitude.values.yaw
-        courseOverGround = DECIDEGREES_TO_RADIANS(GpsNav.groundCourse);
+        courseOverGround = DECIDEGREES_TO_RADIANS(gpsSol.groundCourse);
         useCOG = true;
 
         if (useCOG && shouldInitializeGPSHeading()) {
             // Reset our reference and reinitialize quaternion.  This will likely ideally happen more than once per flight, but for now,
             // shouldInitializeGPSHeading() returns true only once.
-            imuComputeQuaternionFromRPY(&qP, attitude.values.roll, attitude.values.pitch, GpsNav.groundCourse);
+            imuComputeQuaternionFromRPY(&qP, attitude.values.roll, attitude.values.pitch, gpsSol.groundCourse);
 
             useCOG = false; // Don't use the COG when we first reinitialize.  Next time around though, yes.
         }

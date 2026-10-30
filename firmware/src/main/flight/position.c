@@ -39,7 +39,7 @@
 #include "flight/pid.h"
 
 #include "rx/rx.h"
-#include "gps/gps.h"
+#include "io/gps.h"
 
 #include "scheduler/scheduler.h"
 

@@ -37,7 +37,7 @@
 //#include "config/config_reset.h"
 //#include "config/feature.h"
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 
 #include "fc/rc_controls.h"
 #include "fc/rc_adjustments.h"

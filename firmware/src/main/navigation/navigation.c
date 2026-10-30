@@ -34,7 +34,7 @@
 #include "config/feature.h"
 
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 
 //#include "drivers/time.h"
 

@@ -55,7 +55,7 @@
 #endif
 
 #ifdef USE_GPS
-#include "gps/gps.h"
+#include "io/gps.h"
 #endif
 
 #if defined(USE_POSITION_HOLD)

@@ -12,7 +12,7 @@
 #include "rx/rx.h"
 #include "rx/crsf.h"
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 
 #include "msp/msp_serial.h"
 
@@ -43,7 +43,7 @@ DMA_HandleTypeDef hdma_usart6_rx;
 DMA_HandleTypeDef hdma_usart6_tx;
 DMA_HandleTypeDef hdma_uart7_rx;
 
-const uint32_t baudRates[] = {0, 9600, 19200, 38400, 57600, 115200, 230400, 250000,
+const uint32_t baudRates[BAUD_COUNT] = {0, 9600, 19200, 38400, 57600, 115200, 230400, 250000,
         400000, 460800, 500000, 921600, 1000000, 1500000, 2000000, 2470000}; // see baudRate_e
 
 #define BAUD_RATE_COUNT (sizeof(baudRates) / sizeof(baudRates[0]))
@@ -924,9 +924,7 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
 
 baudRate_e lookupBaudRateIndex(uint32_t baudRate)
 {
-    uint8_t index;
-
-    for (index = 0; index < BAUD_RATE_COUNT; index++) {
+    for (unsigned index = 0; index < ARRAYLEN(baudRates); index++) {
         if (baudRates[index] == baudRate) {
             return index;
         }
@@ -950,133 +948,6 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         /* Disable the UART Error Interrupt: (Frame error, noise error, overrun error) */
         CLEAR_BIT(huart->Instance->CR3, USART_CR3_EIE);
   	}
-  }
-}
-
-typedef enum {
-    GCS_IDLE,
-    GCS_HEADER_SYNC,
-    GCS_HEADER_ID,
-
-    GCS_PAYLOAD,
-
-    GCS_CHECKSUM,
-
-    GCS_DATA_RECEIVED
-} gcsState_e;
-
-typedef enum {
-    GCS_Tlemetry,
-    GCS_PID_recive,
-    GCS_PID_send,
-    GCS_PID_save,
-    GCS_ACC_calibration,
-    GCS_MAG_calibration,
-    GCS_PID_Test
-} gcsData_e;
-
-
-#define UBX_SYNC_CHAR1 0xB5
-#define UBX_SYNC_CHAR2 0x62
-
-#define UBX_MAX_PAYLOAD 256
-
-typedef enum {
-    UBX_SYNC1,
-    UBX_SYNC2,
-    UBX_CLASS,
-    UBX_ID,
-    UBX_LENGTH1,
-    UBX_LENGTH2,
-    UBX_PAYLOAD,
-    UBX_CK_A,
-    UBX_CK_B
-} UbxParserState_t;
-
-typedef struct {
-    UbxParserState_t state;
-    uint8_t class;
-    uint8_t id;
-    uint16_t length;
-    uint16_t payload_counter;
-    uint8_t payload[UBX_MAX_PAYLOAD];
-    uint8_t ck_a;
-    uint8_t ck_b;
-    uint32_t Ubx_Error;
-} UbxParser_t;
-
-UbxParser_t ubxParser = {
-    .state = UBX_SYNC1
-};
-
-static void GPS_Passer(uint8_t c)
-{
-  switch (ubxParser.state) {
-      case UBX_SYNC1:
-          if (c == UBX_SYNC_CHAR1) ubxParser.state = UBX_SYNC2;
-          break;
-      case UBX_SYNC2:
-          if (c == UBX_SYNC_CHAR2) ubxParser.state = UBX_CLASS;
-          else if(c == UBX_SYNC_CHAR1) ubxParser.state = UBX_SYNC2;
-          else ubxParser.state = UBX_SYNC1;
-          break;
-      case UBX_CLASS:
-          ubxParser.class = c;
-          ubxParser.ck_a = c;
-          ubxParser.ck_b = ubxParser.ck_a;
-          ubxParser.state = UBX_ID;
-          break;
-      case UBX_ID:
-          ubxParser.id = c;
-          ubxParser.ck_a += c;
-          ubxParser.ck_b += ubxParser.ck_a;
-          ubxParser.state = UBX_LENGTH1;
-          break;
-      case UBX_LENGTH1:
-          ubxParser.length = c;
-          ubxParser.ck_a += c;
-          ubxParser.ck_b += ubxParser.ck_a;
-          ubxParser.state = UBX_LENGTH2;
-          break;
-      case UBX_LENGTH2:
-          ubxParser.length |= ((uint16_t)c << 8);
-          ubxParser.ck_a += c;
-          ubxParser.ck_b += ubxParser.ck_a;
-          if (ubxParser.length > UBX_MAX_PAYLOAD) {
-              // 길이 에러 시 초기화
-              ubxParser.state = UBX_SYNC1;
-          } else if (ubxParser.length == 0) {
-              ubxParser.state = UBX_CK_A;
-          } else {
-              ubxParser.payload_counter = 0;
-              ubxParser.state = UBX_PAYLOAD;
-          }
-          break;
-      case UBX_PAYLOAD:
-          ubxParser.payload[ubxParser.payload_counter++] = c;
-          ubxParser.ck_a += c;
-          ubxParser.ck_b += ubxParser.ck_a;
-          if (ubxParser.payload_counter >= ubxParser.length) {
-              ubxParser.state = UBX_CK_A;
-          }
-          break;
-      case UBX_CK_A:
-          if (c == ubxParser.ck_a) {
-              ubxParser.state = UBX_CK_B;
-          } else {
-            ubxParser.Ubx_Error++;
-            ubxParser.state = UBX_SYNC1; // 체크섬 에러
-          }
-          break;
-      case UBX_CK_B:
-          if (c == ubxParser.ck_b) {
-              // 메시지 완성
-              Ubx_HandleMessage(ubxParser.class, ubxParser.id, ubxParser.payload, ubxParser.length);
-          } else {
-            ubxParser.Ubx_Error++;
-          }
-          ubxParser.state = UBX_SYNC1;
-          break;
   }
 }
 
@@ -1111,10 +982,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
     //uartWrite(_DEF_USB, (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
   	qbufferWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
-		while(uartAvailable(_DEF_UART3))
-		{
-	    GPS_Passer(uartRead(_DEF_UART3));
-		}
   }
 
   if(huart->Instance == UART4)

@@ -30,13 +30,7 @@
 
 //#include "flight/failsafe.h"
 
-#include "drivers/gps/gps.h"
-
-/* GPS Home location data */
-//extern gpsLocation_t        GPS_home;
-//extern uint32_t             GPS_distanceToHome;        // distance to home point in meters
-//extern int16_t              GPS_directionToHome;       // direction to home point in degrees
-//extern fpVector3_t          original_rth_home;         // the original rth home - save it, since it could be replaced by safehome or HOME_RESET
+#include "io/gps.h"
 
 extern bool autoThrottleManuallyIncreased;
 

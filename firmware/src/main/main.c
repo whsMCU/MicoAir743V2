@@ -43,7 +43,7 @@
 #include "sensors/adcinternal.h"
 #include "sensors/battery.h"
 
-#include "drivers/gps/gps.h"
+#include "io/gps.h"
 
 #include "hw/timer.h"
 #include "hw/sdmmc.h"

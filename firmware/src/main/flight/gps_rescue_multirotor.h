@@ -74,6 +74,8 @@ typedef struct gpsRescue_s {
 
 extern float gpsRescueAngle[RP_AXIS_COUNT]; // NOTE: ANGLES ARE IN CENTIDEGREES
 
+extern gpsRescueConfig_t gpsRescueConfig;
+
 void gpsRescueConfig_Init(void);
 
 void gpsRescueInit(void);
