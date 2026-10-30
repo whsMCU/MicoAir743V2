@@ -1017,6 +1017,7 @@ static void GPS_Passer(uint8_t c)
           break;
       case UBX_SYNC2:
           if (c == UBX_SYNC_CHAR2) ubxParser.state = UBX_CLASS;
+          else if(c == UBX_SYNC_CHAR1) ubxParser.state = UBX_SYNC2;
           else ubxParser.state = UBX_SYNC1;
           break;
       case UBX_CLASS:
@@ -1107,9 +1108,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
   if(huart->Instance == USART3)
   {
-    GPS_Passer(rx_buf[_DEF_UART3][0]);
-//    qbufferWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
     HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
+    //uartWrite(_DEF_USB, (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
+  	qbufferWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
+		while(uartAvailable(_DEF_UART3))
+		{
+	    GPS_Passer(uartRead(_DEF_UART3));
+		}
   }
 
   if(huart->Instance == UART4)
