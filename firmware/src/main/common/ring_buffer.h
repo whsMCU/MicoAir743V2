@@ -16,8 +16,8 @@ extern "C" {
 
 typedef struct
 {
-	uint32_t in;
-	uint32_t out;
+	volatile uint32_t in;
+	volatile uint32_t out;
 	uint32_t len;
 	uint32_t size;
 

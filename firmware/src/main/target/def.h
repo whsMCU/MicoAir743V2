@@ -97,6 +97,7 @@
 //#define USE_RANGEFINDER
 //#define USE_RANGEFINDER_MSP
 #define USE_GPS
+#define USE_GPS_NMEA
 #define USE_GPS_UBLOX
 #define USE_CRSF_LINK_STATISTICS
 #define USE_RX_RSSI_DBM

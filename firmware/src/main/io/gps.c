@@ -456,7 +456,7 @@ void gpsInit(void)
     gpsData.tempBaudRateIndex = gpsData.userBaudRateIndex;
 
     // no callback - buffer will be consumed in gpsUpdate()
-    gpsPort = uartOpen(_DEF_UART3, 9600);
+    gpsPort = uartOpen(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
     //gpsPort = openSerialPort(gpsPortConfig->identifier, FUNCTION_GPS, NULL, NULL, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex], mode, options);
     if (!gpsPort) {
         return;
@@ -938,7 +938,7 @@ static void gpsConfigureNmea(void)
     // - send any NMEA custom commands to the GPS Module
     // the user must configure the power-up baud rate of the module to be fast enough for their data rate
     // Note: we always parse all incoming NMEA messages
-    DEBUG_SET(DEBUG_GPS_CONNECTION, 4, (gpsData.state * 100 + gpsData.state_position));
+    //DEBUG_SET(DEBUG_GPS_CONNECTION, 4, (gpsData.state * 100 + gpsData.state_position));
 
     // wait 500ms between changes
     if (cmp32(gpsData.now, gpsData.state_ts) < 500) {
@@ -947,7 +947,7 @@ static void gpsConfigureNmea(void)
     gpsData.state_ts = gpsData.now;
 
     // Check that the GPS transmit buffer is empty
-    if (!isSerialTransmitBufferEmpty(gpsPort)) {
+    if (!!uartTxBufEmpty(_DEF_UART3)) {
         return;
     }
 
@@ -962,13 +962,14 @@ static void gpsConfigureNmea(void)
 #if !defined(GPS_NMEA_TX_ONLY)
         if (gpsData.state_position < 1) {
             // set the FC's baud rate to the user's configured baud rate
-            serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
+            //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
+            uartOpen(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
             gpsData.state_position++;
         } else if (gpsData.state_position < 2) {
             // send NMEA custom commands to select which messages being sent, data rate etc
             // use PUBX, MTK, SiRF or GTK format commands, depending on module type
             static int commandOffset = 0;
-            const char *commands = gpsConfig()->nmeaCustomCommands;
+            const char *commands = gpsConfig.nmeaCustomCommands;
             const char *cmd = commands + commandOffset;
             // skip leading whitespaces and get first command length
             int commandLen;
@@ -977,8 +978,10 @@ static void gpsConfigureNmea(void)
             }
             if (*cmd) {
                 // Send the current command to the GPS
-                serialWriteBuf(gpsPort, (uint8_t *)cmd, commandLen);
-                serialWriteBuf(gpsPort, (uint8_t *)"\r\n", 2);
+//                serialWriteBuf(gpsPort, (uint8_t *)cmd, commandLen);
+//                serialWriteBuf(gpsPort, (uint8_t *)"\r\n", 2);
+                uartWrite(_DEF_UART3, (uint8_t *)cmd, commandLen);
+                uartWrite(_DEF_UART3, (uint8_t *)"\r\n", 2);
                 // Move to the next command
                 cmd += commandLen;
             }
@@ -1003,6 +1006,11 @@ static void gpsConfigureNmea(void)
 #endif // USE_GPS_NMEA
 
 #ifdef USE_GPS_UBLOX
+
+const unsigned char UBX_MON_VER[] = {
+	0xB5, 0x62, 0x0A, 0x00, 0x00,
+	0x0E, 0x34
+};
 
 static void gpsConfigureUblox(void)
 {
@@ -1038,6 +1046,7 @@ static void gpsConfigureUblox(void)
             if (!messageSent) {
                 gpsData.platformVersion = UBX_VERSION_UNDEF;
                 ubloxSendClassMessage(CLASS_MON, MSG_MON_VER, 0);
+                //uartWrite(_DEF_UART3, (uint8_t*)&UBX_MON_VER, sizeof(UBX_MON_VER));
                 gpsData.ackState = UBLOX_ACK_IDLE; // ignore ACK for this message
                 messageSent = true;
             }
@@ -1093,7 +1102,6 @@ static void gpsConfigureUblox(void)
         }
 
         if (gpsData.ackState == UBLOX_ACK_IDLE) {
-
             // short delay before between commands, including the first command
             static uint32_t last_state_position_time = 0;
             if (last_state_position_time == 0) {
@@ -1494,8 +1502,8 @@ void gpsUpdate(timeUs_t currentTimeUs)
         if (!gpsPort) {
             break;
         }
-        rxBytesWaiting = serialRxBytesWaiting(gpsPort);
-        DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
+        rxBytesWaiting = uartAvailable(_DEF_UART3);;
+        //DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         static uint8_t wait = 0;
         static bool isFast = false;
         while (rxBytesWaiting-- > 0) {
@@ -1507,7 +1515,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
             if (cmpTimeUs(micros(), currentTimeUs) > GPS_RECV_TIME_MAX) {
                 break;
             }
-            if (gpsNewFrameNMEA(serialRead(gpsPort))) {
+            if (gpsNewFrameNMEA(uartRead(_DEF_UART3))) {
                 gpsHandleFrameComplete();
             }
         }
