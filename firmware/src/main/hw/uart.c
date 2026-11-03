@@ -20,10 +20,10 @@
 
 
 static bool is_open[UART_MAX_CH];
-#define MAX_SIZE 128
+#define MAX_SIZE 512
 
 static qbuffer_t ring_buffer[UART_MAX_CH];
-static volatile uint8_t rx_buf[UART_MAX_CH][MAX_SIZE];
+static volatile uint8_t rx_buf[UART_MAX_CH];
 static volatile uint8_t rx_ringbuf[UART_MAX_CH][MAX_SIZE];
 
 UART_HandleTypeDef huart1;
@@ -92,7 +92,6 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       {
         ret = true;
         is_open[ch] = true;
-        HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1][0], 1);
       }
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
@@ -106,6 +105,11 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
       {
         Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1], 1) != HAL_OK)
+      {
+        ret = false;
       }
 
       break;
@@ -130,8 +134,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
     	{
     		ret = true;
         is_open[ch] = true;
-        HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2][0], 1);
     	}
+      HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2], 1);
       break;
 
     case _DEF_UART3:
@@ -157,10 +161,6 @@ bool uartOpen(uint8_t ch, uint32_t baud)
     	{
     		ret = true;
         is_open[ch] = true;
-        if(HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3][0], 1) != HAL_OK)
-        {
-          ret = false;
-        }
     	}
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
@@ -174,6 +174,11 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
       {
         Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3], 1) != HAL_OK)
+      {
+        ret = false;
       }
 
       break;
@@ -201,10 +206,6 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       {
         ret = true;
         is_open[ch] = true;
-        if(HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4][0], 1) != HAL_OK)
-        {
-          ret = false;
-        }
       }
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart4, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
@@ -219,6 +220,12 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       {
         Error_Handler();
       }
+
+      if(HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4], 1) != HAL_OK)
+      {
+        ret = false;
+      }
+
       break;
 
     case _DEF_UART5:
@@ -241,11 +248,11 @@ bool uartOpen(uint8_t ch, uint32_t baud)
     	{
     		ret = true;
         is_open[ch] = true;
-        if(HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5][0], 1) != HAL_OK)
-        {
-          ret = false;
-        }
     	}
+      if(HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5], 1) != HAL_OK)
+      {
+        ret = false;
+      }
       break;
 
     case _DEF_UART6:
@@ -271,10 +278,6 @@ bool uartOpen(uint8_t ch, uint32_t baud)
     	{
     		ret = true;
     		is_open[ch] = true;
-        if(HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], 1) != HAL_OK)
-    		{
-    			ret = false;
-    		}
     	}
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart6, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
@@ -289,6 +292,11 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       {
         Error_Handler();
       }
+
+      if(HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6], 1) != HAL_OK)
+  		{
+  			ret = false;
+  		}
 
       break;
     case _DEF_UART7:
@@ -314,10 +322,6 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       {
         ret = true;
         is_open[ch] = true;
-        if(HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7][0], 1) != HAL_OK)
-        {
-          ret = false;
-        }
       }
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart7, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
@@ -331,6 +335,11 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       if (HAL_UARTEx_DisableFifoMode(&huart7) != HAL_OK)
       {
         Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7], 1) != HAL_OK)
+      {
+        ret = false;
       }
       break;
   }
@@ -487,9 +496,11 @@ uint8_t uartRead(uint8_t ch)
     case _DEF_USB:
       ret = cdcRead();
       break;
+
     case _DEF_UART1:
       qbufferRead(&ring_buffer[ch], &ret, 1);
       break;
+
     case _DEF_UART2:
     	qbufferRead(&ring_buffer[ch], &ret, 1);
       break;
@@ -842,80 +853,222 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
 			break;
 
     case _DEF_UART1:
+    	HAL_UART_AbortReceive(&huart1);
+    	HAL_UART_DeInit(&huart1);
       huart1.Init.BaudRate = baud;
       if (HAL_UART_Init(&huart1) != HAL_OK)
       {
         Error_Handler();
-      }else
-      {
-        ret = true;
+        ret = false;
       }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
+
       break;
 
 		case _DEF_UART2:
-			huart2.Init.BaudRate = baud;
-    	if (HAL_UART_Init(&huart2) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}else
-    	{
-    		ret = true;
-    	}
+    	HAL_UART_AbortReceive(&huart2);
+    	HAL_UART_DeInit(&huart2);
+      huart2.Init.BaudRate = baud;
+      if (HAL_UART_Init(&huart2) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
 			break;
 
     case _DEF_UART3:
-			huart3.Init.BaudRate = baud;
-    	if (HAL_UART_Init(&huart3) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}else
-    	{
-    		ret = true;
-    	}
+    	HAL_UART_AbortReceive(&huart3);
+    	HAL_UART_DeInit(&huart3);
+      huart3.Init.BaudRate = baud;
+      if (HAL_UART_Init(&huart3) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart3) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
 			break;
 
     case _DEF_UART4:
-			huart4.Init.BaudRate = baud;
-    	if (HAL_UART_Init(&huart4) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}else
-    	{
-    		ret = true;
-    	}
+    	HAL_UART_AbortReceive(&huart4);
+    	HAL_UART_DeInit(&huart4);
+      huart4.Init.BaudRate = baud;
+      if (HAL_UART_Init(&huart4) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart4, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart4, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart4) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
 			break;
 
     case _DEF_UART5:
-			huart5.Init.BaudRate = baud;
-    	if (HAL_UART_Init(&huart5) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}else
-    	{
-    		ret = true;
-    	}
+    	HAL_UART_AbortReceive(&huart5);
+    	HAL_UART_DeInit(&huart5);
+      huart5.Init.BaudRate = baud;
+      if (HAL_UART_Init(&huart5) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart5, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart5, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart5) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
 			break;
 
     case _DEF_UART6:
-			huart6.Init.BaudRate = baud;
-    	if (HAL_UART_Init(&huart6) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}else
-    	{
-    		ret = true;
-    	}
+    	HAL_UART_AbortReceive(&huart6);
+    	HAL_UART_DeInit(&huart6);
+      huart6.Init.BaudRate = baud;
+      if (HAL_UART_Init(&huart6) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart6, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart6, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart6) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
 			break;
 
     case _DEF_UART7:
-			huart7.Init.BaudRate = baud;
-    	if (HAL_UART_Init(&huart7) != HAL_OK)
-    	{
-    	  Error_Handler();
-    	}else
-    	{
-    		ret = true;
-    	}
+    	HAL_UART_AbortReceive(&huart7);
+    	HAL_UART_DeInit(&huart7);
+      huart7.Init.BaudRate = baud;
+      if (HAL_UART_Init(&huart7) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if (HAL_UARTEx_SetTxFifoThreshold(&huart7, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_SetRxFifoThreshold(&huart7, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      if (HAL_UARTEx_DisableFifoMode(&huart7) != HAL_OK)
+      {
+        Error_Handler();
+      }
+
+      if(HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7], 1) != HAL_OK)
+      {
+        ret = false;
+      } else
+      {
+      	ret = true;
+      }
 			break;
 	}
 
@@ -958,42 +1111,41 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     msp_tx_end_time = micros()-msp_tx_start_time;
   }
 }
-
+volatile uint8_t buffer_test;
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   static uint32_t pre_time = 0;
 
   if(huart->Instance == USART1)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART1], (uint8_t *)&rx_buf[_DEF_UART1][0], 1);
-    HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1][0], 1);
+    qbufferWrite(&ring_buffer[_DEF_UART1], (uint8_t *)&rx_buf[_DEF_UART1], 1);
+    HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1], 1);
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t *)&rx_buf[_DEF_UART1][0], MAX_SIZE);
 //    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   }
 
   if(huart->Instance == USART2)
   {
-      HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2][0], 1);
-      qbufferWrite(&ring_buffer[_DEF_UART2], (uint8_t *)&rx_buf[_DEF_UART2][0], 1);
+      HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2], 1);
+      qbufferWrite(&ring_buffer[_DEF_UART2], (uint8_t *)&rx_buf[_DEF_UART2], 1);
   }
 
   if(huart->Instance == USART3)
   {
-    HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
-    //uartWrite(_DEF_USB, (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
-  	qbufferWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3][0], 1);
+  	qbufferWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3], 1);
+    HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3], 1);
   }
 
   if(huart->Instance == UART4)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART4], (uint8_t *)&rx_buf[_DEF_UART4][0], 1);
-    HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4][0], 1);
+    qbufferWrite(&ring_buffer[_DEF_UART4], (uint8_t *)&rx_buf[_DEF_UART4], 1);
+    HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4], 1);
   }
 
   if(huart->Instance == UART5)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART5], (uint8_t *)&rx_buf[_DEF_UART5][0], 1);
-    HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5][0], 1);
+    qbufferWrite(&ring_buffer[_DEF_UART5], (uint8_t *)&rx_buf[_DEF_UART5], 1);
+    HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5], 1);
   }
 
 	if(huart->Instance == USART6)
@@ -1001,8 +1153,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		rxRuntimeState.callbackTime = micros() - pre_time;
     pre_time = micros();
     rxRuntimeState.RxCallback_Flag = true;
-		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
-    qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6][0], 1);
+		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6], 1);
+    qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6], 1);
 //      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], MAX_SIZE);
 //      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
 
@@ -1016,8 +1168,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	}
   if(huart->Instance == UART7)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART7], (uint8_t *)&rx_buf[_DEF_UART7][0], 1);
-    HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7][0], 1);
+    qbufferWrite(&ring_buffer[_DEF_UART7], (uint8_t *)&rx_buf[_DEF_UART7], 1);
+    HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7], 1);
   }
 }
 

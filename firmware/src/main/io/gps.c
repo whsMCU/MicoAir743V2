@@ -540,6 +540,7 @@ static void ubloxSendByteUpdateChecksum(uint8_t data, uint8_t *checksumA, uint8_
     *checksumA += data;
     *checksumB += *checksumA;
     //serialWrite(gpsPort, data);
+    //uartWriteIT(_DEF_UART3, &data, 1);
     uartWrite(_DEF_UART3, &data, 1);
 }
 
@@ -563,11 +564,15 @@ static void ubloxSendMessage(ubxMessage_t *msg, bool skipAck)
     //serialWrite(gpsPort, msg->header.preamble2);
     uartWrite(_DEF_UART3, &msg->header.preamble1, 1);
     uartWrite(_DEF_UART3, &msg->header.preamble2, 1);
+    //uartWriteIT(_DEF_UART3, &msg->header.preamble1, 1);
+    //uartWriteIT(_DEF_UART3, &msg->header.preamble2, 1);
     ubloxSendDataUpdateChecksum(msg, &checksumA, &checksumB);
 //    serialWrite(gpsPort, checksumA);
 //    serialWrite(gpsPort, checksumB);
     uartWrite(_DEF_UART3, &checksumA, 1);
     uartWrite(_DEF_UART3, &checksumB, 1);
+    //uartWriteIT(_DEF_UART3, &checksumA, 1);
+    //uartWriteIT(_DEF_UART3, &checksumB, 1);
     // Save state for ACK waiting
     gpsData.ackWaitingMsgId = msg->header.msg_id; //save message id for ACK
     gpsData.ackState = skipAck ? UBLOX_ACK_GOT_ACK : UBLOX_ACK_WAITING;
@@ -963,7 +968,7 @@ static void gpsConfigureNmea(void)
         if (gpsData.state_position < 1) {
             // set the FC's baud rate to the user's configured baud rate
             //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
-            uartOpen(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
+            uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
             gpsData.state_position++;
         } else if (gpsData.state_position < 2) {
             // send NMEA custom commands to select which messages being sent, data rate etc
@@ -982,6 +987,8 @@ static void gpsConfigureNmea(void)
 //                serialWriteBuf(gpsPort, (uint8_t *)"\r\n", 2);
                 uartWrite(_DEF_UART3, (uint8_t *)cmd, commandLen);
                 uartWrite(_DEF_UART3, (uint8_t *)"\r\n", 2);
+                //uartWriteIT(_DEF_UART3, (uint8_t *)cmd, commandLen);
+                //uartWriteIT(_DEF_UART3, (uint8_t *)"\r\n", 2);
                 // Move to the next command
                 cmd += commandLen;
             }
@@ -1008,7 +1015,7 @@ static void gpsConfigureNmea(void)
 #ifdef USE_GPS_UBLOX
 
 const unsigned char UBX_MON_VER[] = {
-	0xB5, 0x62, 0x0A, 0x00, 0x00,
+	0xB5, 0x62, 0x0A, 0x04, 0x00, 0x00,
 	0x0E, 0x34
 };
 
@@ -1016,9 +1023,9 @@ static void gpsConfigureUblox(void)
 {
 
     // Wait until GPS transmit buffer is empty
-    if (!uartTxBufEmpty(_DEF_UART3)) {
-        return;
-    }
+//    if (!uartTxBufEmpty(_DEF_UART3)) {
+//        return;
+//    }
 
     switch (gpsData.state) {
     case GPS_STATE_DETECT_BAUD:
@@ -1069,7 +1076,7 @@ static void gpsConfigureUblox(void)
         }
         // set the FC baud rate to the new temp baud rate
         //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex]);
-        uartOpen(_DEF_UART3, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex]);
+        uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex]);
         initBaudRateCycleCount++;
 
         break;
@@ -1083,7 +1090,7 @@ static void gpsConfigureUblox(void)
         }
         // set the FC's serial port to the configured rate
         //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
-        uartOpen(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
+        uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
         //DEBUG_SET(DEBUG_GPS_CONNECTION, 3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex] / 100);
         // then start sending configuration settings
         gpsSetState(GPS_STATE_CONFIGURE);
@@ -1102,6 +1109,7 @@ static void gpsConfigureUblox(void)
         }
 
         if (gpsData.ackState == UBLOX_ACK_IDLE) {
+
             // short delay before between commands, including the first command
             static uint32_t last_state_position_time = 0;
             if (last_state_position_time == 0) {
