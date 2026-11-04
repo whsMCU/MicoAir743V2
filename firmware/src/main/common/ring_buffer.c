@@ -153,7 +153,7 @@ bool qbufferTxEmpty(qbuffer_t *p_node)
   return p_node->in == p_node->out;
 }
 
-bool qbufferTxBytesFree(qbuffer_t *p_node)
+uint32_t qbufferTxBytesFree(qbuffer_t *p_node)
 {
   uint32_t bytesUsed;
 
@@ -168,8 +168,7 @@ bool qbufferTxBytesFree(qbuffer_t *p_node)
 
 void qbufferFlush(qbuffer_t *p_node)
 {
-  p_node->in  = 0;
-  p_node->out = 0;
+	p_node->out = p_node->in;   // 소비자는 out만 수정
 }
 
 

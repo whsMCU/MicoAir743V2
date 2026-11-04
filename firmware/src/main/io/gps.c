@@ -952,7 +952,7 @@ static void gpsConfigureNmea(void)
     gpsData.state_ts = gpsData.now;
 
     // Check that the GPS transmit buffer is empty
-    if (!!uartTxBufEmpty(_DEF_UART3)) {
+    if (!uartTxBufEmpty(_DEF_UART3)) {
         return;
     }
 
@@ -1492,9 +1492,9 @@ void gpsUpdate(timeUs_t currentTimeUs)
                 rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
                 isFast = true;
             }
-            if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
-                break;
-            }
+//            if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
+//                break;
+//            }
             if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
                 gpsHandleFrameComplete();
             }
