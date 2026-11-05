@@ -174,7 +174,7 @@ bool queueRemove(task_t *task)
 /*
  * Returns first item queue or NULL if queue empty
  */
-task_t *queueFirst(void)
+FAST_CODE task_t *queueFirst(void)
 {
     taskQueuePos = 0;
     return taskQueueArray[0]; // guaranteed to be NULL if queue is empty
@@ -183,7 +183,7 @@ task_t *queueFirst(void)
 /*
  * Returns next item in queue or NULL if at end of queue
  */
-task_t *queueNext(void)
+FAST_CODE task_t *queueNext(void)
 {
     return taskQueueArray[++taskQueuePos]; // guaranteed to be NULL at end of queue
 }

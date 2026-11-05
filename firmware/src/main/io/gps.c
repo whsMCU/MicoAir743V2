@@ -432,7 +432,7 @@ void gpsInit(void)
 #endif
     gpsData.updateRateHz = 10; // initialise at 10hz
     gpsData.platformVersion = UBX_VERSION_UNDEF;
-    gpsData.gps_baudrateIndex = BAUD_57600;
+    gpsData.gps_baudrateIndex = BAUD_115200;
 
 #ifdef USE_DASHBOARD
     gpsData.errors = 0;
@@ -1466,7 +1466,6 @@ static inline uint32_t cpuCycleLimit(void)
     return clockMicrosToCycles(GPS_UBLOX_RECV_TIME_MAX);
 }
 
-#define GPS_CYCLE_LIMIT_ENABLE 0     // 1: 체크 켬, 0: 끔 (이 값만 바꿔서 A/B 비교)
 
 volatile uint32_t dbg_gps_calls, dbg_gps_breaks;
 volatile uint32_t dbg_gps_consumed_max, dbg_gps_cycles_max, dbg_gps_gap_us_max, dbg_gps_avail_max;
@@ -1503,12 +1502,10 @@ void gpsUpdate(timeUs_t currentTimeUs)
                 rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
                 isFast = true;
             }
-#if GPS_CYCLE_LIMIT_ENABLE
             if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
             	dbg_gps_breaks++;
                 break;
             }
-#endif
             consumed++;
             if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
                 gpsHandleFrameComplete();
