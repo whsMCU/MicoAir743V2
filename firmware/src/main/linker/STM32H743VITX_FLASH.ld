@@ -31,16 +31,37 @@
 ****************************************************************************
 */
 
-/* Entry Point */
-ENTRY(Reset_Handler)
+/*
+*****************************************************************************
+**
+**
+**  Abstract    : Linker script for STM32H743xI Device with
+**                512K AXI-RAM mapped onto AXI bus on D1 domain
+**                128K SRAM1 mapped on D2 domain
+**                128K SRAM2 mapped on D2 domain
+**                 32K SRAM3 mapped on D2 domain
+**                 64K SRAM4 mapped on D3 domain
+**                 64K ITCM
+**                128K DTCM
+**
+*****************************************************************************
+*/
 
-/* Highest address of the user mode stack */
-/*_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);  /* end of RAM */
-_estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM) - 8;/* Reserve 2 x 4bytes for info across reset */
+/*
+0x00000000 to 0x0000FFFF   64K ITCM
+0x20000000 to 0x2001FFFF  128K DTCM
+0x24000000 to 0x2407FFFF  512K AXI SRAM, D1 domain, main RAM
+0x30000000 to 0x3001FFFF  128K SRAM1, D2 domain
+0x30020000 to 0x3003FFFF  128K SRAM2, D2 domain
+0x30040000 to 0x30047FFF   32K SRAM3, D2 domain, unused
+0x38000000 to 0x3800FFFF   64K SRAM4, D3 domain, unused
+0x38800000 to 0x38800FFF    4K BACKUP SRAM, Backup domain, unused
 
-/* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x200;      /* required amount of heap  */
-_Min_Stack_Size = 0x800; /* required amount of stack */
+0x08000000 to 0x081FFFFF 2048K full flash,
+0x08000000 to 0x0801FFFF  128K isr vector, startup code,
+0x08020000 to 0x0803FFFF  128K config,                  // FLASH_Sector_1
+0x08040000 to 0x081FFFFF 1792K firmware,
+*/
 
 /* Specify the memory areas */
 MEMORY
@@ -52,6 +73,17 @@ MEMORY
   RAM_D3 (xrw)   : ORIGIN = 0x38000000, LENGTH = 64K
   ITCMRAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 64K
 }
+
+/* Entry Point */
+ENTRY(Reset_Handler)
+
+/* Highest address of the user mode stack */
+/*_estack = ORIGIN(RAM_D1) + LENGTH(RAM_D1);  /* end of RAM */
+_estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM) - 8;/* Reserve 2 x 4bytes for info across reset */
+
+/* Generate a link error if heap and stack don't fit into RAM */
+_Min_Heap_Size = 0x200;      /* required amount of heap  */
+_Min_Stack_Size = 0x800; /* required amount of stack */
 
 /* Define output sections */
 SECTIONS

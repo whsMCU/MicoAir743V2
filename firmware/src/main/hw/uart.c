@@ -1111,7 +1111,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     msp_tx_end_time = micros()-msp_tx_start_time;
   }
 }
-volatile uint8_t buffer_test;
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   static uint32_t pre_time = 0;

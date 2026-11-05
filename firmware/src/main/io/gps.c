@@ -1466,6 +1466,11 @@ static inline uint32_t cpuCycleLimit(void)
     return clockMicrosToCycles(GPS_UBLOX_RECV_TIME_MAX);
 }
 
+#define GPS_CYCLE_LIMIT_ENABLE 0     // 1: 체크 켬, 0: 끔 (이 값만 바꿔서 A/B 비교)
+
+volatile uint32_t dbg_gps_calls, dbg_gps_breaks;
+volatile uint32_t dbg_gps_consumed_max, dbg_gps_cycles_max, dbg_gps_gap_us_max, dbg_gps_avail_max;
+
 void gpsUpdate(timeUs_t currentTimeUs)
 {
     static timeDelta_t gpsStateDurationFractionUs[GPS_STATE_COUNT];
@@ -1480,10 +1485,16 @@ void gpsUpdate(timeUs_t currentTimeUs)
         if (!gpsPort) {
             break;
         }
+        static timeUs_t lastCallUs = 0;
+        uint32_t gap = cmpTimeUs(currentTimeUs, lastCallUs);
+        lastCallUs = currentTimeUs;
+        if (dbg_gps_calls && gap > dbg_gps_gap_us_max) dbg_gps_gap_us_max = gap;  // 호출 간격
         //rxBytesWaiting = serialRxBytesWaiting(gpsPort);
         rxBytesWaiting = uartAvailable(_DEF_UART3);
+        if (rxBytesWaiting > dbg_gps_avail_max) dbg_gps_avail_max = rxBytesWaiting;
         //DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         const uint32_t initialCycleCount = getCycleCounter();
+        uint32_t consumed = 0;
         static uint8_t wait = 0;
         static bool isFast = false;
         while (rxBytesWaiting-- > 0) {
@@ -1492,13 +1503,21 @@ void gpsUpdate(timeUs_t currentTimeUs)
                 rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
                 isFast = true;
             }
-//            if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
-//                break;
-//            }
+#if GPS_CYCLE_LIMIT_ENABLE
+            if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
+            	dbg_gps_breaks++;
+                break;
+            }
+#endif
+            consumed++;
             if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
                 gpsHandleFrameComplete();
             }
         }
+        uint32_t cyc = getCycleCounter() - initialCycleCount;
+        dbg_gps_calls++;
+        if (consumed > dbg_gps_consumed_max) dbg_gps_consumed_max = consumed;
+        if (cyc > dbg_gps_cycles_max) dbg_gps_cycles_max = cyc;
         rescheduleWhenNecessary(&wait, &isFast);
         break;
     }
@@ -2744,7 +2763,7 @@ static bool UBLOX_parse_gps(void)
     }
     return false;
 }
-
+volatile uint32_t dbg_ubx_ok, dbg_ubx_badA, dbg_ubx_badB;
 static bool gpsNewFrameUBLOX(uint8_t data)
 {
     ubloxParsingAlmostDone = false;
@@ -2839,6 +2858,7 @@ static bool gpsNewFrameUBLOX(uint8_t data)
             ubloxParsingAlmostDone = true;
             break;
         }
+        dbg_ubx_badA++;
         // Bad checksum A, restart new message parsing.
         // Note that we do not parse checksum B, new message processing will handle skipping it if needed.
 #ifdef USE_DASHBOARD
@@ -2853,6 +2873,7 @@ static bool gpsNewFrameUBLOX(uint8_t data)
         break;
     case UBX_PARSE_CHECKSUM_B:
         if (ubxRcvMsgChecksumB == data) {
+        	dbg_ubx_ok++;
             // Checksum B also matches, successfully received a new full packet!
 #ifdef USE_DASHBOARD
             dashboardGpsPacketCount++;  // Packet counter used by dashboard device.
@@ -2863,6 +2884,7 @@ static bool gpsNewFrameUBLOX(uint8_t data)
             ubxFrameParseState = UBX_PARSE_PREAMBLE_SYNC_1;  // Restart new message parsing.
             break;
         }
+        dbg_ubx_badB++;
             // Bad checksum B, restart new message parsing.
 #ifdef USE_DASHBOARD
         logErrorToPacketLog();
