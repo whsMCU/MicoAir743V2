@@ -99,7 +99,6 @@ uint32_t microsISR(void)
     return ((ms + pending) * 1000) + (usTicks * 1000 - cycle_cnt) / usTicks;
 }
 
-// Return system uptime in microseconds (rollover in 70minutes)
 uint32_t micros(void)
 {
  register uint32_t ms, cycle_cnt;
@@ -142,12 +141,18 @@ int32_t clockCyclesToMicros(int32_t clockCycles)
     return clockCycles / usTicks;
 }
 
+float clockCyclesToMicrosf(int32_t clockCycles)
+{
+    return clockCycles * usTicksInv;
+}
+
 // Note that this conversion is signed as this is used for periods rather than absolute timestamps
 int32_t clockCyclesTo10thMicros(int32_t clockCycles)
 {
     return 10 * clockCycles / (int32_t)usTicks;
 }
 
+// Note that this conversion is signed as this is used for periods rather than absolute timestamps
 int32_t clockCyclesTo100thMicros(int32_t clockCycles)
 {
     return 100 * clockCycles / (int32_t)usTicks;
@@ -158,22 +163,50 @@ uint32_t clockMicrosToCycles(uint32_t micros)
     return micros * usTicks;
 }
 
-void delay(uint32_t ms)
-{
-    while (ms--)
-        delayMicroseconds(1000);
-}
-
+// Return system uptime in milliseconds (rollover in 49 days)
 uint32_t millis(void)
 {
-  return HAL_GetTick();
+    return sysTickUptime;
 }
 
-
+#if 1
 void delayMicroseconds(uint32_t us)
 {
     uint32_t now = micros();
     while (micros() - now < us);
+}
+#else
+void delayMicroseconds(uint32_t us)
+{
+    uint32_t elapsed = 0;
+    uint32_t lastCount = SysTick->VAL;
+
+    for (;;) {
+        register uint32_t current_count = SysTick->VAL;
+        uint32_t elapsed_us;
+
+        // measure the time elapsed since the last time we checked
+        elapsed += current_count - lastCount;
+        lastCount = current_count;
+
+        // convert to microseconds
+        elapsed_us = elapsed / usTicks;
+        if (elapsed_us >= us)
+            break;
+
+        // reduce the delay by the elapsed time
+        us -= elapsed_us;
+
+        // keep fractional microseconds for the next iteration
+        elapsed %= usTicks;
+    }
+}
+#endif
+
+void delay(uint32_t ms)
+{
+    while (ms--)
+        delayMicroseconds(1000);
 }
 
 int __io_putchar(int ch)

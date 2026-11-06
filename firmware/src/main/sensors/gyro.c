@@ -206,15 +206,15 @@ static FAST_CODE void gyroUpdateSensor(void)
 		return;
 	}
     bmi270.gyro.dataReady = false;
-    if(bmi088.gyro.dataReady == true)
-    {
-      bmi088GyroRead(&bmi088);
-
-      bmi088.gyro.gyroADC.x = (float)bmi088.gyro.gyroADCRaw[X] * bmi088.gyro.scale;
-      bmi088.gyro.gyroADC.y = (float)bmi088.gyro.gyroADCRaw[Y] * bmi088.gyro.scale;
-      bmi088.gyro.gyroADC.z = (float)bmi088.gyro.gyroADCRaw[Z] * bmi088.gyro.scale;
-      //return;
-    }
+//    if(bmi088.gyro.dataReady == true)
+//    {
+//      bmi088GyroRead(&bmi088);
+//
+//      bmi088.gyro.gyroADC.x = (float)bmi088.gyro.gyroADCRaw[X] * bmi088.gyro.scale;
+//      bmi088.gyro.gyroADC.y = (float)bmi088.gyro.gyroADCRaw[Y] * bmi088.gyro.scale;
+//      bmi088.gyro.gyroADC.z = (float)bmi088.gyro.gyroADCRaw[Z] * bmi088.gyro.scale;
+//      //return;
+//    }
 
     bmi088.gyro.dataReady = false;
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -516,11 +516,11 @@ void taskAccUpdate(timeUs_t currentTimeUs)
 	if (!bmi270SpiAccRead(&bmi270)) {
 			return;
 	}
-	if(bmi088.acc.dataReady == true)
-	{
-		bmi088AccRead(&bmi088);
-		//return;
-	}
+//	if(bmi088.acc.dataReady == true)
+//	{
+//		bmi088AccRead(&bmi088);
+//		//return;
+//	}
 
 	bmi088.acc.dataReady = false;
 
