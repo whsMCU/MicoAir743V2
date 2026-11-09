@@ -7,168 +7,188 @@
 
 #include "ring_buffer.h"
 
-void qbufferInit(void)
+
+static bool ringWrite(volatile uint8_t *buf, uint32_t size,
+                      volatile uint32_t *head, volatile uint32_t *tail,
+                      const uint8_t *p_data, uint32_t length)
 {
-
-}
-
-bool qbufferCreate(qbuffer_t *p_node, uint8_t *p_buf, uint32_t length)
-{
-  if (p_node == NULL || p_buf == NULL || length < 2)
-  {
-      return false;
-  }
-
-  p_node->in    = 0;
-  p_node->out   = 0;
-  p_node->len   = length;
-  p_node->size  = 1;
-  p_node->p_buf = p_buf;
-
-  return true;
-}
-
-bool qbufferCreateBySize(qbuffer_t *p_node, uint8_t *p_buf, uint32_t size, uint32_t length)
-{
-  bool ret = true;
-
-  p_node->in    = 0;
-  p_node->out   = 0;
-  p_node->len   = length;
-  p_node->size  = size;
-  p_node->p_buf = p_buf;
-
-  return ret;
-}
-
-bool qbufferWrite(qbuffer_t *p_node, uint8_t *p_data, uint32_t length)
-{
-  if (p_node == NULL ||
-      p_node->p_buf == NULL ||
-      p_data == NULL ||
-      p_node->len < 2 ||
-      p_node->size == 0)
-  {
-      return false;
-  }
-
   for (uint32_t i = 0; i < length; i++)
   {
-      uint32_t next_in =
-          (p_node->in + 1U) % p_node->len;
+    uint32_t next = (*head + 1U) % size;
 
-      // 버퍼가 가득 찬 경우
-      if (next_in == p_node->out)
-      {
-          return false;
-      }
+    // 버퍼가 가득 찬 경우
+    if (next == *tail)
+    {
+      return false;
+    }
 
-      // 현재 위치에 데이터 저장
-      uint8_t *p_buf =
-          &p_node->p_buf[p_node->in * p_node->size];
-
-      for (uint32_t j = 0; j < p_node->size; j++)
-      {
-          p_buf[j] = p_data[j];
-      }
-
-      p_data += p_node->size;
-
-      // 쓰기 인덱스 갱신
-      p_node->in = next_in;
+    buf[*head] = p_data[i];
+    *head = next;               // 쓰기 인덱스 갱신
   }
 
   return true;
 }
 
-bool qbufferRead(qbuffer_t *p_node, uint8_t *p_data, uint32_t length)
+static bool ringRead(volatile uint8_t *buf, uint32_t size,
+                     volatile uint32_t *head, volatile uint32_t *tail,
+                     uint8_t *p_data, uint32_t length)
 {
-  if (p_node == NULL ||
-      p_node->p_buf == NULL ||
-      p_data == NULL ||
-      p_node->len < 2 ||
-      p_node->size == 0)
-  {
-      return false;
-  }
-
   for (uint32_t i = 0; i < length; i++)
   {
-      // 버퍼가 비어 있는 경우
-      if (p_node->out == p_node->in)
-      {
-          return false;
-      }
+    // 버퍼가 비어 있는 경우
+    if (*tail == *head)
+    {
+      return false;
+    }
 
-      // 현재 위치에서 데이터 읽기
-      uint8_t *p_buf =
-          &p_node->p_buf[p_node->out * p_node->size];
-
-      for (uint32_t j = 0; j < p_node->size; j++)
-      {
-          p_data[j] = p_buf[j];
-      }
-
-      p_data += p_node->size;
-
-      // 읽기 인덱스 갱신
-      p_node->out =
-          (p_node->out + 1U) % p_node->len;
+    p_data[i] = buf[*tail];
+    *tail = (*tail + 1U) % size;  // 읽기 인덱스 갱신
   }
 
   return true;
 }
 
-uint8_t *qbufferPeekWrite(qbuffer_t *p_node)
+static uint32_t ringAvailable(uint32_t size, uint32_t head, uint32_t tail)
 {
-  return &p_node->p_buf[p_node->in*p_node->size];
-}
-
-uint8_t *qbufferPeekRead(qbuffer_t *p_node)
-{
-  return &p_node->p_buf[p_node->out*p_node->size];
-}
-
-
-uint32_t qbufferAvailable(qbuffer_t *p_node)
-{
-  uint32_t ret;
-
-  if(p_node->in >= p_node->out)
+  if (head >= tail)
   {
-  	ret = p_node->in - p_node->out;
-  }
-  else
-  {
-  	ret = p_node->len + p_node->in - p_node->out;
+    return head - tail;
   }
 
-  //ret = (p_node->len + p_node->in - p_node->out) % p_node->len;
+  return size + head - tail;
+}
 
-  return ret;
+/* ---------- 초기화 ---------- */
+
+bool qbufferCreate(qbuffer_t *p_node,
+                   uint8_t *p_rx_buf, uint32_t rx_size,
+                   uint8_t *p_tx_buf, uint32_t tx_size)
+{
+  if (p_node == NULL ||
+      p_rx_buf == NULL || rx_size < 2 ||
+      p_tx_buf == NULL || tx_size < 2)
+  {
+    return false;
+  }
+
+  p_node->rxBuffer     = p_rx_buf;
+  p_node->rxBufferSize = rx_size;
+  p_node->rxBufferHead = 0;
+  p_node->rxBufferTail = 0;
+
+  p_node->txBuffer     = p_tx_buf;
+  p_node->txBufferSize = tx_size;
+  p_node->txBufferHead = 0;
+  p_node->txBufferTail = 0;
+
+  return true;
+}
+
+/* ---------- RX ---------- */
+
+bool qbufferRxWrite(qbuffer_t *p_node, const uint8_t *p_data, uint32_t length)
+{
+  if (p_node == NULL || p_node->rxBuffer == NULL || p_data == NULL || p_node->rxBufferSize < 2)
+  {
+    return false;
+  }
+
+  return ringWrite(p_node->rxBuffer, p_node->rxBufferSize,
+                   &p_node->rxBufferHead, &p_node->rxBufferTail,
+                   p_data, length);
+}
+
+bool qbufferRxRead(qbuffer_t *p_node, uint8_t *p_data, uint32_t length)
+{
+  if (p_node == NULL || p_node->rxBuffer == NULL || p_data == NULL || p_node->rxBufferSize < 2)
+  {
+    return false;
+  }
+
+  return ringRead(p_node->rxBuffer, p_node->rxBufferSize,
+                  &p_node->rxBufferHead, &p_node->rxBufferTail,
+                  p_data, length);
+}
+
+volatile uint8_t *qbufferRxPeekWrite(qbuffer_t *p_node)
+{
+  return &p_node->rxBuffer[p_node->rxBufferHead];
+}
+
+volatile uint8_t *qbufferRxPeekRead(qbuffer_t *p_node)
+{
+  return &p_node->rxBuffer[p_node->rxBufferTail];
+}
+
+uint32_t qbufferRxAvailable(qbuffer_t *p_node)
+{
+  return ringAvailable(p_node->rxBufferSize, p_node->rxBufferHead, p_node->rxBufferTail);
+}
+
+bool qbufferRxEmpty(qbuffer_t *p_node)
+{
+  return p_node->rxBufferHead == p_node->rxBufferTail;
+}
+
+void qbufferRxFlush(qbuffer_t *p_node)
+{
+  p_node->rxBufferTail = p_node->rxBufferHead;   // 소비자는 Tail만 수정
+}
+
+/* ---------- TX ---------- */
+
+bool qbufferTxWrite(qbuffer_t *p_node, const uint8_t *p_data, uint32_t length)
+{
+  if (p_node == NULL || p_node->txBuffer == NULL || p_data == NULL || p_node->txBufferSize < 2)
+  {
+    return false;
+  }
+
+  return ringWrite(p_node->txBuffer, p_node->txBufferSize,
+                   &p_node->txBufferHead, &p_node->txBufferTail,
+                   p_data, length);
+}
+
+bool qbufferTxRead(qbuffer_t *p_node, uint8_t *p_data, uint32_t length)
+{
+  if (p_node == NULL || p_node->txBuffer == NULL || p_data == NULL || p_node->txBufferSize < 2)
+  {
+    return false;
+  }
+
+  return ringRead(p_node->txBuffer, p_node->txBufferSize,
+                  &p_node->txBufferHead, &p_node->txBufferTail,
+                  p_data, length);
+}
+
+volatile uint8_t *qbufferTxPeekWrite(qbuffer_t *p_node)
+{
+  return &p_node->txBuffer[p_node->txBufferHead];
+}
+
+volatile uint8_t *qbufferTxPeekRead(qbuffer_t *p_node)
+{
+  return &p_node->txBuffer[p_node->txBufferTail];
+}
+
+uint32_t qbufferTxAvailable(qbuffer_t *p_node)
+{
+  return ringAvailable(p_node->txBufferSize, p_node->txBufferHead, p_node->txBufferTail);
 }
 
 bool qbufferTxEmpty(qbuffer_t *p_node)
 {
-  return p_node->in == p_node->out;
+  return p_node->txBufferHead == p_node->txBufferTail;
 }
 
 uint32_t qbufferTxBytesFree(qbuffer_t *p_node)
 {
-  uint32_t bytesUsed;
-
-  if (p_node->in >= p_node->out) {
-      bytesUsed = p_node->in - p_node->out;
-  } else {
-      bytesUsed = p_node->size + p_node->in - p_node->out;
-  }
-
-  return (p_node->size - 1) - bytesUsed;
+  // 링버퍼는 한 칸을 비워 두므로 최대 사용 가능 = size - 1
+  return (p_node->txBufferSize - 1U) - qbufferTxAvailable(p_node);
 }
 
-void qbufferFlush(qbuffer_t *p_node)
+void qbufferTxFlush(qbuffer_t *p_node)
 {
-	p_node->out = p_node->in;   // 소비자는 out만 수정
+  p_node->txBufferTail = p_node->txBufferHead;
 }
-
 

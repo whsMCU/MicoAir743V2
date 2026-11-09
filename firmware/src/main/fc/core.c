@@ -14,6 +14,7 @@
 #include "build/debug.h"
 #include "fc/core.h"
 #include "flight/pid.h"
+#include "drivers/dshot.h"
 
 #include "sensors/gyro.h"
 
@@ -44,6 +45,16 @@ FAST_CODE bool pidLoopReady(void)
         return true;
     }
     return false;
+}
+
+FAST_CODE void taskFiltering(timeUs_t currentTimeUs)
+{
+		#ifdef USE_DSHOT_TELEMETRY
+				updateDshotTelemetry();  // decode and update Dshot telemetry
+		#endif
+
+    gyroFiltering(currentTimeUs);
+
 }
 
 // Function for loop trigger

@@ -693,7 +693,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 	}
 }
 
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+FAST_CODE void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	spi_t  *p_spi;
 

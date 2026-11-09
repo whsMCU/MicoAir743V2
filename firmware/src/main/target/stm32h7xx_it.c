@@ -207,7 +207,7 @@ void PendSV_Handler(void)
 /**
   * @brief This function handles System tick timer.
   */
-void SysTick_Handler(void)
+FAST_IRQ_HANDLER void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
   HAL_SYSTICK_IRQHandler();
@@ -228,7 +228,7 @@ void SysTick_Handler(void)
 /**
   * @brief This function handles DMA1 stream0 global interrupt.
   */
-void DMA1_Stream0_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream0_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream0_IRQn 0 */
 
@@ -242,7 +242,7 @@ void DMA1_Stream0_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream1 global interrupt.
   */
-void DMA1_Stream1_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream1_IRQn 0 */
 
@@ -256,7 +256,7 @@ void DMA1_Stream1_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream2 global interrupt.
   */
-void DMA1_Stream2_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream2_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream2_IRQn 0 */
 
@@ -270,7 +270,7 @@ void DMA1_Stream2_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream3 global interrupt.
   */
-void DMA1_Stream3_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream3_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream3_IRQn 0 */
 
@@ -284,7 +284,7 @@ void DMA1_Stream3_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream4 global interrupt.
   */
-void DMA1_Stream4_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream4_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream4_IRQn 0 */
 
@@ -298,7 +298,7 @@ void DMA1_Stream4_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream5 global interrupt.
   */
-void DMA1_Stream5_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream5_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream5_IRQn 0 */
 
@@ -312,7 +312,7 @@ void DMA1_Stream5_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream6 global interrupt.
   */
-void DMA1_Stream6_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream6_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream6_IRQn 0 */
 
@@ -326,7 +326,7 @@ void DMA1_Stream6_IRQHandler(void)
 /**
   * @brief This function handles ADC1 and ADC2 global interrupts.
   */
-void ADC_IRQHandler(void)
+FAST_IRQ_HANDLER void ADC_IRQHandler(void)
 {
   /* USER CODE BEGIN ADC_IRQn 0 */
 
@@ -340,7 +340,7 @@ void ADC_IRQHandler(void)
 /**
   * @brief This function handles EXTI line[9:5] interrupts.
   */
-void EXTI9_5_IRQHandler(void)
+FAST_IRQ_HANDLER void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 
@@ -354,7 +354,7 @@ void EXTI9_5_IRQHandler(void)
 /**
   * @brief This function handles TIM1 update interrupt.
   */
-void TIM1_UP_IRQHandler(void)
+FAST_IRQ_HANDLER void TIM1_UP_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_UP_IRQn 0 */
 
@@ -368,7 +368,7 @@ void TIM1_UP_IRQHandler(void)
 /**
   * @brief This function handles TIM1 capture compare interrupt.
   */
-void TIM1_CC_IRQHandler(void)
+FAST_IRQ_HANDLER void TIM1_CC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_CC_IRQn 0 */
 
@@ -382,7 +382,7 @@ void TIM1_CC_IRQHandler(void)
 /**
   * @brief This function handles I2C1 event interrupt.
   */
-void I2C1_EV_IRQHandler(void)
+FAST_IRQ_HANDLER void I2C1_EV_IRQHandler(void)
 {
   /* USER CODE BEGIN I2C1_EV_IRQn 0 */
 
@@ -396,7 +396,7 @@ void I2C1_EV_IRQHandler(void)
 /**
   * @brief This function handles I2C1 error interrupt.
   */
-void I2C1_ER_IRQHandler(void)
+FAST_IRQ_HANDLER void I2C1_ER_IRQHandler(void)
 {
   /* USER CODE BEGIN I2C1_ER_IRQn 0 */
 
@@ -410,7 +410,7 @@ void I2C1_ER_IRQHandler(void)
 /**
   * @brief This function handles I2C2 event interrupt.
   */
-void I2C2_EV_IRQHandler(void)
+FAST_IRQ_HANDLER void I2C2_EV_IRQHandler(void)
 {
   /* USER CODE BEGIN I2C2_EV_IRQn 0 */
 
@@ -424,7 +424,7 @@ void I2C2_EV_IRQHandler(void)
 /**
   * @brief This function handles I2C2 error interrupt.
   */
-void I2C2_ER_IRQHandler(void)
+FAST_IRQ_HANDLER void I2C2_ER_IRQHandler(void)
 {
   /* USER CODE BEGIN I2C2_ER_IRQn 0 */
 
@@ -438,7 +438,7 @@ void I2C2_ER_IRQHandler(void)
 /**
   * @brief This function handles SPI2 global interrupt.
   */
-void SPI2_IRQHandler(void)
+FAST_IRQ_HANDLER void SPI2_IRQHandler(void)
 {
   /* USER CODE BEGIN SPI2_IRQn 0 */
 
@@ -452,7 +452,7 @@ void SPI2_IRQHandler(void)
 /**
   * @brief This function handles USART1 global interrupt.
   */
-void USART1_IRQHandler(void)
+FAST_IRQ_HANDLER void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
 
@@ -466,7 +466,7 @@ void USART1_IRQHandler(void)
 /**
   * @brief This function handles USART3 global interrupt.
   */
-void USART3_IRQHandler(void)
+FAST_IRQ_HANDLER void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
 
@@ -480,7 +480,7 @@ void USART3_IRQHandler(void)
 /**
   * @brief This function handles EXTI line[15:10] interrupts.
   */
-void EXTI15_10_IRQHandler(void)
+FAST_IRQ_HANDLER void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
@@ -495,7 +495,7 @@ void EXTI15_10_IRQHandler(void)
 /**
   * @brief This function handles DMA1 stream7 global interrupt.
   */
-void DMA1_Stream7_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA1_Stream7_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream7_IRQn 0 */
 
@@ -509,7 +509,7 @@ void DMA1_Stream7_IRQHandler(void)
 /**
   * @brief This function handles SDMMC1 global interrupt.
   */
-void SDMMC1_IRQHandler(void)
+FAST_IRQ_HANDLER void SDMMC1_IRQHandler(void)
 {
   /* USER CODE BEGIN SDMMC1_IRQn 0 */
 
@@ -523,7 +523,7 @@ void SDMMC1_IRQHandler(void)
 /**
   * @brief This function handles SPI3 global interrupt.
   */
-void SPI3_IRQHandler(void)
+FAST_IRQ_HANDLER void SPI3_IRQHandler(void)
 {
   /* USER CODE BEGIN SPI3_IRQn 0 */
 
@@ -537,7 +537,7 @@ void SPI3_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream0 global interrupt.
   */
-void DMA2_Stream0_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream0_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream0_IRQn 0 */
 
@@ -551,7 +551,7 @@ void DMA2_Stream0_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream1 global interrupt.
   */
-void DMA2_Stream1_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream1_IRQn 0 */
 
@@ -565,7 +565,7 @@ void DMA2_Stream1_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream2 global interrupt.
   */
-void DMA2_Stream2_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream2_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream2_IRQn 0 */
 
@@ -579,7 +579,7 @@ void DMA2_Stream2_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream3 global interrupt.
   */
-void DMA2_Stream3_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream3_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream3_IRQn 0 */
 
@@ -593,7 +593,7 @@ void DMA2_Stream3_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream4 global interrupt.
   */
-void DMA2_Stream4_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream4_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream4_IRQn 0 */
 
@@ -607,7 +607,7 @@ void DMA2_Stream4_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream5 global interrupt.
   */
-void DMA2_Stream5_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream5_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream5_IRQn 0 */
 
@@ -621,7 +621,7 @@ void DMA2_Stream5_IRQHandler(void)
 /**
   * @brief This function handles DMA2 stream6 global interrupt.
   */
-void DMA2_Stream6_IRQHandler(void)
+FAST_IRQ_HANDLER void DMA2_Stream6_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream6_IRQn 0 */
 
@@ -635,7 +635,7 @@ void DMA2_Stream6_IRQHandler(void)
 /**
   * @brief This function handles USART6 global interrupt.
   */
-void USART6_IRQHandler(void)
+FAST_IRQ_HANDLER void USART6_IRQHandler(void)
 {
   /* USER CODE BEGIN USART6_IRQn 0 */
 
@@ -649,7 +649,7 @@ void USART6_IRQHandler(void)
 /**
   * @brief This function handles UART7 global interrupt.
   */
-void UART7_IRQHandler(void)
+FAST_IRQ_HANDLER void UART7_IRQHandler(void)
 {
   /* USER CODE BEGIN UART7_IRQn 0 */
 
@@ -663,7 +663,7 @@ void UART7_IRQHandler(void)
 /**
   * @brief This function handles USB On The Go FS global interrupt.
   */
-void OTG_FS_IRQHandler(void)
+FAST_IRQ_HANDLER void OTG_FS_IRQHandler(void)
 {
   /* USER CODE BEGIN OTG_FS_IRQn 0 */
 

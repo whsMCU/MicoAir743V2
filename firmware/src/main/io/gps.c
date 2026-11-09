@@ -540,7 +540,6 @@ static void ubloxSendByteUpdateChecksum(uint8_t data, uint8_t *checksumA, uint8_
     *checksumA += data;
     *checksumB += *checksumA;
     //serialWrite(gpsPort, data);
-    //uartWriteIT(_DEF_UART3, &data, 1);
     uartWrite(_DEF_UART3, &data, 1);
 }
 
@@ -564,15 +563,11 @@ static void ubloxSendMessage(ubxMessage_t *msg, bool skipAck)
     //serialWrite(gpsPort, msg->header.preamble2);
     uartWrite(_DEF_UART3, &msg->header.preamble1, 1);
     uartWrite(_DEF_UART3, &msg->header.preamble2, 1);
-    //uartWriteIT(_DEF_UART3, &msg->header.preamble1, 1);
-    //uartWriteIT(_DEF_UART3, &msg->header.preamble2, 1);
     ubloxSendDataUpdateChecksum(msg, &checksumA, &checksumB);
 //    serialWrite(gpsPort, checksumA);
 //    serialWrite(gpsPort, checksumB);
     uartWrite(_DEF_UART3, &checksumA, 1);
     uartWrite(_DEF_UART3, &checksumB, 1);
-    //uartWriteIT(_DEF_UART3, &checksumA, 1);
-    //uartWriteIT(_DEF_UART3, &checksumB, 1);
     // Save state for ACK waiting
     gpsData.ackWaitingMsgId = msg->header.msg_id; //save message id for ACK
     gpsData.ackState = skipAck ? UBLOX_ACK_GOT_ACK : UBLOX_ACK_WAITING;
@@ -987,8 +982,6 @@ static void gpsConfigureNmea(void)
 //                serialWriteBuf(gpsPort, (uint8_t *)"\r\n", 2);
                 uartWrite(_DEF_UART3, (uint8_t *)cmd, commandLen);
                 uartWrite(_DEF_UART3, (uint8_t *)"\r\n", 2);
-                //uartWriteIT(_DEF_UART3, (uint8_t *)cmd, commandLen);
-                //uartWriteIT(_DEF_UART3, (uint8_t *)"\r\n", 2);
                 // Move to the next command
                 cmd += commandLen;
             }
@@ -1014,11 +1007,6 @@ static void gpsConfigureNmea(void)
 
 #ifdef USE_GPS_UBLOX
 
-const unsigned char UBX_MON_VER[] = {
-	0xB5, 0x62, 0x0A, 0x04, 0x00, 0x00,
-	0x0E, 0x34
-};
-
 static void gpsConfigureUblox(void)
 {
 
@@ -1036,7 +1024,7 @@ static void gpsConfigureUblox(void)
         // initially the FC will be at the user-configured baud rate.
         if (gpsData.platformVersion > UBX_VERSION_UNDEF) {
             // set the GPS module's serial port to the user's intended baud rate
-            serialPrint(gpsPort, gpsInitData[gpsData.userBaudRateIndex].ubx);
+            serialPrint(_DEF_UART3, gpsInitData[gpsData.userBaudRateIndex].ubx);
             // use this baud rate for re-connections
             gpsData.tempBaudRateIndex = gpsData.userBaudRateIndex;
             // we're done here, let's move the the next state
@@ -1053,7 +1041,6 @@ static void gpsConfigureUblox(void)
             if (!messageSent) {
                 gpsData.platformVersion = UBX_VERSION_UNDEF;
                 ubloxSendClassMessage(CLASS_MON, MSG_MON_VER, 0);
-                //uartWrite(_DEF_UART3, (uint8_t*)&UBX_MON_VER, sizeof(UBX_MON_VER));
                 gpsData.ackState = UBLOX_ACK_IDLE; // ignore ACK for this message
                 messageSent = true;
             }
@@ -1466,9 +1453,8 @@ static inline uint32_t cpuCycleLimit(void)
     return clockMicrosToCycles(GPS_UBLOX_RECV_TIME_MAX);
 }
 
-
-volatile uint32_t dbg_gps_calls, dbg_gps_breaks;
-volatile uint32_t dbg_gps_consumed_max, dbg_gps_cycles_max, dbg_gps_gap_us_max, dbg_gps_avail_max;
+volatile static uint32_t gps_dt, gps_dt_tmp;
+uint32_t rxBytesWaiting_tmp;
 
 void gpsUpdate(timeUs_t currentTimeUs)
 {
@@ -1477,6 +1463,9 @@ void gpsUpdate(timeUs_t currentTimeUs)
     uint32_t rxBytesWaiting = 0;
     gpsData.now = millis();
 
+    gps_dt = micros() - gps_dt_tmp;
+    gps_dt_tmp = micros();
+
     switch (gpsConfig.provider) {
 #ifdef USE_GPS_UBLOX
     case GPS_UBLOX:
@@ -1484,16 +1473,11 @@ void gpsUpdate(timeUs_t currentTimeUs)
         if (!gpsPort) {
             break;
         }
-        static timeUs_t lastCallUs = 0;
-        uint32_t gap = cmpTimeUs(currentTimeUs, lastCallUs);
-        lastCallUs = currentTimeUs;
-        if (dbg_gps_calls && gap > dbg_gps_gap_us_max) dbg_gps_gap_us_max = gap;  // 호출 간격
         //rxBytesWaiting = serialRxBytesWaiting(gpsPort);
         rxBytesWaiting = uartAvailable(_DEF_UART3);
-        if (rxBytesWaiting > dbg_gps_avail_max) dbg_gps_avail_max = rxBytesWaiting;
+        rxBytesWaiting_tmp = rxBytesWaiting;
         //DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         const uint32_t initialCycleCount = getCycleCounter();
-        uint32_t consumed = 0;
         static uint8_t wait = 0;
         static bool isFast = false;
         while (rxBytesWaiting-- > 0) {
@@ -1503,18 +1487,12 @@ void gpsUpdate(timeUs_t currentTimeUs)
                 isFast = true;
             }
             if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
-            	dbg_gps_breaks++;
                 break;
             }
-            consumed++;
             if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
                 gpsHandleFrameComplete();
             }
         }
-        uint32_t cyc = getCycleCounter() - initialCycleCount;
-        dbg_gps_calls++;
-        if (consumed > dbg_gps_consumed_max) dbg_gps_consumed_max = consumed;
-        if (cyc > dbg_gps_cycles_max) dbg_gps_cycles_max = cyc;
         rescheduleWhenNecessary(&wait, &isFast);
         break;
     }
@@ -2760,7 +2738,7 @@ static bool UBLOX_parse_gps(void)
     }
     return false;
 }
-volatile uint32_t dbg_ubx_ok, dbg_ubx_badA, dbg_ubx_badB;
+
 static bool gpsNewFrameUBLOX(uint8_t data)
 {
     ubloxParsingAlmostDone = false;
@@ -2855,7 +2833,6 @@ static bool gpsNewFrameUBLOX(uint8_t data)
             ubloxParsingAlmostDone = true;
             break;
         }
-        dbg_ubx_badA++;
         // Bad checksum A, restart new message parsing.
         // Note that we do not parse checksum B, new message processing will handle skipping it if needed.
 #ifdef USE_DASHBOARD
@@ -2870,7 +2847,6 @@ static bool gpsNewFrameUBLOX(uint8_t data)
         break;
     case UBX_PARSE_CHECKSUM_B:
         if (ubxRcvMsgChecksumB == data) {
-        	dbg_ubx_ok++;
             // Checksum B also matches, successfully received a new full packet!
 #ifdef USE_DASHBOARD
             dashboardGpsPacketCount++;  // Packet counter used by dashboard device.
@@ -2881,7 +2857,6 @@ static bool gpsNewFrameUBLOX(uint8_t data)
             ubxFrameParseState = UBX_PARSE_PREAMBLE_SYNC_1;  // Restart new message parsing.
             break;
         }
-        dbg_ubx_badB++;
             // Bad checksum B, restart new message parsing.
 #ifdef USE_DASHBOARD
         logErrorToPacketLog();

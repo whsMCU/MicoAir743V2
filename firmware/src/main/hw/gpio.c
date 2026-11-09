@@ -212,7 +212,7 @@ void gpioPinToggle(uint8_t ch)
   HAL_GPIO_TogglePin(gpio_tbl[ch].port, gpio_tbl[ch].pin);
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+FAST_CODE void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin==GPIO_PIN_7)
 	{

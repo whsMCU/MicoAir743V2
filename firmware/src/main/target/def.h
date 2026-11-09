@@ -130,6 +130,8 @@
 
 #define USE_GPS_RESCUE
 
+#define FAST_IRQ_HANDLER FAST_CODE
+
 #define NOINLINE __attribute__((noinline))
 
 #ifdef USE_ITCM_RAM

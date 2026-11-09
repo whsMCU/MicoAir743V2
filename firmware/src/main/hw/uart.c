@@ -20,11 +20,13 @@
 
 
 static bool is_open[UART_MAX_CH];
-#define MAX_SIZE 512
+#define MAX_SIZE 1024
 
 static qbuffer_t ring_buffer[UART_MAX_CH];
 static volatile uint8_t rx_buf[UART_MAX_CH];
+static volatile uint8_t tx_buf[UART_MAX_CH];
 static volatile uint8_t rx_ringbuf[UART_MAX_CH][MAX_SIZE];
+static volatile uint8_t tx_ringbuf[UART_MAX_CH][MAX_SIZE];
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -82,7 +84,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
       huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-      qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART1][0], MAX_SIZE);
+      qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART1][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART1][0], MAX_SIZE);
 
       if (HAL_UART_Init(&huart1) != HAL_OK)
       {
@@ -124,7 +127,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
     	huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     	huart2.Init.OverSampling = UART_OVERSAMPLING_16;
 
-    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART2][0], MAX_SIZE);
+    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART2][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART2][0], MAX_SIZE);
 
     	if (HAL_UART_Init(&huart2) != HAL_OK)
     	{
@@ -151,7 +155,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
       huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART3][0], MAX_SIZE);
+    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART3][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART3][0], MAX_SIZE);
 
     	if (HAL_UART_Init(&huart3) != HAL_OK)
     	{
@@ -196,7 +201,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
       huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-      qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART4][0], MAX_SIZE);
+      qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART4][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART4][0], MAX_SIZE);
 
       if (HAL_UART_Init(&huart4) != HAL_OK)
       {
@@ -238,7 +244,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
     	huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     	huart5.Init.OverSampling = UART_OVERSAMPLING_16;
 
-    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART5][0], MAX_SIZE);
+    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART5][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART5][0], MAX_SIZE);
 
     	if (HAL_UART_Init(&huart5) != HAL_OK)
     	{
@@ -268,7 +275,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       huart6.Init.ClockPrescaler = UART_PRESCALER_DIV1;
       huart6.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART6][0], MAX_SIZE);
+    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART6][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART6][0], MAX_SIZE);
 
     	if (HAL_UART_Init(&huart6) != HAL_OK)
     	{
@@ -312,7 +320,8 @@ bool uartOpen(uint8_t ch, uint32_t baud)
       huart7.Init.ClockPrescaler = UART_PRESCALER_DIV1;
       huart7.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 
-    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART7][0], MAX_SIZE);
+    	qbufferCreate(&ring_buffer[ch], (uint8_t *)&rx_ringbuf[_DEF_UART7][0], MAX_SIZE,
+										(uint8_t *)&tx_ringbuf[_DEF_UART7][0], MAX_SIZE);
 
       if (HAL_UART_Init(&huart7) != HAL_OK)
       {
@@ -367,36 +376,36 @@ uint32_t uartAvailable(uint8_t ch)
 
     case _DEF_UART1:
       //ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart2_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
 
     case _DEF_UART2:
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart2_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
     case _DEF_UART3:
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart3_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
 
     case _DEF_UART4:
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_uart4_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
 
     case _DEF_UART5:
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_uart5_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
 
     case _DEF_UART6:
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart6_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
 
     case _DEF_UART7:
     	//ring_buffer[ch].in = (ring_buffer[ch].len - hdma_usart7_rx.Instance->NDTR);
-      ret = qbufferAvailable(&ring_buffer[ch]);
+      ret = qbufferRxAvailable(&ring_buffer[ch]);
       break;
   }
   return ret;
@@ -498,31 +507,31 @@ uint8_t uartRead(uint8_t ch)
       break;
 
     case _DEF_UART1:
-      qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
 
     case _DEF_UART2:
-    	qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
 
     case _DEF_UART3:
-    	qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
 
     case _DEF_UART4:
-    	qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
 
     case _DEF_UART5:
-    	qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
 
     case _DEF_UART6:
-    	qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
 
     case _DEF_UART7:
-    	qbufferRead(&ring_buffer[ch], &ret, 1);
+    	qbufferRxRead(&ring_buffer[ch], &ret, 1);
       break;
   }
 
@@ -861,7 +870,7 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
         Error_Handler();
         ret = false;
       }
-
+      qbufferRxFlush(&ring_buffer[ch]);
       if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
         Error_Handler();
@@ -894,6 +903,8 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
         Error_Handler();
       }
 
+      qbufferRxFlush(&ring_buffer[ch]);
+
       if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
         Error_Handler();
@@ -924,6 +935,8 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
       {
         Error_Handler();
       }
+
+      qbufferRxFlush(&ring_buffer[ch]);
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
@@ -956,6 +969,8 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
         Error_Handler();
       }
 
+      qbufferRxFlush(&ring_buffer[ch]);
+
       if (HAL_UARTEx_SetTxFifoThreshold(&huart4, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
         Error_Handler();
@@ -986,6 +1001,8 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
       {
         Error_Handler();
       }
+
+      qbufferRxFlush(&ring_buffer[ch]);
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart5, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
@@ -1018,6 +1035,8 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
         Error_Handler();
       }
 
+      qbufferRxFlush(&ring_buffer[ch]);
+
       if (HAL_UARTEx_SetTxFifoThreshold(&huart6, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
         Error_Handler();
@@ -1048,6 +1067,8 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
       {
         Error_Handler();
       }
+
+      qbufferRxFlush(&ring_buffer[ch]);
 
       if (HAL_UARTEx_SetTxFifoThreshold(&huart7, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
       {
@@ -1086,6 +1107,9 @@ baudRate_e lookupBaudRateIndex(uint32_t baudRate)
 }
 
 uint32_t overren_cnt = 0;
+volatile uint32_t uart3_err_pe, uart3_err_ne, uart3_err_fe, uart3_err_ore, uart3_err_other;
+volatile uint32_t uart3_err_last;   // 마지막 ErrorCode 원본값
+volatile uint32_t uart3_err_baud;   // 에러 당시 보레이트
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART6)
@@ -1102,6 +1126,21 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         CLEAR_BIT(huart->Instance->CR3, USART_CR3_EIE);
   	}
   }
+
+  if (huart->Instance == USART3)
+  {
+    uint32_t e = huart->ErrorCode;
+    uart3_err_last = e;
+    uart3_err_baud = huart->Init.BaudRate;
+
+    if (e & HAL_UART_ERROR_PE)  uart3_err_pe++;
+    if (e & HAL_UART_ERROR_NE)  uart3_err_ne++;
+    if (e & HAL_UART_ERROR_FE)  uart3_err_fe++;
+    if (e & HAL_UART_ERROR_ORE) uart3_err_ore++;
+    if (e & ~0x0FU)             uart3_err_other++;
+
+    HAL_UART_Receive_IT(huart, (uint8_t *)&rx_buf[_DEF_UART3], 1);  // ORE 후 수신 재시작
+  }
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
@@ -1112,13 +1151,13 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
   }
 }
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+FAST_CODE void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   static uint32_t pre_time = 0;
 
   if(huart->Instance == USART1)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART1], (uint8_t *)&rx_buf[_DEF_UART1], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART1], (uint8_t *)&rx_buf[_DEF_UART1], 1);
     HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1], 1);
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t *)&rx_buf[_DEF_UART1][0], MAX_SIZE);
 //    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
@@ -1127,24 +1166,24 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if(huart->Instance == USART2)
   {
       HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2], 1);
-      qbufferWrite(&ring_buffer[_DEF_UART2], (uint8_t *)&rx_buf[_DEF_UART2], 1);
+      qbufferRxWrite(&ring_buffer[_DEF_UART2], (uint8_t *)&rx_buf[_DEF_UART2], 1);
   }
 
   if(huart->Instance == USART3)
   {
-  	qbufferWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3], 1);
     HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3], 1);
   }
 
   if(huart->Instance == UART4)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART4], (uint8_t *)&rx_buf[_DEF_UART4], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART4], (uint8_t *)&rx_buf[_DEF_UART4], 1);
     HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4], 1);
   }
 
   if(huart->Instance == UART5)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART5], (uint8_t *)&rx_buf[_DEF_UART5], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART5], (uint8_t *)&rx_buf[_DEF_UART5], 1);
     HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5], 1);
   }
 
@@ -1154,21 +1193,21 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     pre_time = micros();
     rxRuntimeState.RxCallback_Flag = true;
 		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6], 1);
-    qbufferWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6], 1);
+		qbufferRxWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6], 1);
 //      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], MAX_SIZE);
 //      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
 
 		rxRuntimeState.uartAvalable = uartAvailable(_DEF_UART6);
 		while(uartAvailable(_DEF_UART6))
 		{
-		 crsfDataReceive(uartRead(_DEF_UART6), (void*) &rxRuntimeState);
+			crsfDataReceive(uartRead(_DEF_UART6), (void*) &rxRuntimeState);
 		}
 
     rxRuntimeState.RxCallback_Flag = false;
 	}
   if(huart->Instance == UART7)
   {
-    qbufferWrite(&ring_buffer[_DEF_UART7], (uint8_t *)&rx_buf[_DEF_UART7], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART7], (uint8_t *)&rx_buf[_DEF_UART7], 1);
     HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7], 1);
   }
 }
@@ -1404,22 +1443,22 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 
     /* UART4 DMA Init */
     /* UART4_RX Init */
-    hdma_uart4_rx.Instance = DMA1_Stream2;
-    //hdma_uart4_rx.Init.Channel = DMA_CHANNEL_4;
-    hdma_uart4_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_uart4_rx.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_uart4_rx.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_uart4_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_uart4_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_uart4_rx.Init.Mode = DMA_CIRCULAR;
-    hdma_uart4_rx.Init.Priority = DMA_PRIORITY_LOW;
-    hdma_uart4_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-    if (HAL_DMA_Init(&hdma_uart4_rx) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    __HAL_LINKDMA(uartHandle,hdmarx,hdma_uart4_rx);
+//    hdma_uart4_rx.Instance = DMA1_Stream2;
+//    hdma_uart4_rx.Init.Channel = DMA_CHANNEL_4;
+//    hdma_uart4_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+//    hdma_uart4_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+//    hdma_uart4_rx.Init.MemInc = DMA_MINC_ENABLE;
+//    hdma_uart4_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+//    hdma_uart4_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+//    hdma_uart4_rx.Init.Mode = DMA_CIRCULAR;
+//    hdma_uart4_rx.Init.Priority = DMA_PRIORITY_LOW;
+//    hdma_uart4_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+//    if (HAL_DMA_Init(&hdma_uart4_rx) != HAL_OK)
+//    {
+//      Error_Handler();
+//    }
+//
+//    __HAL_LINKDMA(uartHandle,hdmarx,hdma_uart4_rx);
 
     /* UART4 interrupt Init */
     HAL_NVIC_SetPriority(UART4_IRQn, 0, 2);
@@ -1460,20 +1499,20 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     /* UART5_RX Init */
     //hdma_uart5_rx.Instance = DMA1_Stream0;
     //hdma_uart5_rx.Init.Channel = DMA_CHANNEL_4;
-    hdma_uart5_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_uart5_rx.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_uart5_rx.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_uart5_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_uart5_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_uart5_rx.Init.Mode = DMA_CIRCULAR;
-    hdma_uart5_rx.Init.Priority = DMA_PRIORITY_LOW;
-    hdma_uart5_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-    if (HAL_DMA_Init(&hdma_uart5_rx) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    __HAL_LINKDMA(uartHandle,hdmarx,hdma_uart5_rx);
+//    hdma_uart5_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+//    hdma_uart5_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+//    hdma_uart5_rx.Init.MemInc = DMA_MINC_ENABLE;
+//    hdma_uart5_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+//    hdma_uart5_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+//    hdma_uart5_rx.Init.Mode = DMA_CIRCULAR;
+//    hdma_uart5_rx.Init.Priority = DMA_PRIORITY_LOW;
+//    hdma_uart5_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+//    if (HAL_DMA_Init(&hdma_uart5_rx) != HAL_OK)
+//    {
+//      Error_Handler();
+//    }
+//
+//    __HAL_LINKDMA(uartHandle,hdmarx,hdma_uart5_rx);
 
     /* UART5 interrupt Init */
     HAL_NVIC_SetPriority(UART5_IRQn, 1, 2);

@@ -16,26 +16,38 @@ extern "C" {
 
 typedef struct
 {
-	volatile uint32_t in;
-	volatile uint32_t out;
-	uint32_t len;
-	uint32_t size;
+  uint32_t rxBufferSize;
+  uint32_t txBufferSize;
+  volatile uint8_t *rxBuffer;
+  volatile uint8_t *txBuffer;
+  volatile uint32_t rxBufferHead;
+  volatile uint32_t rxBufferTail;
+  volatile uint32_t txBufferHead;
+  volatile uint32_t txBufferTail;
 
-	uint8_t *p_buf;
 } qbuffer_t;
 
 
-void     qbufferInit(void);
-bool     qbufferCreate(qbuffer_t *p_node, uint8_t *p_buf, uint32_t length);
-bool     qbufferCreateBySize(qbuffer_t *p_node, uint8_t *p_buf, uint32_t size, uint32_t length);
-bool     qbufferWrite(qbuffer_t *p_node, uint8_t *p_data, uint32_t length);
-bool     qbufferRead(qbuffer_t *p_node, uint8_t *p_data, uint32_t length);
-uint8_t *qbufferPeekWrite(qbuffer_t *p_node);
-uint8_t *qbufferPeekRead(qbuffer_t *p_node);
-uint32_t qbufferAvailable(qbuffer_t *p_node);
-uint32_t     qbufferTxBytesFree(qbuffer_t *p_node);
-bool 		 qbufferTxEmpty(qbuffer_t *p_node);
-void     qbufferFlush(qbuffer_t *p_node);
+bool qbufferCreate(qbuffer_t *p_node,
+                   uint8_t *p_rx_buf, uint32_t rx_size,
+                   uint8_t *p_tx_buf, uint32_t tx_size);
+
+bool     qbufferRxWrite(qbuffer_t *p_node, const uint8_t *p_data, uint32_t length);
+bool     qbufferRxRead(qbuffer_t *p_node, uint8_t *p_data, uint32_t length);
+volatile uint8_t *qbufferRxPeekWrite(qbuffer_t *p_node);
+volatile uint8_t *qbufferRxPeekRead(qbuffer_t *p_node);
+uint32_t qbufferRxAvailable(qbuffer_t *p_node);
+bool     qbufferRxEmpty(qbuffer_t *p_node);
+void     qbufferRxFlush(qbuffer_t *p_node);
+
+bool     qbufferTxWrite(qbuffer_t *p_node, const uint8_t *p_data, uint32_t length);
+bool     qbufferTxRead(qbuffer_t *p_node, uint8_t *p_data, uint32_t length);
+volatile uint8_t *qbufferTxPeekWrite(qbuffer_t *p_node);
+volatile uint8_t *qbufferTxPeekRead(qbuffer_t *p_node);
+uint32_t qbufferTxAvailable(qbuffer_t *p_node);
+bool     qbufferTxEmpty(qbuffer_t *p_node);
+uint32_t qbufferTxBytesFree(qbuffer_t *p_node);
+void     qbufferTxFlush(qbuffer_t *p_node);
 
 #ifdef __cplusplus
 }

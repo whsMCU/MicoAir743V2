@@ -168,16 +168,6 @@ void taskUpdateOpticalFlow(timeUs_t currentTimeUs)
 }
 #endif
 
-FAST_CODE void taskFiltering(timeUs_t currentTimeUs)
-{
-		#ifdef USE_DSHOT_TELEMETRY
-				updateDshotTelemetry();  // decode and update Dshot telemetry
-		#endif
-
-    gyroFiltering(currentTimeUs);
-
-}
-
 #ifdef USE_GPS_RESCUE
 static void taskGpsRescue(timeUs_t currentTimeUs)
 {

@@ -78,7 +78,7 @@ void Reset_All_PID_Integrator(void);
 
 void pidInit(void);
 
-FAST_CODE void subTaskPidController(timeUs_t currentTimeUs);
+void subTaskPidController(timeUs_t currentTimeUs);
 
 void mixerSetThrottleAngleCorrection(int correctionValue);
 
