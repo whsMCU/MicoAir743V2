@@ -1157,7 +1157,7 @@ FAST_CODE void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
   if(huart->Instance == USART1)
   {
-  	qbufferRxWrite(&ring_buffer[_DEF_UART1], (uint8_t *)&rx_buf[_DEF_UART1], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART1], (const uint8_t *)&rx_buf[_DEF_UART1], 1);
     HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buf[_DEF_UART1], 1);
 //    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t *)&rx_buf[_DEF_UART1][0], MAX_SIZE);
 //    __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
@@ -1166,24 +1166,26 @@ FAST_CODE void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if(huart->Instance == USART2)
   {
       HAL_UART_Receive_IT(&huart2, (uint8_t *)&rx_buf[_DEF_UART2], 1);
-      qbufferRxWrite(&ring_buffer[_DEF_UART2], (uint8_t *)&rx_buf[_DEF_UART2], 1);
+      qbufferRxWrite(&ring_buffer[_DEF_UART2], (const uint8_t *)&rx_buf[_DEF_UART2], 1);
   }
 
   if(huart->Instance == USART3)
   {
-  	qbufferRxWrite(&ring_buffer[_DEF_UART3], (uint8_t *)&rx_buf[_DEF_UART3], 1);
-    HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3], 1);
+    qbufferRxWrite(&ring_buffer[_DEF_UART3], (const uint8_t *)&rx_buf[_DEF_UART3], 1);
+
+		HAL_UART_Receive_IT(&huart3, (uint8_t *)&rx_buf[_DEF_UART3], 1);
+
   }
 
   if(huart->Instance == UART4)
   {
-  	qbufferRxWrite(&ring_buffer[_DEF_UART4], (uint8_t *)&rx_buf[_DEF_UART4], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART4], (const uint8_t *)&rx_buf[_DEF_UART4], 1);
     HAL_UART_Receive_IT(&huart4, (uint8_t *)&rx_buf[_DEF_UART4], 1);
   }
 
   if(huart->Instance == UART5)
   {
-  	qbufferRxWrite(&ring_buffer[_DEF_UART5], (uint8_t *)&rx_buf[_DEF_UART5], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART5], (const uint8_t *)&rx_buf[_DEF_UART5], 1);
     HAL_UART_Receive_IT(&huart5, (uint8_t *)&rx_buf[_DEF_UART5], 1);
   }
 
@@ -1193,7 +1195,7 @@ FAST_CODE void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     pre_time = micros();
     rxRuntimeState.RxCallback_Flag = true;
 		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6], 1);
-		qbufferRxWrite(&ring_buffer[_DEF_UART6], (uint8_t *)&rx_buf[_DEF_UART6], 1);
+		qbufferRxWrite(&ring_buffer[_DEF_UART6], (const uint8_t *)&rx_buf[_DEF_UART6], 1);
 //      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], MAX_SIZE);
 //      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
 
@@ -1207,7 +1209,7 @@ FAST_CODE void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	}
   if(huart->Instance == UART7)
   {
-  	qbufferRxWrite(&ring_buffer[_DEF_UART7], (uint8_t *)&rx_buf[_DEF_UART7], 1);
+  	qbufferRxWrite(&ring_buffer[_DEF_UART7], (const uint8_t *)&rx_buf[_DEF_UART7], 1);
     HAL_UART_Receive_IT(&huart7, (uint8_t *)&rx_buf[_DEF_UART7], 1);
   }
 }
