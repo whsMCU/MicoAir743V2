@@ -59,10 +59,10 @@
 #endif
 
 #if defined(USE_POSITION_HOLD)
-#include "pg/autopilot.h"
+//#include "pg/autopilot.h"
 #endif
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-#include "pg/pos_hold.h"
+//#include "pg/pos_hold.h"
 #endif
 
 // Accelerometer process noise in (cm/s^2)^2.
@@ -132,7 +132,7 @@ static bool positionEstimatorWantXYFusion(void)
 #ifdef USE_GPS
     if (sensors(SENSOR_GPS) && STATE(GPS_FIX)) {
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-        if (posHoldConfig()->positionSource != POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
+        if (posHoldConfig.positionSource != POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
             return true;
         }
 #else
@@ -224,7 +224,7 @@ void positionEstimatorInit(void)
 {
 
 #if defined(USE_POSITION_HOLD)
-    qaccelXY = Q_ACCEL_XY * ((autopilotConfig()->positionA > 1) ?  (30.0f / autopilotConfig()->positionA ) : 15.0f);
+    qaccelXY = Q_ACCEL_XY * ((autopilotConfig.positionA > 1) ?  (30.0f / autopilotConfig.positionA ) : 15.0f);
     // when user reduces positionA, , they want more accelerometer influence (up to 15x more), and vice versa
 #endif
     kalmanInit(&kfEast, 0.0f, 0.0f, INITIAL_POS_VAR, INITIAL_VEL_VAR, qaccelXY);
@@ -355,7 +355,7 @@ static void feedGPSMeasurements(timeUs_t nowUs)
 
     // Determine which measurements are allowed by source settings
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    const uint8_t posSource = posHoldConfig()->positionSource;
+    const uint8_t posSource = posHoldConfig.positionSource;
     const bool gpsXYAllowed = (posSource != POSHOLD_SOURCE_OPTICALFLOW_ONLY);
 #else
     const bool gpsXYAllowed = true;
