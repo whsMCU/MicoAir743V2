@@ -1011,9 +1011,9 @@ static void gpsConfigureUblox(void)
 {
 
     // Wait until GPS transmit buffer is empty
-//    if (!uartTxBufEmpty(_DEF_UART3)) {
-//        return;
-//    }
+   if (!uartTxBufEmpty(_DEF_UART3)) {
+       return;
+   }
 
     switch (gpsData.state) {
     case GPS_STATE_DETECT_BAUD:
@@ -1453,21 +1453,12 @@ static inline uint32_t cpuCycleLimit(void)
     return clockMicrosToCycles(GPS_UBLOX_RECV_TIME_MAX);
 }
 
-volatile static uint32_t gps_dt, gps_dt_tmp;
-uint32_t rxBytesWaiting_tmp;
-
-volatile uint8_t gps_debug_rx[256];
-volatile uint32_t gps_debug_rx_count = 0;
-
 void gpsUpdate(timeUs_t currentTimeUs)
 {
     static timeDelta_t gpsStateDurationFractionUs[GPS_STATE_COUNT];
     gpsState_e gpsCurrentState = gpsData.state;
     uint32_t rxBytesWaiting = 0;
     gpsData.now = millis();
-
-    gps_dt = micros() - gps_dt_tmp;
-    gps_dt_tmp = micros();
 
     switch (gpsConfig.provider) {
 #ifdef USE_GPS_UBLOX
@@ -1478,35 +1469,24 @@ void gpsUpdate(timeUs_t currentTimeUs)
         }
         //rxBytesWaiting = serialRxBytesWaiting(gpsPort);
         rxBytesWaiting = uartAvailable(_DEF_UART3);
-        rxBytesWaiting_tmp = rxBytesWaiting;
         //DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         const uint32_t initialCycleCount = getCycleCounter();
         static uint8_t wait = 0;
         static bool isFast = false;
         while (rxBytesWaiting-- > 0) {
-//            wait = 0;
-//            if (!isFast) {
-//                rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
-//                isFast = true;
-//            }
-//            if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
-//                break;
-//            }
-            //////////////////////////////////////
-            uint8_t data = uartRead(_DEF_UART3);
-
-            if (gps_debug_rx_count < sizeof(gps_debug_rx)) {
-                gps_debug_rx[gps_debug_rx_count++] = data;
-            }
-
-            if (gpsNewFrameUBLOX(data)) {
-                gpsHandleFrameComplete();
-            }
-//            if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
-//                gpsHandleFrameComplete();
-//            }
+           wait = 0;
+           if (!isFast) {
+               rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
+               isFast = true;
+           }
+           if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
+               break;
+           }
+           if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
+               gpsHandleFrameComplete();
+           }
         }
-        //rescheduleWhenNecessary(&wait, &isFast);
+        rescheduleWhenNecessary(&wait, &isFast);
         break;
     }
 #endif
@@ -2834,7 +2814,6 @@ static bool gpsNewFrameUBLOX(uint8_t data)
         }
         // Payload length seems legit, go on to receive the payload content.
         ubxFrameParsePayloadCounter = 0;
-        gps_debug_rx_count = 0;
         ubxFrameParseState = UBX_PARSE_PAYLOAD_CONTENT;
         break;
     case UBX_PARSE_PAYLOAD_CONTENT:

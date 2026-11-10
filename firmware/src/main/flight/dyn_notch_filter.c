@@ -34,7 +34,6 @@
 #include "hw.h"
 
 #ifdef USE_DYN_NOTCH_FILTER
-
 #include "build/debug.h"
 
 #include "common/axis.h"
