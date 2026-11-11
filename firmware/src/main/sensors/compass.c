@@ -56,9 +56,6 @@
 static void cliQmc5883l(cli_args_t *args);
 #endif
 
-#if defined(USE_GPS) || defined(USE_MAG)
-int16_t magHold;
-#endif
 
 #define LAMBDA_MIN 0.95f // minimal adaptive forgetting factor, range: [0.90, 0.99], currently tuned for 200 Hz
                          // (TASK_COMPASS_RATE_HZ) and update rate of compassBiasEstimatorApply(), not the mag readout

@@ -4290,7 +4290,7 @@ bool navigationIsExecutingAnEmergencyLanding(void)
 
 bool isNavLaunchEnabled(void)
 {
-    return IS_RC_MODE_ACTIVE(BOXNAVLAUNCH) || feature(FEATURE_FW_LAUNCH);
+    return IS_RC_MODE_ACTIVE(BOXNAVLAUNCH);// || featureIsEnabled(FEATURE_FW_LAUNCH);
 }
 
 //bool abortLaunchAllowed(void)

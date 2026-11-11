@@ -262,6 +262,28 @@ typedef struct {
 #endif
 } task_t;
 
+#ifndef SCHEDULER_RELAX_RX
+#define SCHEDULER_RELAX_RX  25
+#endif
+
+#ifndef SCHEDULER_RELAX_OSD
+#define SCHEDULER_RELAX_OSD 25
+#endif
+
+// Tenths of a % of tasks late
+#ifndef CPU_LOAD_LATE_LIMIT
+#define CPU_LOAD_LATE_LIMIT 10
+#endif
+
+typedef struct schedulerConfig_s {
+    uint16_t rxRelaxDeterminism;
+    uint16_t osdRelaxDeterminism;
+    uint16_t cpuLatePercentageLimit;
+    uint8_t debugTask;
+} schedulerConfig_t;
+
+extern schedulerConfig_t schedulerConfig;
+
 void getCheckFuncInfo(cfCheckFuncInfo_t *checkFuncInfo);
 void getTaskInfo(taskId_e taskId, taskInfo_t *taskInfo);
 void rescheduleTask(taskId_e taskId, timeDelta_t newPeriodUs);

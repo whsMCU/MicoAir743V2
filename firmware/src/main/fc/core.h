@@ -56,6 +56,10 @@ typedef enum {
 extern const char * const osdLaunchControlModeNames[LAUNCH_CONTROL_MODE_COUNT];
 #endif
 
+extern throttleCorrectionConfig_t throttleCorrectionConfig;
+
+void throttleCorrectionConfig_Init(void);
+
 void disarm(flightLogDisarmReason_e reason);
 void tryArm(void);
 

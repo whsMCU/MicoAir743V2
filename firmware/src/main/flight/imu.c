@@ -98,9 +98,8 @@ void imuConfig_Init(void)
 	imuConfig.dcm_kp = 2500;                // 1.0 * 10000
 	imuConfig.dcm_ki = 0;                   // 0.003 * 10000
 	imuConfig.small_angle = 25;
-	imuConfig.throttle_correction_value = 0;      // could 10 with althold or 40 for fpv
-  imuConfig.throttle_correction_angle = 800;    // could be 80.0 deg with atlhold or 45.0 for fpv
-  imuConfigure(imuConfig.throttle_correction_angle, imuConfig.throttle_correction_value);
+
+  imuConfigure(throttleCorrectionConfig.throttle_correction_angle, throttleCorrectionConfig.throttle_correction_value);
 }
 
 static void imuQuaternionComputeProducts(quaternion_t *quat, quaternionProducts *quatProd)

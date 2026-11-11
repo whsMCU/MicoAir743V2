@@ -60,7 +60,7 @@
 #include "fc/dispatch.h"
 #include "fc/init.h"
 #include "fc/rc.h"
-//#include "fc/core.h"
+#include "fc/core.h"
 //#include "fc/rc_modes.h"
 #include "fc/rc_controls.h"
 #include "fc/rc_adjustments.h"
@@ -237,15 +237,13 @@ void init(void)
 
 #ifdef USE_LED_STRIP
     ledStripInit();
-    featureSet(FEATURE_LED_STRIP);
-    if (featureConfigured(FEATURE_LED_STRIP)) {
+    if (featureIsEnabled(FEATURE_LED_STRIP)) {
         ledStripEnable();
     }
 #endif
 
 #ifdef USE_ESC_SENSOR
-    featureSet(FEATURE_ESC_SENSOR);
-    if (featureConfigured(FEATURE_ESC_SENSOR)) {
+    if (featureIsEnabled(FEATURE_ESC_SENSOR)) {
         escSensorInit();
     }
 #endif
@@ -369,7 +367,7 @@ void Param_Config_Init(void)
 	batteryConfig_Init();
 	controlRateProfiles_Init();
 //	mixerConfig_Init();
-//	throttleCorrectionConfig_Init();
+	throttleCorrectionConfig_Init();
 //	featureConfig_Init();
 	navConfig_Init();
 	positionConfig_Init();

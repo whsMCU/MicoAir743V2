@@ -407,7 +407,7 @@ void tasksInit(void)
 #endif
 
 #ifdef USE_LED_STRIP
-    setTaskEnabled(TASK_LEDSTRIP, featureConfigured(FEATURE_LED_STRIP));
+    setTaskEnabled(TASK_LEDSTRIP, featureIsEnabled(FEATURE_LED_STRIP));
 #endif
 
 #ifdef USE_TRANSPONDER
@@ -424,7 +424,7 @@ void tasksInit(void)
 #endif
 //
 #ifdef USE_ESC_SENSOR
-    setTaskEnabled(TASK_ESC_SENSOR, featureConfigured(FEATURE_ESC_SENSOR));
+    setTaskEnabled(TASK_ESC_SENSOR, featureIsEnabled(FEATURE_ESC_SENSOR));
 #endif
 
 #ifdef USE_ADC_INTERNAL

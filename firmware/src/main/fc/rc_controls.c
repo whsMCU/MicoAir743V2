@@ -53,6 +53,8 @@
 
 // true if arming is done via the sticks (as opposed to a switch)
 static bool isUsingSticksToArm = true;
+static bool disarmUserRequested = false; // has the user requested a disarm, using either sticks or switches, whether armed or disarmed
+
 
 float rcCommand[4];           // interval [1000;2000] for THROTTLE and [-500;+500] for ROLL/PITCH/YAW
 
@@ -91,6 +93,16 @@ void flight3DConfig_Init(void)
 bool isUsingSticksForArming(void)
 {
     return isUsingSticksToArm;
+}
+
+bool wasLastDisarmUserRequested(void)
+{
+    return disarmUserRequested;
+}
+
+void clearWasLastDisarmUserRequested(void)
+{
+    disarmUserRequested = false;
 }
 
 bool areSticksInApModePosition(uint16_t ap_mode)

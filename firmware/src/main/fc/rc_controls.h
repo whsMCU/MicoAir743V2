@@ -141,6 +141,7 @@ extern flight3DConfig_t flight3DConfig;
 typedef struct armingConfig_s {
     uint8_t gyro_cal_on_first_arm;          // allow disarm/arm on throttle down + roll left/right
     uint8_t auto_disarm_delay;              // allow automatically disarming multicopters after auto_disarm_delay seconds of zero throttle. Disabled when 0
+    uint8_t prearm_allow_rearm;
 } armingConfig_t;
 
 extern armingConfig_t armingConfig;
@@ -156,6 +157,12 @@ throttleStatus_e calculateThrottleStatus(void);
 void processRcStickPositions();
 
 bool isUsingSticksForArming(void);
+
+
+bool wasLastDisarmUserRequested(void); // Check if the user has requested a disarm since the last cleared
+
+void clearWasLastDisarmUserRequested(void); // Clear the user disarm request flag
+
 
 int32_t getRcStickDeflection(int32_t axis, uint16_t midrc);
 void rcControlsInit(void);

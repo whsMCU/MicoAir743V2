@@ -124,6 +124,16 @@ static int32_t gyroCyclesNow;
 
 static timeMs_t lastFailsafeCheckMs = 0;
 
+schedulerConfig_t schedulerConfig;
+
+void schedulerConfig_Init(void)
+{
+	schedulerConfig.rxRelaxDeterminism = SCHEDULER_RELAX_RX;
+	schedulerConfig.osdRelaxDeterminism = SCHEDULER_RELAX_OSD;
+	schedulerConfig.cpuLatePercentageLimit = CPU_LOAD_LATE_LIMIT;
+	schedulerConfig.debugTask = 0;
+}
+
 static FAST_DATA_ZERO_INIT task_t* taskQueueArray[TASK_COUNT + 1]; // extra item for NULL pointer at end of queue (+ overflow check in UNTT_TEST)
 
 void queueClear(void)

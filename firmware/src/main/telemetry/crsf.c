@@ -505,7 +505,7 @@ void initCrsfTelemetry(void)
     crsfSchedule[index++] = BV(CRSF_FRAME_GPS_INDEX);
 #endif
 #if defined(USE_BARO) || defined(USE_GPS)
-    if (sensors(SENSOR_BARO) || (STATE(FIXED_WING_LEGACY) && feature(FEATURE_GPS))) {
+    if (sensors(SENSOR_BARO) || (STATE(FIXED_WING_LEGACY) && featureIsEnabled(FEATURE_GPS))) {
         crsfSchedule[index++] = BV(CRSF_FRAME_VARIO_SENSOR_INDEX);
     }
 #endif
