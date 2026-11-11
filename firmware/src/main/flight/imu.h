@@ -98,6 +98,8 @@ bool shouldInitializeGPSHeading(void);
 
 bool isUpright(void);
 
+bool imuIsHeadingValid(void);
+
 void imuTransformVectorBodyToEarth(fpVector3_t * v);
 void imuTransformVectorEarthToBody(fpVector3_t * v);
 

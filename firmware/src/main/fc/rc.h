@@ -46,6 +46,9 @@ float getRawSetpoint(int axis);
 float getRcCommandDelta(int axis);
 float applyCurve(int axis, float deflection);
 bool getShouldUpdateFeedforward();
+
+float getMaxRcRate(int axis);
+
 void updateRcRefreshRate(uint32_t currentTimeUs);
 uint16_t getCurrentRxRefreshRate(void);
 bool getRxRateValid(void);

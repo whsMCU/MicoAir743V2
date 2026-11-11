@@ -32,6 +32,7 @@ typedef struct altHoldConfig_s {
 #define ALTHOLD_TASK_RATE_HZ 100         // hz
 
 void altHoldInit(void);
+void altHoldConfig_Init(void);
 void updateAltHold(timeUs_t currentTimeUs);
 bool isAltHoldActive(void);
 

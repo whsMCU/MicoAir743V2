@@ -135,7 +135,10 @@ typedef struct autopilotConfig_s {
     uint8_t geofenceAction;           // autopilotGeofenceAction_e (default AP_GEOFENCE_LAND)
 } autopilotConfig_t;
 
+extern autopilotConfig_t autopilotConfig;
+
 void autopilotInit(void);
+void autopilotConfig_Init(void);
 void resetAltitudeControl(void);
 void setSticksActiveStatus(bool areSticksActive);
 void resetPositionControl(unsigned taskRateHz);

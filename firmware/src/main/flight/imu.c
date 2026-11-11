@@ -179,6 +179,21 @@ void imuInit(void)
     imuComputeRotationMatrix();
 }
 
+bool imuIsHeadingValid(void)
+{
+#ifdef USE_MAG
+    if (compassEnabledAndCalibrated()) {
+        return true;
+    }
+#endif
+#ifdef USE_GPS
+    if (canUseGPSHeading) {
+        return true;
+    }
+#endif
+    return false;
+}
+
 #if defined(USE_ACC)
 static float invSqrt(float x)
 {

@@ -60,9 +60,11 @@
 
 #if defined(USE_POSITION_HOLD)
 //#include "pg/autopilot.h"
+#include "flight/autopilot.h"
 #endif
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
 //#include "pg/pos_hold.h"
+#include "flight/pos_hold.h"
 #endif
 
 // Accelerometer process noise in (cm/s^2)^2.
@@ -679,7 +681,7 @@ bool positionEstimatorIsHeadingRequired(void)
 {
     // If configured for optical flow only, heading is not required
 #if defined(USE_GPS) && defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    if (posHoldConfig()->positionSource == POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
+    if (posHoldConfig.positionSource == POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
         return false;
     }
 #endif

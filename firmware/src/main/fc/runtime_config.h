@@ -44,7 +44,7 @@ typedef enum {
     ARMING_DISABLED_NO_GYRO         = (1 << 0),
     ARMING_DISABLED_FAILSAFE        = (1 << 1),
     ARMING_DISABLED_RX_FAILSAFE     = (1 << 2),
-    ARMING_DISABLED_BAD_RX_RECOVERY = (1 << 3),
+    ARMING_DISABLED_NOT_DISARMED    = (1 << 3),
     ARMING_DISABLED_BOXFAILSAFE     = (1 << 4),
     ARMING_DISABLED_RUNAWAY_TAKEOFF = (1 << 5),
     ARMING_DISABLED_CRASH_DETECTED  = (1 << 6),
@@ -61,12 +61,16 @@ typedef enum {
     ARMING_DISABLED_PARALYZE        = (1 << 17),
     ARMING_DISABLED_GPS             = (1 << 18),
     ARMING_DISABLED_RESC            = (1 << 19),
-    ARMING_DISABLED_RPMFILTER       = (1 << 20),
+    ARMING_DISABLED_DSHOT_TELEM     = (1 << 20),
     ARMING_DISABLED_REBOOT_REQUIRED = (1 << 21),
     ARMING_DISABLED_DSHOT_BITBANG   = (1 << 22),
     ARMING_DISABLED_ACC_CALIBRATION = (1 << 23),
     ARMING_DISABLED_MOTOR_PROTOCOL  = (1 << 24),
-    ARMING_DISABLED_ARM_SWITCH      = (1 << 25), // Needs to be the last element, since it's always activated if one of the others is active when arming
+    ARMING_DISABLED_CRASHFLIP       = (1 << 25),
+    ARMING_DISABLED_ALTHOLD         = (1 << 26),
+    ARMING_DISABLED_POSHOLD         = (1 << 27),
+    ARMING_DISABLED_AUTOPILOT       = (1 << 28),
+    ARMING_DISABLED_ARM_SWITCH      = (1 << 29) // Needs to be the last element, since it's always activated if one of the others is active when arming
 } armingDisableFlags_e;
 
 #define ARMING_DISABLE_FLAGS_COUNT (LOG2(ARMING_DISABLED_ARM_SWITCH) + 1)
@@ -77,6 +81,7 @@ void setArmingDisabled(armingDisableFlags_e flag);
 void unsetArmingDisabled(armingDisableFlags_e flag);
 bool isArmingDisabled(void);
 armingDisableFlags_e getArmingDisableFlags(void);
+const char *getArmingDisableFlagName(armingDisableFlags_e flag);
 
 typedef enum {
     ANGLE_MODE            = (1 << 0),
@@ -99,7 +104,10 @@ typedef enum {
 
     RANGEFINDER_MODE      = (1 << 17),
     GPS_RESCUE_MODE       = (1 << 18),
-    OPFLOW_HOLD_MODE      = (1 << 19)
+    OPFLOW_HOLD_MODE      = (1 << 19),
+    ALT_HOLD_MODE   	  = (1 << 20),
+    POS_HOLD_MODE  		  = (1 << 21),
+    AUTOPILOT_MODE  	  = (1 << 22)  // GPS waypoint tracking
 } flightModeFlags_e;
 
 extern uint16_t flightModeFlags;
@@ -113,12 +121,16 @@ extern uint16_t flightModeFlags;
 #define BOXID_TO_FLIGHT_MODE_MAP_INITIALIZER {           \
    [BOXANGLE]       = LOG2(ANGLE_MODE),                  \
    [BOXHORIZON]     = LOG2(HORIZON_MODE),                \
-   [BOXMAG]         = LOG2(HEADING_MODE),                    \
+   [BOXMAG]         = LOG2(MAG_MODE),                    \
+   [BOXALTHOLD]     = LOG2(ALT_HOLD_MODE),               \
+   [BOXPOSHOLD]     = LOG2(POS_HOLD_MODE),               \
    [BOXHEADFREE]    = LOG2(HEADFREE_MODE),               \
-   [BOXPASSTHRU]    = LOG2(MANUAL_MODE),               \
+   [BOXCHIRP]       = LOG2(CHIRP_MODE),                  \
+   [BOXPASSTHRU]    = LOG2(PASSTHRU_MODE),               \
    [BOXFAILSAFE]    = LOG2(FAILSAFE_MODE),               \
    [BOXGPSRESCUE]   = LOG2(GPS_RESCUE_MODE),             \
-}                                                        \
+   [BOXAUTOPILOT]   = LOG2(AUTOPILOT_MODE),              \
+}                                                        \                                                     \
 /**/
 
 typedef enum {
@@ -163,5 +175,3 @@ bool sensors(uint32_t mask);
 void sensorsSet(uint32_t mask);
 void sensorsClear(uint32_t mask);
 uint32_t sensorsMask(void);
-
-void mwDisarm(void);

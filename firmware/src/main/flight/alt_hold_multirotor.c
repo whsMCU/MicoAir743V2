@@ -158,7 +158,7 @@ static void altHoldUpdateTargetAltitude(void)
 static void altHoldUpdate(void)
 {
     
-    if (altHoldConfig()->climbRate) {
+    if (altHoldConfig.climbRate) {
         altHoldUpdateTargetAltitude(); // check if the pilot has changed the target altitude using sticks
     }
 

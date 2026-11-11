@@ -29,6 +29,14 @@
 #include "common/time.h"
 #include "common/axis.h"
 
+ typedef struct pidCoefficient_s {
+     float Kp;
+     float Ki;
+     float Kd;
+     float Kf;
+     float Ka;
+ } pidCoefficient_t;
+
 enum {
    HEADING_HOLD_DISABLED = 0,
    HEADING_HOLD_UPDATE_HEADING,

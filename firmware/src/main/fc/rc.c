@@ -111,6 +111,12 @@ float getSetpointRate(int axis)
 #endif
 }
 
+static float maxRcRate[3];
+float getMaxRcRate(int axis)
+{
+    return maxRcRate[axis];
+}
+
 float getRcDeflection(int axis)
 {
 #ifdef USE_RC_SMOOTHING_FILTER
@@ -752,6 +758,36 @@ void initRcProcessing(void)
         applyRates = applyQuickRates;
 
         break;
+    }
+
+#ifdef USE_RC_SMOOTHING_FILTER
+    rcSmoothingData.debugAxis = rxConfig()->rc_smoothing_debug_axis;
+
+    rcSmoothingData.autoSmoothnessFactorSetpoint = 1.5f / (1.0f + (rxConfig()->rc_smoothing_auto_factor_rpy / 10.0f));
+    rcSmoothingData.autoSmoothnessFactorThrottle = 1.5f / (1.0f + (rxConfig()->rc_smoothing_auto_factor_throttle / 10.0f));
+
+    rcSmoothingData.setpointCutoffSetting = rxConfig()->rc_smoothing_setpoint_cutoff;
+    rcSmoothingData.throttleCutoffSetting = rxConfig()->rc_smoothing_throttle_cutoff;
+
+    rcSmoothingData.setpointCutoffFrequency = rcSmoothingData.setpointCutoffSetting; //initialise to user's cutoff setting, but if 0, will be replaced with auto values from rcSmoothingSetFilterCutoffs()
+    rcSmoothingData.throttleCutoffFrequency = rcSmoothingData.throttleCutoffSetting;
+#endif
+
+#ifdef USE_FEEDFORWARD
+    updateFeedforwardFilters(&pidRuntime);
+    feedforwardAveraging = pidRuntime.feedforwardAveraging;
+    pt1FilterInit(&feedforwardYawHoldLpf, 0.0f);
+#endif // USE_FEEDFORWARD
+
+    for (int i = 0; i < XYZ_AXIS_COUNT; i++) {
+        maxRcRate[i] = applyRates(i, 1.0f, 1.0f);
+#ifdef USE_FEEDFORWARD
+        feedforwardSmoothed[i] = 0.0f;
+        feedforwardRaw[i] = 0.0f;
+        if (feedforwardAveraging) {
+            laggedMovingAverageInit(&feedforwardDeltaAvg[i].filter, feedforwardAveraging + 1, (float *)&feedforwardDeltaAvg[i].buf[0]);
+        }
+#endif // USE_FEEDFORWARD
     }
 
 #ifdef USE_YAW_SPIN_RECOVERY

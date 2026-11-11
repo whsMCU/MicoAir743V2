@@ -48,6 +48,8 @@
 #include "flight/pos_hold.h"
 #endif
 
+#include "flight/pid.h"
+
 // DEBUG_AUTOPILOT_PID each parameter on the axis set by gyro_filter_debug_axis
 // 0 - VelocityError cm/s
 // 1 - DistanceError cm

@@ -70,7 +70,7 @@
 
 #include "scheduler/tasks.h"
 
-//#include "flight/failsafe.h"
+#include "flight/failsafe.h"
 #include "flight/imu.h"
 //#include "flight/mixer_init.h"
 //#include "flight/mixer.h"
@@ -115,6 +115,9 @@
 
 #include "flight/pid.h"
 #include "flight/gps_rescue_multirotor.h"
+#include "flight/alt_hold.h"
+#include "flight/pos_hold.h"
+#include "flight/autopilot_multirotor.h"
 
 #include "drivers/motor.h"
 //#include "drivers/pwm_output.h"
@@ -167,6 +170,7 @@ void init(void)
 #endif
 
 	position_Init();
+	autopilotInit();
 
 #ifdef USE_BARO
 	Baro_Init();
@@ -221,8 +225,8 @@ void init(void)
   // to set the boxes up
   mspFcInit();
 
-//    failsafeInit();
-//
+    failsafeInit();
+
     rxInit();
 
     initRcProcessing();
@@ -288,6 +292,15 @@ void init(void)
     telemetryInit();
 #endif
 
+// autopilot must be initialised before modes that require the autopilot pids
+#ifdef USE_ALTITUDE_HOLD
+	altHoldInit();
+#endif
+
+#ifdef USE_POSITION_HOLD
+	posHoldInit();
+#endif
+
 #ifdef USE_GPS_RESCUE
     if (feature(FEATURE_GPS)) {
         gpsRescueInit();
@@ -322,7 +335,7 @@ void Param_Config_Init(void)
 //	sdcardConfig_Init();
 
 	boardAlignment_Init(0, 0, 0);
-//	failsafeConfig_Init();
+	failsafeConfig_Init();
 	gyroConfig_init();
 
 	motorConfig_Init();
@@ -336,6 +349,7 @@ void Param_Config_Init(void)
 
 #ifdef USE_GPS
 	gpsConfig_Init();
+	gpsRescueConfig_Init();
 #endif
 #ifdef USE_OPTICALFLOW
 	opflow_Init();
@@ -357,7 +371,7 @@ void Param_Config_Init(void)
 //	mixerConfig_Init();
 //	throttleCorrectionConfig_Init();
 //	featureConfig_Init();
-  navConfig_Init();
+	navConfig_Init();
 	positionConfig_Init();
 	posControlConfig_Init();
 	rcControlsConfig_Init();
@@ -366,6 +380,10 @@ void Param_Config_Init(void)
 	flight3DConfig_Init();
 	ledStripConfig_Init();
 	ledStripStatusModeConfig_Init();
+
+	altHoldConfig_Init();
+	posHoldConfig_Init();
+	autopilotConfig_Init();
 #ifdef USE_OSD
 	vcdProfile_Init();
 	osdConfig_Init();

@@ -37,7 +37,10 @@ typedef struct posHoldConfig_s {
     uint16_t opticalflowMaxRange;        // Maximum altitude for optical flow (cm)
 } posHoldConfig_t;
 
+extern posHoldConfig_t posHoldConfig;
+
 void posHoldInit(void);
+void posHoldConfig_Init(void);
 void updatePosHold(timeUs_t currentTimeUs);
 bool isAutopilotInControl(void);
 

@@ -428,9 +428,8 @@ void rcControlsInit(void)
     //isUsingSticksToArm = !isModeActivationConditionPresent(BOXARM) && systemConfig.enableStickArming;
 }
 
-throttleStatus_e FAST_CODE NOINLINE calculateThrottleStatus(throttleStatusType_e type)
+throttleStatus_e FAST_CODE NOINLINE calculateThrottleStatus(void)
 {
-  UNUSED(type);
   int value = rcData[THROTTLE];    // THROTTLE_STATUS_TYPE_RC
 
   //const uint16_t mid_throttle_deadband = rcControlsConfig.mid_throttle_deadband;
@@ -444,5 +443,5 @@ throttleStatus_e FAST_CODE NOINLINE calculateThrottleStatus(throttleStatusType_e
 
 bool throttleStickIsLow(void)
 {
-    return calculateThrottleStatus(THROTTLE_STATUS_TYPE_RC) == THROTTLE_LOW;
+    return calculateThrottleStatus() == THROTTLE_LOW;
 }
