@@ -459,7 +459,7 @@ static const struct {
 } flightModeToLed[] = {
     {HEADFREE_MODE, LED_MODE_HEADFREE},
 #ifdef USE_MAG
-    {HEADING_MODE,      LED_MODE_MAG},
+    {MAG_MODE,      LED_MODE_MAG},
 #endif
     {HORIZON_MODE,  LED_MODE_HORIZON},
     {ANGLE_MODE,    LED_MODE_ANGLE},

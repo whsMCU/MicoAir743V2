@@ -178,7 +178,7 @@ static const dshotTelemetryType_t extendedTelemetryLookup[8] = {
 void initDshotTelemetry(const timeUs_t looptimeUs)
 {
     // if bidirectional DShot is not available
-    if (!motorConfig.useDshotTelemetry && !featureConfigured(FEATURE_ESC_SENSOR)) {
+    if (!motorConfig.useDshotTelemetry && !featureIsEnabled(FEATURE_ESC_SENSOR)) {
         return;
     }
 

@@ -117,7 +117,7 @@ extern uint16_t flightModeFlags;
    [BOXFAILSAFE]    = LOG2(FAILSAFE_MODE),               \
    [BOXGPSRESCUE]   = LOG2(GPS_RESCUE_MODE),             \
    [BOXAUTOPILOT]   = LOG2(AUTOPILOT_MODE)               \
-}                                                        \                                                     \
+}                                                        \
 /**/
 
 typedef enum {

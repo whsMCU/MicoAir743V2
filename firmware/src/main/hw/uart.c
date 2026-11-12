@@ -1147,7 +1147,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
   if(huart->Instance == USART1)
   {
-    msp_tx_end_time = micros()-msp_tx_start_time;
+    //msp_tx_end_time = micros()-msp_tx_start_time;
   }
 }
 

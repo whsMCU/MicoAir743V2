@@ -75,4 +75,10 @@ void taskMainPidLoop(timeUs_t currentTimeUs);
 
 bool areSticksActive(uint8_t stickPercentLimit);
 
+bool isCrashFlipModeActive(void);
+timeUs_t getLastDisarmTimeUs(void);
+bool isTryingToArm(void);
+void resetTryingToArm(void);
+bool isLaunchControlActive(void);
+
 #endif /* SRC_MAIN_FC_CORE_H_ */

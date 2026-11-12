@@ -51,9 +51,6 @@
 #include "sensors/compass.h"
 #include "sensors/opticalflow.h"
 #include "sensors/rangefinder.h"
-#include "navigation/navigation.h"
-#include "navigation/navigation_private.h"
-#include "navigation/sqrt_controller.h"
 
 timeDelta_t cycleTime = 0;         // this is the number in micro second to achieve a full loop, it can differ a little and is taken into account in the PID loop
 static timeUs_t flightTime = 0;
@@ -209,30 +206,6 @@ void Reset_All_PID_Integrator(void)
   _YAW_Rate.integral = 0;
 }
 
-static uint8_t getHeadingHoldState(void)
-{
-    // Don't apply heading hold if overall tilt is greater than maximum angle inclination
-    if (getCosTiltAngle() < headingHoldCosZLimit) {
-        return HEADING_HOLD_DISABLED;
-    }
-
-    int navHeadingState = navigationGetHeadingControlState();
-    // NAV will prevent MAG_MODE from activating, but require heading control
-    if (navHeadingState != NAV_HEADING_CONTROL_NONE) {
-        // Apply maghold only if heading control is in auto mode
-        if (navHeadingState == NAV_HEADING_CONTROL_AUTO) {
-            return HEADING_HOLD_ENABLED;
-        }
-    }
-    else if (ABS(rcCommand[YAW]) == 0 && FLIGHT_MODE(HEADING_MODE)) {
-        return HEADING_HOLD_ENABLED;
-    } else {
-        return HEADING_HOLD_UPDATE_HEADING;
-    }
-
-    return HEADING_HOLD_UPDATE_HEADING;
-}
-
 float yaw_heading_reference;
 
 // Function for loop trigger
@@ -279,12 +252,6 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 //      updateHeadingHoldTarget(DECIDEGREES_TO_DEGREES(attitude.values.yaw));
 //  }
 
-  if (isRXDataNew) {
-      updateWaypointsAndNavigationMode();
-  }
-  isRXDataNew = false;
-
-  applyWaypointNavigationAndAltitudeHold();
 
   applyCommand[ROLL]      = scaleRangef(rcCommand[ROLL],  -500.0f, 500.0f, -30.0f,  30.f);
   applyCommand[PITCH]     = scaleRangef(rcCommand[PITCH], -500.0f, 500.0f, -30.0f,  30.f);

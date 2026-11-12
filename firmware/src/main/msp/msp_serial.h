@@ -105,7 +105,7 @@ typedef struct __attribute__((packed)) {
 
 struct serialPort_s;
 typedef struct mspPort_s {
-    uint8_t port; // null when port unused.
+    struct serialPort_s *port; // null when port unused.
     timeMs_t lastActivityMs;
     mspPendingSystemRequest_e pendingRequest;
     mspPortState_e portState;
@@ -129,9 +129,9 @@ void mspSerialInit(void);
 bool mspSerialWaiting(void);
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn);
 void mspSerialAllocatePorts(void);
-void mspSerialReleasePortIfAllocated(struct serialPort_s *serialPort);
-void mspSerialReleaseSharedTelemetryPorts(void);
-mspDescriptor_t getMspSerialPortDescriptor(const serialPortIdentifier_e portIdentifier);
-int mspSerialPush(serialPortIdentifier_e port, uint8_t cmd, uint8_t *data, int datalen, mspDirection_e direction, mspVersion_e mspVersion);
-uint32_t mspSerialTxBytesFree(void);
-bool mspSerialIsConfiguratorActive(void);
+//void mspSerialReleasePortIfAllocated(struct serialPort_s *serialPort);
+//void mspSerialReleaseSharedTelemetryPorts(void);
+//mspDescriptor_t getMspSerialPortDescriptor(const serialPortIdentifier_e portIdentifier);
+//int mspSerialPush(serialPortIdentifier_e port, uint8_t cmd, uint8_t *data, int datalen, mspDirection_e direction, mspVersion_e mspVersion);
+//uint32_t mspSerialTxBytesFree(void);
+//bool mspSerialIsConfiguratorActive(void);

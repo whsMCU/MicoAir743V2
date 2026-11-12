@@ -375,9 +375,9 @@ RAM_CODE static void fontUpdateCompletion(void)
 }
 #endif
 
-RAM_CODE static void mspRebootFn(uint8_t ch)
+RAM_CODE static void mspRebootFn(serialPort_t *serialPort)
 {
-    UNUSED(ch);
+    UNUSED(serialPort);
 
 //    motorShutdown();
 //
@@ -434,7 +434,7 @@ RAM_CODE static void mspReboot(dispatchEntry_t* self)
         return;
     }
 
-    //mspRebootFn(NULL);
+    mspRebootFn(NULL);
 }
 
 dispatchEntry_t mspRebootEntry = {
@@ -3854,7 +3854,7 @@ RAM_CODE static mspResult_e mspProcessInCommand(mspDescriptor_t srcDesc, int16_t
 #endif
 
     case MSP2_SET_MOTOR_OUTPUT_REORDERING:
-//        {
+        {
 //            if (dataSize < 1) {
 //                return MSP_RESULT_ERROR;
 //            }
@@ -3872,7 +3872,7 @@ RAM_CODE static mspResult_e mspProcessInCommand(mspDescriptor_t srcDesc, int16_t
 //
 //                motorConfigMutable()->dev.motorOutputReordering[i] = value;
 //            }
-//        }
+        }
         break;
 
 #ifdef USE_DSHOT
@@ -4483,14 +4483,14 @@ RAM_CODE static mspResult_e mspProcessInCommand(mspDescriptor_t srcDesc, int16_t
 //        profile->consumptionWarningPercentage = consumptionWarnPct;
 //        break;
 //    }
-//
-//    default:
-//        // we do not know how to handle the (valid) message, indicate error MSP $M!
-//        return MSP_RESULT_ERROR;
-//    }
-//    return MSP_RESULT_ACK;
-//}
-//
+
+    default:
+        // we do not know how to handle the (valid) message, indicate error MSP $M!
+        return MSP_RESULT_ERROR;
+    }
+    return MSP_RESULT_ACK;
+}
+
 RAM_CODE static mspResult_e mspCommonProcessInCommand(mspDescriptor_t srcDesc, int16_t cmdMSP, sbuf_t *src, mspPostProcessFnPtr *mspPostProcessFn)
 {
     UNUSED(mspPostProcessFn);

@@ -46,6 +46,7 @@ typedef struct systemConfig_s {
 } systemConfig_t;
 
 extern systemConfig_t systemConfig;
+void systemConfig_Init(void);
 
 struct pidProfile_s;
 extern struct pidProfile_s *currentPidProfile;

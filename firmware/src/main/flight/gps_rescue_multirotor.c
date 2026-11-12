@@ -52,8 +52,6 @@
 #include "sensors/sensors.h"
 #include "sensors/gyro.h"
 
-#include "navigation/navigation_private.h"
-
 typedef enum {
     RESCUE_IDLE,
     RESCUE_INITIALIZE,
@@ -238,7 +236,7 @@ static void rescueAttainPosition(bool newGpsData)
         // Initialize internal variables each time GPS Rescue is started
         previousVelocityError = 0.0f;
         velocityI = 0.0f;
-        resetMulticopterAltitudeController();
+        //resetMulticopterAltitudeController();
         //resetAltitudeController();
         rescueState.intent.disarmThreshold = gpsRescueConfig.disarmThreshold * 0.1f;
         rescueState.sensor.imuYawCogGain = 1.0f;

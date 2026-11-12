@@ -25,7 +25,7 @@
 
 #include "common/time.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 #include "fc/dispatch.h"
 #include "fc/runtime_config.h"
 
@@ -49,6 +49,9 @@ static uint32_t arm_distance_cm;
 
 static bool saveRequired = false;
 
+static void writeStats(dispatchEntry_t *self);
+dispatchEntry_t writeStatsEntry = { writeStats, 0, NULL, false };
+
 statsConfig_t statsConfig;
 
 void statsConfig_Init(void)
@@ -57,6 +60,8 @@ void statsConfig_Init(void)
 	statsConfig.stats_total_flights = 0;
 	statsConfig.stats_total_time_s = 0;
 	statsConfig.stats_total_dist_m = 0;
+	statsConfig.stats_mah_used = 0;
+	statsConfig.statsSaveMoveLimit = 20;
 }
 
 #ifdef USE_GPS
@@ -78,14 +83,14 @@ void writeStats(dispatchEntry_t* self)
         // Don't save if the user made config changes that have not yet been saved.
         if (!isConfigDirty()) {
 
-            const bool gyroIsStill = fabsf(gyro.gyroADCf[FD_ROLL]) < statsConfig.statsSaveMoveLimit &&
-                fabsf(gyro.gyroADCf[FD_PITCH]) < statsConfig.statsSaveMoveLimit &&
-                fabsf(gyro.gyroADCf[FD_YAW]) < statsConfig.statsSaveMoveLimit;
+            const bool gyroIsStill = fabsf(bmi270.gyro.gyroADCf[FD_ROLL]) < statsConfig.statsSaveMoveLimit &&
+                fabsf(bmi270.gyro.gyroADCf[FD_PITCH]) < statsConfig.statsSaveMoveLimit &&
+                fabsf(bmi270.gyro.gyroADCf[FD_YAW]) < statsConfig.statsSaveMoveLimit;
 
             if (gyroIsStill || statsConfig.statsSaveMoveLimit == 0) {
                 writeEEPROM();
                 // Repeat disarming beep indicating the stats save is complete
-                beeper(BEEPER_DISARMING);
+                //beeper(BEEPER_DISARMING);
             } else {
                 dispatchAdd(&writeStatsEntry, STATS_SAVE_DELAY_US);
             }
@@ -94,12 +99,6 @@ void writeStats(dispatchEntry_t* self)
         saveRequired = false;
     }
 }
-
-dispatchEntry_t writeStatsEntry =
-{
-    writeStats, 0, NULL, false
-};
-
 
 void statsOnArm(void)
 {

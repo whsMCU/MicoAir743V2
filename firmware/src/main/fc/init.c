@@ -34,7 +34,7 @@
 #include "common/maths.h"
 #include "common/printf_serial.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 #include "config/feature.h"
 #include "config/sdcard.h"
 
@@ -61,7 +61,7 @@
 #include "fc/init.h"
 #include "fc/rc.h"
 #include "fc/core.h"
-//#include "fc/rc_modes.h"
+#include "fc/rc_modes.h"
 #include "fc/rc_controls.h"
 #include "fc/rc_adjustments.h"
 #include "fc/runtime_config.h"
@@ -210,20 +210,6 @@ void init(void)
 
 	imuInit();
 
-  DISABLE_STATE(FIXED_WING_LEGACY);
-  DISABLE_STATE(MULTIROTOR);
-  DISABLE_STATE(ROVER);
-  DISABLE_STATE(BOAT);
-  DISABLE_STATE(AIRPLANE);
-  DISABLE_STATE(MOVE_FORWARD_ONLY);
-
-  ENABLE_STATE(MULTIROTOR);
-  ENABLE_STATE(ALTITUDE_CONTROL);
-
-  // Sensors have now been detected, mspFcInit() can now be called
-  // to set the boxes up
-  mspFcInit();
-
     failsafeInit();
 
     rxInit();
@@ -264,9 +250,6 @@ void init(void)
 #ifdef USE_OPTICALFLOW
     opflowInit();
 #endif
-    navigationInit();
-
-    positionEstimationConfig_Init();
 
     batteryInit(); // always needs doing, regardless of features.
 
@@ -299,7 +282,7 @@ void init(void)
 #endif
 
 #ifdef USE_GPS_RESCUE
-    if (feature(FEATURE_GPS)) {
+    if (featureIsEnabled(FEATURE_GPS)) {
         gpsRescueInit();
     }
 #endif
@@ -368,9 +351,7 @@ void Param_Config_Init(void)
 //	mixerConfig_Init();
 	throttleCorrectionConfig_Init();
 //	featureConfig_Init();
-	navConfig_Init();
 	positionConfig_Init();
-	posControlConfig_Init();
 	rcControlsConfig_Init();
 	telemetryConfig_Init();
 	armingConfig_Init();

@@ -152,9 +152,9 @@ static void processMspPacket(void)
     if (mspFcProcessCommand(mspSharedDescriptor, &requestPacket, &responsePacket, &mspPostProcessFn) == MSP_RESULT_ERROR) {
         sbufWriteU8(&responsePacket.buf, TELEMETRY_MSP_ERROR);
     }
-//    if (mspPostProcessFn) {
-//        mspPostProcessFn(NULL);
-//    }
+    if (mspPostProcessFn) {
+        mspPostProcessFn(NULL);
+    }
 
     sbufSwitchToReader(&responsePacket.buf, responseBuffer);
 }

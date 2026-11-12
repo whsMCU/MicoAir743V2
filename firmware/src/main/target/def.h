@@ -76,6 +76,9 @@
 #define BOX_USER4_NAME "USER4"
 #endif
 
+#ifndef DEBUG_MODE
+#define DEBUG_MODE DEBUG_NONE
+#endif
 
 
 #ifndef TARGET_BOARD_IDENTIFIER

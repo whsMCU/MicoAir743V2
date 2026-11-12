@@ -27,7 +27,7 @@
 #include "common/maths.h"
 #include "common/utils.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 #include "config/feature.h"
 
 #include "drivers/dshot.h"
@@ -176,6 +176,21 @@ void throttleCorrectionConfig_Init(void)
 	throttleCorrectionConfig.throttle_correction_angle = 800;     // could be 80.0 deg with atlhold or 45.0 for fpv
 }
 
+static bool isCalibrating(void)
+{
+    return (sensors(SENSOR_GYRO) && !gyroIsCalibrationComplete())
+#ifdef USE_ACC
+        || (sensors(SENSOR_ACC) && !accIsCalibrationComplete())
+#endif
+#ifdef USE_BARO
+        || (sensors(SENSOR_BARO) && !baroIsCalibrated())
+#endif
+#ifdef USE_MAG
+        || (sensors(SENSOR_MAG) && !compassIsCalibrationComplete())
+#endif
+        ;
+}
+
 #ifdef USE_DSHOT
 static void setMotorSpinDirection(uint8_t spinDirection)
 {
@@ -193,23 +208,23 @@ void updateArmingStatus(void)
 
 #ifdef USE_DSHOT
 // --- handle crashFlip behaviours while armed ---
-if (crashFlipModeActive) {
-    if (!IS_RC_MODE_ACTIVE(BOXCRASHFLIP)) {
-        // Pilot has reverted the crash flip switch while crashflip is active and craft is  armed
-        if (!mixerConfig()->crashflip_auto_rearm) {
-            // we are in manual re-arm mode:  block arming until manual re-arm:
-            setArmingDisabled(ARMING_DISABLED_CRASHFLIP); // block tryArm() until user disarms manually
-            clearWasLastDisarmUserRequested();
-            // tell disarm() that this was not a user generated disarm
-            // also clear the flag in rc_controls so that it will only be true when the pilot makes a new user manual disarm
-            disarm(DISARM_REASON_CRASHFLIP); // stop the motors, revert crashflipMode and set motor direction normal
-        } else {
-            // we are in auto re-arm mode, terminate crashflip mode and set motor direction normal
-            setMotorSpinDirection(DSHOT_CMD_SPIN_DIRECTION_NORMAL);
-            crashFlipModeActive = false;
-        }
-    }
-}
+//if (crashFlipModeActive) {
+//    if (!IS_RC_MODE_ACTIVE(BOXCRASHFLIP)) {
+//        // Pilot has reverted the crash flip switch while crashflip is active and craft is  armed
+//        if (!mixerConfig()->crashflip_auto_rearm) {
+//            // we are in manual re-arm mode:  block arming until manual re-arm:
+//            setArmingDisabled(ARMING_DISABLED_CRASHFLIP); // block tryArm() until user disarms manually
+//            clearWasLastDisarmUserRequested();
+//            // tell disarm() that this was not a user generated disarm
+//            // also clear the flag in rc_controls so that it will only be true when the pilot makes a new user manual disarm
+//            disarm(DISARM_REASON_CRASHFLIP); // stop the motors, revert crashflipMode and set motor direction normal
+//        } else {
+//            // we are in auto re-arm mode, terminate crashflip mode and set motor direction normal
+//            setMotorSpinDirection(DSHOT_CMD_SPIN_DIRECTION_NORMAL);
+//            crashFlipModeActive = false;
+//        }
+//    }
+//}
 #endif // USE_DSHOT
     } else {
         // arming switch on, but not yet armed; currently DISARMED
@@ -218,7 +233,7 @@ if (crashFlipModeActive) {
         // Check if the power-on arming grace time has elapsed
         bool graceTimeElapsed =
             (getArmingDisableFlags() & ARMING_DISABLED_BOOT_GRACE_TIME)
-            && (millis() >= systemConfig()->powerOnArmingGraceTime * 1000);
+            && (millis() >= systemConfig.powerOnArmingGraceTime * 1000);
 
 #ifdef USE_DSHOT
         // With DSHOT, we also require DSHOT to be ready
@@ -307,7 +322,7 @@ if (crashFlipModeActive) {
         }
 
         if (isModeActivationConditionPresent(BOXPREARM)) {
-            if (IS_RC_MODE_ACTIVE(BOXPREARM) && (!ARMING_FLAG(WAS_ARMED_WITH_PREARM) || armingConfig()->prearm_allow_rearm) ) {
+            if (IS_RC_MODE_ACTIVE(BOXPREARM) && (!ARMING_FLAG(WAS_ARMED_WITH_PREARM) || armingConfig.prearm_allow_rearm) ) {
                 unsetArmingDisabled(ARMING_DISABLED_NOPREARM);
             } else {
                 setArmingDisabled(ARMING_DISABLED_NOPREARM);
@@ -316,7 +331,7 @@ if (crashFlipModeActive) {
 
 #ifdef USE_GPS_RESCUE
         if (gpsRescueIsConfigured()) {
-            if (gpsRescueConfig.allowArmingWithoutFix || (STATE(GPS_FIX) && (gpsSol.numSat >= gpsRescueConfig()->minSats)) ||
+            if (gpsRescueConfig.allowArmingWithoutFix || (STATE(GPS_FIX) && (gpsSol.numSat >= gpsRescueConfig.minSats)) ||
             ARMING_FLAG(WAS_EVER_ARMED) || IS_RC_MODE_ACTIVE(BOXCRASHFLIP)) {
                 unsetArmingDisabled(ARMING_DISABLED_GPS);
             } else {
@@ -352,11 +367,11 @@ if (crashFlipModeActive) {
         }
 
 #ifdef USE_ACC
-        if (accNeedsCalibration()) {
-            setArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
-        } else {
-            unsetArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
-        }
+//        if (accNeedsCalibration()) {
+//            setArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
+//        } else {
+//            unsetArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
+//        }
 #endif
 
         if (!isMotorProtocolEnabled()) {
@@ -392,13 +407,13 @@ if (crashFlipModeActive) {
             }
         }
 
-        if (isArmingDisabled()) {
-            warningLedFlash();
-        } else {
-            warningLedDisable();
-        }
-
-        warningLedUpdate();
+//        if (isArmingDisabled()) {
+//            warningLedFlash();
+//        } else {
+//            warningLedDisable();
+//        }
+//
+//        warningLedUpdate();
     }
 }
 
@@ -582,7 +597,7 @@ if (isMotorProtocolDshot()) {
             if (lastArmingDisabledReason != armingDisabledReason) {
                 lastArmingDisabledReason = armingDisabledReason;
 
-                beeperWarningBeeps(armingDisabledReason);
+                //beeperWarningBeeps(armingDisabledReason);
             }
         }
     }
@@ -656,3 +671,32 @@ bool areSticksActive(uint8_t stickPercentLimit)
     return false;
 }
 #endif
+
+bool isCrashFlipModeActive(void)
+{
+    return crashFlipModeActive;
+}
+
+timeUs_t getLastDisarmTimeUs(void)
+{
+    return lastDisarmTimeUs;
+}
+
+bool isTryingToArm(void)
+{
+    return (tryingToArm != ARMING_DELAYED_DISARMED);
+}
+
+void resetTryingToArm(void)
+{
+    tryingToArm = ARMING_DELAYED_DISARMED;
+}
+
+bool isLaunchControlActive(void)
+{
+#ifdef USE_LAUNCH_CONTROL
+    return launchControlState == LAUNCH_CONTROL_ACTIVE;
+#else
+    return false;
+#endif
+}

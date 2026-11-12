@@ -45,7 +45,6 @@
 #include "sensors/compass.h"
 #include "sensors/gyro.h"
 #include "sensors/sensors.h"
-#include "navigation/navigation.h"
 
 // the limit (in degrees/second) beyond which we stop integrating
 // omega_I. At larger spin rates the DCM PI controller can get 'dizzy'
@@ -576,11 +575,11 @@ void imuUpdateAttitude(timeUs_t currentTimeUs)
     }
     mixerSetThrottleAngleCorrection(throttleAngleCorrection);
 
-    updatePositionEstimator();
   } else {
-    bmi270.acc.accADC.x = 0;
-    bmi270.acc.accADC.y = 0;
-    bmi270.acc.accADC.z = 0;
+    vector3Zero(&bmi270.acc.accADC);
+    vector3Zero(&bmi270.acc.jerk);
+    bmi270.acc.accMagnitude = 0.0f;
+    bmi270.acc.jerkMagnitude = 0.0f;
     schedulerIgnoreTaskStateTime();
   }
 }

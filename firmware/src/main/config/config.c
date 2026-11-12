@@ -131,10 +131,10 @@ bool isEepromWriteInProgress(void)
     return eepromWriteInProgress;
 }
 
-uint8_t getCurrentPidProfileIndex(void)
-{
-    return systemConfig()->pidProfileIndex;
-}
+//uint8_t getCurrentPidProfileIndex(void)
+//{
+//    return systemConfig()->pidProfileIndex;
+//}
 
 static void loadPidProfile(void)
 {
@@ -285,15 +285,15 @@ static void validateAndFixConfig(void)
 #endif
     }
 
-    if (motorConfig()->dev.motorProtocol == MOTOR_PROTOCOL_BRUSHED) {
+    if (motorConfig.motorProtocol == MOTOR_PROTOCOL_BRUSHED) {
         featureDisableImmediate(FEATURE_3D);
 
-        if (motorConfig()->mincommand < 1000) {
-            motorConfigMutable()->mincommand = 1000;
+        if (motorConfig.mincommand < 1000) {
+            motorConfig.mincommand = 1000;
         }
     }
 
-    if ((motorConfig()->dev.motorProtocol == MOTOR_PROTOCOL_PWM ) && (motorConfig()->dev.motorPwmRate > BRUSHLESS_MOTORS_PWM_RATE)) {
+    if ((motorConfig.motorProtocol == MOTOR_PROTOCOL_PWM ) && (motorConfig.motorPwmRate > BRUSHLESS_MOTORS_PWM_RATE)) {
         motorConfigMutable()->dev.motorPwmRate = BRUSHLESS_MOTORS_PWM_RATE;
     }
 
@@ -764,7 +764,7 @@ void writeEEPROM(void)
 #ifdef USE_RX_SPI
     rxSpiStop(); // some rx spi protocols use hardware timer, which needs to be stopped before writing to eeprom
 #endif
-    systemConfigMutable()->configurationState = CONFIGURATION_STATE_CONFIGURED;
+    systemConfig.configurationState = CONFIGURATION_STATE_CONFIGURED;
 
     writeUnmodifiedConfigToEEPROM();
 }
