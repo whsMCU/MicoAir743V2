@@ -36,7 +36,6 @@
 
 #include "scheduler/scheduler.h"
 
-#include "navigation/navigation.h"
 
 #ifdef USE_BARO_DPS310
 
@@ -192,7 +191,6 @@ void taskUpdateBaro(timeUs_t currentTimeUs)
     if (newDeadline != 0) {
         rescheduleTask(TASK_SELF, newDeadline);
     }
-    updatePositionEstimator_BaroTopic(currentTimeUs);
 }
 
 static void performBaroCalibrationCycle(const float altitude);

@@ -91,13 +91,22 @@ quaternion_t imuAttitudeQuaternion = QUATERNION_INITIALIZE;
 FAST_DATA_ZERO_INIT fpVector3_t imuMeasuredAccelBF;
 FAST_DATA_ZERO_INIT fpVector3_t imuMeasuredRotationBF;
 
+#ifdef USE_RACE_PRO
+#define DEFAULT_SMALL_ANGLE 180
+#else
+#define DEFAULT_SMALL_ANGLE 25
+#endif
+
 imuConfig_t imuConfig;
 
 void imuConfig_Init(void)
 {
 	imuConfig.dcm_kp = 2500;                // 1.0 * 10000
 	imuConfig.dcm_ki = 0;                   // 0.003 * 10000
-	imuConfig.small_angle = 25;
+	imuConfig.small_angle = DEFAULT_SMALL_ANGLE,
+	imuConfig.imu_process_denom = 2;
+	imuConfig.mag_declination = 0;
+	imuConfig.trust_mag = false; // user must set to true for mag to be accepted as a heading source
 
   imuConfigure(throttleCorrectionConfig.throttle_correction_angle, throttleCorrectionConfig.throttle_correction_value);
 }

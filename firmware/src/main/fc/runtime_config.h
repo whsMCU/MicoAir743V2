@@ -75,8 +75,6 @@ typedef enum {
 
 #define ARMING_DISABLE_FLAGS_COUNT (LOG2(ARMING_DISABLED_ARM_SWITCH) + 1)
 
-extern const char *armingDisableFlagNames[ARMING_DISABLE_FLAGS_COUNT];
-
 void setArmingDisabled(armingDisableFlags_e flag);
 void unsetArmingDisabled(armingDisableFlags_e flag);
 bool isArmingDisabled(void);
@@ -84,30 +82,19 @@ armingDisableFlags_e getArmingDisableFlags(void);
 const char *getArmingDisableFlagName(armingDisableFlags_e flag);
 
 typedef enum {
-    ANGLE_MODE            = (1 << 0),
-    HORIZON_MODE          = (1 << 1),
-    HEADING_MODE          = (1 << 2),
-    NAV_ALTHOLD_MODE      = (1 << 3),
-    NAV_RTH_MODE          = (1 << 4),
-    NAV_POSHOLD_MODE      = (1 << 5),
-    HEADFREE_MODE         = (1 << 6),
-    NAV_LAUNCH_MODE       = (1 << 7),
-    MANUAL_MODE           = (1 << 8),
-    FAILSAFE_MODE         = (1 << 9),
-    AUTO_TUNE             = (1 << 10),
-    NAV_WP_MODE           = (1 << 11),
-    NAV_COURSE_HOLD_MODE  = (1 << 12),
-    FLAPERON              = (1 << 13),
-    TURN_ASSISTANT        = (1 << 14),
-    TURTLE_MODE           = (1 << 15),
-    SOARING_MODE          = (1 << 16),
-
-    RANGEFINDER_MODE      = (1 << 17),
-    GPS_RESCUE_MODE       = (1 << 18),
-    OPFLOW_HOLD_MODE      = (1 << 19),
-    ALT_HOLD_MODE   	  = (1 << 20),
-    POS_HOLD_MODE  		  = (1 << 21),
-    AUTOPILOT_MODE  	  = (1 << 22)  // GPS waypoint tracking
+    ANGLE_MODE      = (1 << 0),
+    HORIZON_MODE    = (1 << 1),
+    MAG_MODE        = (1 << 2),
+    ALT_HOLD_MODE    = (1 << 3),
+//    GPS_HOME_MODE   = (1 << 4),
+    POS_HOLD_MODE   = (1 << 5),
+    HEADFREE_MODE   = (1 << 6),
+    CHIRP_MODE     = (1 << 7), // old autotune
+    PASSTHRU_MODE   = (1 << 8),
+//    RANGEFINDER_MODE= (1 << 9),
+    FAILSAFE_MODE   = (1 << 10),
+    GPS_RESCUE_MODE = (1 << 11),
+    AUTOPILOT_MODE  = (1 << 12)  // GPS waypoint tracking
 } flightModeFlags_e;
 
 extern uint16_t flightModeFlags;
@@ -129,37 +116,14 @@ extern uint16_t flightModeFlags;
    [BOXPASSTHRU]    = LOG2(PASSTHRU_MODE),               \
    [BOXFAILSAFE]    = LOG2(FAILSAFE_MODE),               \
    [BOXGPSRESCUE]   = LOG2(GPS_RESCUE_MODE),             \
-   [BOXAUTOPILOT]   = LOG2(AUTOPILOT_MODE),              \
+   [BOXAUTOPILOT]   = LOG2(AUTOPILOT_MODE)               \
 }                                                        \                                                     \
 /**/
 
 typedef enum {
-    GPS_FIX_HOME                        = (1 << 0),
-    GPS_FIX                             = (1 << 1),
-    CALIBRATE_MAG                       = (1 << 2),
-    SMALL_ANGLE                         = (1 << 3),
-    FIXED_WING_LEGACY                   = (1 << 4),     // No new code should use this state. Use AIRPLANE, MULTIROTOR, ROVER, BOAT, ALTITUDE_CONTROL and MOVE_FORWARD_ONLY states
-    ANTI_WINDUP                         = (1 << 5),
-    FLAPERON_AVAILABLE                  = (1 << 6),
-    NAV_MOTOR_STOP_OR_IDLE              = (1 << 7),     // navigation requests MOTOR_STOP or motor idle regardless of throttle stick, will only activate if MOTOR_STOP feature is available
-    COMPASS_CALIBRATED                  = (1 << 8),
-    ACCELEROMETER_CALIBRATED            = (1 << 9),
-    NAV_CRUISE_BRAKING                  = (1 << 11),
-    NAV_CRUISE_BRAKING_BOOST            = (1 << 12),
-    NAV_CRUISE_BRAKING_LOCKED           = (1 << 13),
-    NAV_EXTRA_ARMING_SAFETY_BYPASSED    = (1 << 14),    // nav_extra_arming_safey was bypassed. Keep it until power cycle.
-    AIRMODE_ACTIVE                      = (1 << 15),
-    ESC_SENSOR_ENABLED                  = (1 << 16),
-    AIRPLANE                            = (1 << 17),
-    MULTIROTOR                          = (1 << 18),
-    ROVER                               = (1 << 19),
-    BOAT                                = (1 << 20),
-    ALTITUDE_CONTROL                    = (1 << 21),    //It means it can fly
-    MOVE_FORWARD_ONLY                   = (1 << 22),
-    SET_REVERSIBLE_MOTORS_FORWARD       = (1 << 23),
-    FW_HEADING_USE_YAW                  = (1 << 24),
-    ANTI_WINDUP_DEACTIVATED             = (1 << 25),
-    LANDING_DETECTED                    = (1 << 26),
+    GPS_FIX_HOME   = (1 << 0),
+    GPS_FIX        = (1 << 1),
+    GPS_FIX_EVER   = (1 << 2),
 } stateFlags_t;
 
 #define DISABLE_STATE(mask) (stateFlags &= ~(mask))
@@ -175,3 +139,4 @@ bool sensors(uint32_t mask);
 void sensorsSet(uint32_t mask);
 void sensorsClear(uint32_t mask);
 uint32_t sensorsMask(void);
+

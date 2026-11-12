@@ -22,10 +22,10 @@
 
 #include "def.h"
 #include "hw_def.h"
-#include "crsf_protocol.h"
+#include "rx/crsf_protocol.h"
 
-// #define CRSF_PORT_OPTIONS       (SERIAL_STOPBITS_1 | SERIAL_PARITY_NO)
-// #define CRSF_PORT_MODE          MODE_RXTX
+#define CRSF_PORT_OPTIONS       (SERIAL_STOPBITS_1 | SERIAL_PARITY_NO)
+#define CRSF_PORT_MODE          MODE_RXTX
 
 #define CRSF_MAX_CHANNEL        16
 #define CRSFV3_MAX_CHANNEL      24
@@ -89,4 +89,8 @@ bool crsfRxInit(struct rxRuntimeState_s *rxRuntimeState);
 void crsfDataReceive(uint16_t c, void *data);
 void crsfRxUpdateBaudrate(uint32_t baudrate);
 bool crsfRxUseNegotiatedBaud(void);
+#if defined(USE_CRSF_V3)
+bool crsfRxIsEventDrivenTelemetry(void);
+#endif
 bool crsfRxIsActive(void);
+void crsfRxBind(void);

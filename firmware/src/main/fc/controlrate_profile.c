@@ -63,6 +63,7 @@ void controlRateProfiles_Init(void)
 		controlRateProfiles[i].quickRatesRcExpo = 0;
 		controlRateProfiles[i].levelExpo[FD_ROLL] = 0;
 		controlRateProfiles[i].levelExpo[FD_PITCH] = 0;
+		controlRateProfiles[i].thrHover8 = 50;
     }
     currentControlRateProfile = &controlRateProfiles[0];
 }

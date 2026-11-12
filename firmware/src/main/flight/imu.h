@@ -61,11 +61,15 @@ typedef union {
 
 extern attitudeEulerAngles_t attitude;
 extern matrix33_t rMat;
+extern quaternion_t imuAttitudeQuaternion; //attitude quaternion to use in blackbox
 
 typedef struct imuConfig_s {
     uint16_t dcm_kp;                        // DCM filter proportional gain ( x 10000)
     uint16_t dcm_ki;                        // DCM filter integral gain ( x 10000)
     uint8_t small_angle;
+    uint8_t imu_process_denom;
+    int16_t mag_declination;      // Magnetic declination in degrees * 10
+    bool trust_mag;      // default to false, to indicate that the user has calibrated and validated their mag
 } imuConfig_t;
 
 extern imuConfig_t imuConfig;

@@ -30,7 +30,7 @@
 
 #include "config/feature.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 #include "fc/runtime_config.h"
 
 //#include "flight/mixer.h"
@@ -43,11 +43,6 @@
 //#include "pg/piniobox.h"
 
 #include "msp_box.h"
-
-#include "navigation/navigation.h"
-
-#define BOX_SUFFIX ';'
-#define BOX_SUFFIX_LEN 1
 
 // permanent IDs must uniquely identify BOX meaning, DO NOT REUSE THEM!
 static const box_t boxes[CHECKBOX_ITEM_COUNT] = {
@@ -115,333 +110,317 @@ static const box_t boxes[CHECKBOX_ITEM_COUNT] = {
 
 static boxBitmask_t activeBoxIds;
 
-const box_t *findBoxByActiveBoxId(boxId_e boxId)
+const box_t *findBoxByBoxId(boxId_e boxId)
 {
-  for (unsigned i = 0; i < ARRAYLEN(boxes); i++) {
-      const box_t *candidate = &boxes[i];
-      if (candidate->boxId == boxId)
-          return candidate;
-  }
-  return NULL;
-}
-
-const box_t *findBoxByPermanentId(uint8_t permenantId)
-{
-  for (unsigned i = 0; i < ARRAYLEN(boxes); i++) {
-      const box_t *candidate = &boxes[i];
-      if (candidate->permanentId == permanentId)
-          return candidate;
-  }
-  return NULL;
-}
-
-bool serializeBoxNamesReply(sbuf_t *dst)
-{
-    // First run of the loop - calculate total length of the reply
-    int replyLengthTotal = 0;
-    for (int i = 0; i < activeBoxIdCount; i++) {
-        const box_t *box = findBoxByActiveBoxId(activeBoxIds[i]);
-        if (box) {
-            replyLengthTotal += strlen(box->boxName) + BOX_SUFFIX_LEN;
-        }
+    for (unsigned i = 0; i < ARRAYLEN(boxes); i++) {
+        const box_t *candidate = &boxes[i];
+        if (candidate->boxId == boxId)
+            return candidate;
     }
+    return NULL;
+}
 
-    // Check if we have enough space to send a reply
-    if (sbufBytesRemaining(dst) < replyLengthTotal) {
+const box_t *findBoxByPermanentId(uint8_t permanentId)
+{
+    for (unsigned i = 0; i < ARRAYLEN(boxes); i++) {
+        const box_t *candidate = &boxes[i];
+        if (candidate->permanentId == permanentId)
+            return candidate;
+    }
+    return NULL;
+}
+
+static bool activeBoxIdGet(boxId_e boxId)
+{
+    if (boxId > sizeof(activeBoxIds) * 8) {
         return false;
     }
 
-    for (int i = 0; i < activeBoxIdCount; i++) {
-        const int activeBoxId = activeBoxIds[i];
-        const box_t *box = findBoxByActiveBoxId(activeBoxId);
-        if (box) {
-            const int len = strlen(box->boxName);
-            sbufWriteData(dst, box->boxName, len);
-            sbufWriteU8(dst, BOX_SUFFIX);
-        }
-    }
-
-    return true;
+    return bitArrayGet(&activeBoxIds, boxId);
 }
 
-void serializeBoxReply(sbuf_t *dst)
+int serializeBoxNameFn(sbuf_t *dst, const box_t *box)
 {
-    for (int i = 0; i < activeBoxIdCount; i++) {
-        const box_t *box = findBoxByActiveBoxId(activeBoxIds[i]);
-        if (!box) {
-            continue;
+    const char* name = NULL;
+    int len;
+#if defined(USE_CUSTOM_BOX_NAMES)
+    if (box->boxId >= BOXUSER1 && box->boxId <= BOXUSER4) {
+        const int n = box->boxId - BOXUSER1;
+        name = modeActivationConfig()->box_user_names[n];
+        // possibly there is no '\0' in boxname
+        if (*name) {
+            len = strnlen(name, sizeof(modeActivationConfig()->box_user_names[n]));
+        } else {
+            name = NULL;
         }
-        sbufWriteU8(dst, box->permanentId);
+    }
+#endif
+    if (name == NULL) {
+        name = box->boxName;
+        len = strlen(name);
+    }
+    if (sbufBytesRemaining(dst) < len + 1) {
+        // boxname or separator won't fit
+        return -1;
+    }
+    sbufWriteData(dst, name, len);
+    sbufWriteU8(dst, ';');
+    return len + 1;
+}
+
+int serializeBoxPermanentIdFn(sbuf_t *dst, const box_t *box)
+{
+    if (sbufBytesRemaining(dst) < 1) {
+        return -1;
+    }
+    sbufWriteU8(dst, box->permanentId);
+    return 1;
+}
+
+// serialize 'page' of boxNames.
+// Each page contains at most 32 boxes
+void serializeBoxReply(sbuf_t *dst, int page, serializeBoxFn *serializeBox)
+{
+    unsigned boxIdx = 0;
+    unsigned pageStart = page * 32;
+    unsigned pageEnd = pageStart + 32;
+    for (boxId_e id = 0; id < CHECKBOX_ITEM_COUNT; id++) {
+        if (activeBoxIdGet(id)) {
+            if (boxIdx >= pageStart && boxIdx < pageEnd) {
+                if ((*serializeBox)(dst, findBoxByBoxId(id)) < 0) {
+                    // failed to serialize, abort
+                    return;
+                }
+            }
+            boxIdx++;                 // count active boxes
+        }
     }
 }
 
 void initActiveBoxIds(void)
 {
-    // calculate used boxes based on features and fill availableBoxes[] array
-    memset(activeBoxIds, 0xFF, sizeof(activeBoxIds));
+    // calculate used boxes based on features and set corresponding activeBoxIds bits
+    boxBitmask_t ena;  // temporary variable to collect result
+    memset(&ena, 0, sizeof(ena));
 
-    RESET_BOX_ID_COUNT;
-    ADD_ACTIVE_BOX(BOXARM);
-    ADD_ACTIVE_BOX(BOXPREARM);
-
-    if (sensors(SENSOR_ACC) && STATE(ALTITUDE_CONTROL)) {
-        ADD_ACTIVE_BOX(BOXANGLE);
-        ADD_ACTIVE_BOX(BOXHORIZON);
-        ADD_ACTIVE_BOX(BOXTURNASSIST);
+    // macro to enable boxId (BoxidMaskEnable). Reference to ena is hidden, local use only
+#define BME(boxId) do { bitArraySet(&ena, boxId); } while (0)
+    BME(BOXARM);
+    BME(BOXPREARM);
+    if (!featureIsEnabled(FEATURE_AIRMODE)) {
+        BME(BOXAIRMODE);
     }
 
-//    if (!feature(FEATURE_AIRMODE) && STATE(ALTITUDE_CONTROL)) {
-//        ADD_ACTIVE_BOX(BOXAIRMODE);
+    bool acceleratorGainsEnabled = false;
+//    for (unsigned i = 0; i < PID_PROFILE_COUNT; i++) {
+//        if (pidProfiles(i)->anti_gravity_gain != ITERM_ACCELERATOR_GAIN_OFF) {
+//            acceleratorGainsEnabled = true;
+//        }
 //    }
-
-    ADD_ACTIVE_BOX(BOXHEADINGHOLD);
-
-    //Camstab mode is enabled always
-    ADD_ACTIVE_BOX(BOXCAMSTAB);
-
-    if (STATE(MULTIROTOR)) {
-        if ((sensors(SENSOR_ACC) || sensors(SENSOR_MAG))) {
-            ADD_ACTIVE_BOX(BOXHEADFREE);
-            ADD_ACTIVE_BOX(BOXHEADADJ);
-        }
-        if (sensors(SENSOR_BARO) && sensors(SENSOR_RANGEFINDER)) {
-            ADD_ACTIVE_BOX(BOXSURFACE);
-        }
-        ADD_ACTIVE_BOX(BOXFPVANGLEMIX);
+    if (acceleratorGainsEnabled && !featureIsEnabled(FEATURE_ANTI_GRAVITY)) {
+        BME(BOXANTIGRAVITY);
     }
 
-    bool navReadyAltControl = sensors(SENSOR_BARO);
-//#ifdef USE_GPS
-//    navReadyAltControl = navReadyAltControl || (feature(FEATURE_GPS) && (STATE(AIRPLANE) || positionEstimationConfig()->use_gps_no_baro));
-//
-//    const bool navFlowDeadReckoning = sensors(SENSOR_OPTICALFLOW) && sensors(SENSOR_ACC) && positionEstimationConfig()->allow_dead_reckoning;
-//    bool navReadyPosControl = sensors(SENSOR_ACC) && feature(FEATURE_GPS);
-//    if (STATE(MULTIROTOR)) {
-//        navReadyPosControl = navReadyPosControl && getHwCompassStatus() != HW_SENSOR_NONE;
-//    }
-//
-//    if (STATE(ALTITUDE_CONTROL) && navReadyAltControl && (navReadyPosControl || navFlowDeadReckoning)) {
-//        ADD_ACTIVE_BOX(BOXNAVPOSHOLD);
-//        if (STATE(AIRPLANE)) {
-//            ADD_ACTIVE_BOX(BOXLOITERDIRCHN);
-//        }
-//    }
-//
-//    if (navReadyPosControl) {
-//        if (!STATE(ALTITUDE_CONTROL) || (STATE(ALTITUDE_CONTROL) && navReadyAltControl)) {
-//            ADD_ACTIVE_BOX(BOXNAVRTH);
-//            ADD_ACTIVE_BOX(BOXNAVWP);
-//            ADD_ACTIVE_BOX(BOXHOMERESET);
-//            ADD_ACTIVE_BOX(BOXGCSNAV);
-//            ADD_ACTIVE_BOX(BOXPLANWPMISSION);
-//#ifdef USE_MULTI_MISSION
-//            ADD_ACTIVE_BOX(BOXCHANGEMISSION);
-//#endif
-//        }
-//
-//        if (STATE(AIRPLANE)) {
-//            ADD_ACTIVE_BOX(BOXNAVCRUISE);
-//            ADD_ACTIVE_BOX(BOXNAVCOURSEHOLD);
-//            ADD_ACTIVE_BOX(BOXSOARING);
-//        }
-//    }
-//
-//#ifdef USE_MR_BRAKING_MODE
-//    if (mixerConfig()->platformType == PLATFORM_MULTIROTOR) {
-//        ADD_ACTIVE_BOX(BOXBRAKING);
-//    }
-//#endif
-//#endif  // GPS
-    if (STATE(ALTITUDE_CONTROL) && navReadyAltControl) {
-        ADD_ACTIVE_BOX(BOXNAVALTHOLD);
-    }
-
-//    if (STATE(AIRPLANE) || STATE(ROVER) || STATE(BOAT)) {
-//        ADD_ACTIVE_BOX(BOXMANUAL);
-//    }
-//
-//    if (STATE(AIRPLANE)) {
-//        if (!feature(FEATURE_FW_LAUNCH)) {
-//           ADD_ACTIVE_BOX(BOXNAVLAUNCH);
-//        }
-//
-//        if (!feature(FEATURE_FW_AUTOTRIM)) {
-//            ADD_ACTIVE_BOX(BOXAUTOTRIM);
-//        }
-
-#if defined(USE_AUTOTUNE_FIXED_WING)
-        ADD_ACTIVE_BOX(BOXAUTOTUNE);
+    if (sensors(SENSOR_ACC)) {
+        BME(BOXANGLE);
+        BME(BOXHORIZON);
+#ifdef USE_ALTITUDE_HOLD
+        BME(BOXALTHOLD);
 #endif
-//        if (sensors(SENSOR_BARO)) {
-//            ADD_ACTIVE_BOX(BOXAUTOLEVEL);
-//        }
-//    }
-
-    /*
-     * FLAPERON mode active only in case of airplane and custom airplane. Activating on
-     * flying wing can cause bad thing
-     */
-//    if (STATE(FLAPERON_AVAILABLE)) {
-//        ADD_ACTIVE_BOX(BOXFLAPERON);
-//    }
-
-//    ADD_ACTIVE_BOX(BOXBEEPERON);
-
-#ifdef USE_LIGHTS
-    ADD_ACTIVE_BOX(BOXLIGHTS);
+#ifdef USE_POSITION_HOLD
+        BME(BOXPOSHOLD);
 #endif
+        BME(BOXHEADFREE);
+        BME(BOXHEADADJ);
+        BME(BOXFPVANGLEMIX);
+        if (featureIsEnabled(FEATURE_INFLIGHT_ACC_CAL)) {
+            BME(BOXCALIB);
+        }
+#if defined(USE_ACRO_TRAINER) && defined(USE_ACC)
+        BME(BOXACROTRAINER);
+#endif // USE_ACRO_TRAINER
+    }
+
+#ifdef USE_MAG
+    if (sensors(SENSOR_MAG)) {
+        BME(BOXMAG);
+    }
+#endif
+
+#ifdef USE_GPS
+    if (featureIsEnabled(FEATURE_GPS)) {
+#ifdef USE_GPS_RESCUE
+        if (!featureIsEnabled(FEATURE_3D)) {// && !isFixedWing()
+            BME(BOXGPSRESCUE);
+        }
+#endif
+        BME(BOXBEEPGPSCOUNT);
+    }
+#if ENABLE_FLIGHT_PLAN
+    BME(BOXAUTOPILOT);
+#if !defined(USE_WING)
+    BME(BOXWPCAPTURE);
+#endif
+#endif
+#endif
+
+    BME(BOXFAILSAFE);
+
+//    if (mixerConfig()->mixerMode == MIXER_FLYING_WING || mixerConfig()->mixerMode == MIXER_AIRPLANE || mixerConfig()->mixerMode == MIXER_CUSTOM_AIRPLANE) {
+//        BME(BOXPASSTHRU);
+//    }
+
+    BME(BOXBEEPERON);
+    BME(BOXBEEPERMUTE);
 
 #ifdef USE_LED_STRIP
     if (featureIsEnabled(FEATURE_LED_STRIP)) {
-        ADD_ACTIVE_BOX(BOXLEDLOW);
-    }
-#endif
-
-    ADD_ACTIVE_BOX(BOXOSD);
-
-#ifdef USE_TELEMETRY
-    if (featureIsEnabled(FEATURE_TELEMETRY) && telemetryConfig.telemetry_switch) {
-        ADD_ACTIVE_BOX(BOXTELEMETRY);
+        BME(BOXLEDLOW);
     }
 #endif
 
 #ifdef USE_BLACKBOX
-    if (feature(FEATURE_BLACKBOX)) {
-        ADD_ACTIVE_BOX(BOXBLACKBOX);
+    BME(BOXBLACKBOX);
+#ifdef USE_FLASHFS
+    BME(BOXBLACKBOXERASE);
+#endif
+#endif
+
+    if (featureIsEnabled(FEATURE_3D)) {
+        BME(BOX3D);
     }
-#endif
-
-    ADD_ACTIVE_BOX(BOXKILLSWITCH);
-    ADD_ACTIVE_BOX(BOXFAILSAFE);
-
-#ifdef USE_RCDEVICE
-    ADD_ACTIVE_BOX(BOXCAMERA1);
-    ADD_ACTIVE_BOX(BOXCAMERA2);
-    ADD_ACTIVE_BOX(BOXCAMERA3);
-#endif
-
-#ifdef USE_PINIOBOX
-    // USER modes are only used for PINIO at the moment
-    ADD_ACTIVE_BOX(BOXUSER1);
-    ADD_ACTIVE_BOX(BOXUSER2);
-    ADD_ACTIVE_BOX(BOXUSER3);
-    ADD_ACTIVE_BOX(BOXUSER4);
-#endif
-
-#if defined(USE_OSD) && defined(OSD_LAYOUT_COUNT)
-#if OSD_LAYOUT_COUNT > 0
-    ADD_ACTIVE_BOX(BOXOSDALT1);
-#if OSD_LAYOUT_COUNT > 1
-    ADD_ACTIVE_BOX(BOXOSDALT2);
-#if OSD_LAYOUT_COUNT > 2
-    ADD_ACTIVE_BOX(BOXOSDALT3);
-#endif
-#endif
-#endif
-#endif
-
-#if defined(USE_RX_MSP) && defined(USE_MSP_RC_OVERRIDE)
-    ADD_ACTIVE_BOX(BOXMSPRCOVERRIDE);
-#endif
 
 #ifdef USE_DSHOT
-//    if(STATE(MULTIROTOR) && isMotorProtocolDshot()) {
-//        ADD_ACTIVE_BOX(BOXTURTLE);
+//    bool configuredMotorProtocolDshot;
+//    checkMotorProtocolEnabled(&motorConfig()->dev, &configuredMotorProtocolDshot);
+//    if (configuredMotorProtocolDshot) {
+//        BME(BOXCRASHFLIP);
 //    }
 #endif
+
+    if (featureIsEnabled(FEATURE_SERVO_TILT)) {
+        BME(BOXCAMSTAB);
+    }
+
+    BME(BOXOSD);
+
+#ifdef USE_TELEMETRY
+    if (featureIsEnabled(FEATURE_TELEMETRY)) {
+        BME(BOXTELEMETRY);
+    }
+#endif
+
+#ifdef USE_SERVOS
+    if (mixerConfig()->mixerMode == MIXER_CUSTOM_AIRPLANE) {
+        BME(BOXSERVO1);
+        BME(BOXSERVO2);
+        BME(BOXSERVO3);
+    }
+#endif
+
+#ifdef USE_RCDEVICE
+    BME(BOXCAMERA1);
+    BME(BOXCAMERA2);
+    BME(BOXCAMERA3);
+#endif
+
+#if defined(USE_VTX_SMARTAUDIO) || defined(USE_VTX_TRAMP) || defined(USE_VTX_MSP)
+    BME(BOXVTXPITMODE);
+    BME(BOXVTXCONTROLDISABLE);
+#endif
+
+    BME(BOXPARALYZE);
+
+#ifdef USE_PINIOBOX
+    // Turn BOXUSERx only if pinioBox facility monitors them, as the facility is the only BOXUSERx observer.
+    // Note that pinioBoxConfig can be set to monitor any box.
+    for (int i = 0; i < PINIO_COUNT; i++) {
+        if (pinioBoxConfig()->permanentId[i] != PERMANENT_ID_NONE) {
+            const box_t *box = findBoxByPermanentId(pinioBoxConfig()->permanentId[i]);
+            if (box) {
+                switch(box->boxId) {
+                case BOXUSER1:
+                case BOXUSER2:
+                case BOXUSER3:
+                case BOXUSER4:
+                    BME(box->boxId);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+#endif
+
+#if defined(USE_PID_AUDIO)
+    BME(BOXPIDAUDIO);
+#endif
+
+#ifdef USE_LAUNCH_CONTROL
+    BME(BOXLAUNCHCONTROL);
+#endif
+
+#if defined(USE_RX_MSP_OVERRIDE)
+    if (rxConfig()->msp_override_channels_mask) {
+        BME(BOXMSPOVERRIDE);
+    }
+#endif
+
+    BME(BOXSTICKCOMMANDDISABLE);
+    BME(BOXREADY);
+
+#if defined(USE_GPS_LAP_TIMER)
+    BME(BOXLAPTIMERRESET);
+#endif
+
+#if defined(USE_CHIRP)
+    BME(BOXCHIRP);
+#endif
+
+#undef BME
+    // check that all enabled IDs are in boxes array (check may be skipped when using findBoxById() functions)
+    for (boxId_e boxId = 0;  boxId < CHECKBOX_ITEM_COUNT; boxId++)
+        if (bitArrayGet(&ena, boxId)
+            && findBoxByBoxId(boxId) == NULL)
+            bitArrayClr(&ena, boxId);                 // this should not happen, but handle it gracefully
+
+    activeBoxIds = ena;                               // set global variable
 }
 
-#define IS_ENABLED(mask) ((mask) == 0 ? 0 : 1)
-#define CHECK_ACTIVE_BOX(condition, index)    do { if (IS_ENABLED(condition)) { activeBoxes[index] = 1; } } while(0)
-
-void packBoxModeFlags(boxBitmask_t * mspBoxModeFlags)
+// return state of given boxId box, handling ARM and FLIGHT_MODE
+bool getBoxIdState(boxId_e boxid)
 {
-    uint8_t activeBoxes[CHECKBOX_ITEM_COUNT];
-    ZERO_FARRAY(activeBoxes);
+    const uint8_t boxIdToFlightModeMap[] = BOXID_TO_FLIGHT_MODE_MAP_INITIALIZER;
 
-    // Serialize the flags in the order we delivered them, ignoring BOXNAMES and BOXINDEXES
-    // Requires new Multiwii protocol version to fix
-    // It would be preferable to setting the enabled bits based on BOXINDEX.
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(ANGLE_MODE)),               BOXANGLE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(HORIZON_MODE)),             BOXHORIZON);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(HEADING_MODE)),             BOXHEADINGHOLD);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(HEADFREE_MODE)),            BOXHEADFREE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXHEADADJ)),         BOXHEADADJ);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXCAMSTAB)),         BOXCAMSTAB);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXFPVANGLEMIX)),     BOXFPVANGLEMIX);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(MANUAL_MODE)),              BOXMANUAL);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXBEEPERON)),        BOXBEEPERON);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXLEDLOW)),          BOXLEDLOW);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXLIGHTS)),          BOXLIGHTS);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXOSD)),             BOXOSD);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXTELEMETRY)),       BOXTELEMETRY);
-    CHECK_ACTIVE_BOX(IS_ENABLED(ARMING_FLAG(ARMED)),                    BOXARM);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXBLACKBOX)),        BOXBLACKBOX);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(FAILSAFE_MODE)),            BOXFAILSAFE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_ALTHOLD_MODE)),         BOXNAVALTHOLD);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_POSHOLD_MODE)),         BOXNAVPOSHOLD);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_COURSE_HOLD_MODE)),     BOXNAVCOURSEHOLD);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_COURSE_HOLD_MODE)) && IS_ENABLED(FLIGHT_MODE(NAV_ALTHOLD_MODE)), BOXNAVCRUISE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_RTH_MODE)),             BOXNAVRTH);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_WP_MODE)),              BOXNAVWP);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXAIRMODE)),         BOXAIRMODE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXGCSNAV)),          BOXGCSNAV);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(FLAPERON)),                 BOXFLAPERON);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(TURN_ASSISTANT)),           BOXTURNASSIST);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(NAV_LAUNCH_MODE)),          BOXNAVLAUNCH);
-    CHECK_ACTIVE_BOX(IS_ENABLED(FLIGHT_MODE(AUTO_TUNE)),                BOXAUTOTUNE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXAUTOTRIM)),        BOXAUTOTRIM);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXKILLSWITCH)),      BOXKILLSWITCH);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXHOMERESET)),       BOXHOMERESET);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXCAMERA1)),         BOXCAMERA1);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXCAMERA2)),         BOXCAMERA2);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXCAMERA3)),         BOXCAMERA3);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXOSDALT1)),         BOXOSDALT1);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXOSDALT2)),         BOXOSDALT2);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXOSDALT3)),         BOXOSDALT3);
-    CHECK_ACTIVE_BOX(IS_ENABLED(navigationTerrainFollowingEnabled()),   BOXSURFACE);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXBRAKING)),         BOXBRAKING);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXUSER1)),           BOXUSER1);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXUSER2)),           BOXUSER2);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXUSER3)),           BOXUSER3);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXUSER4)),           BOXUSER4);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXLOITERDIRCHN)),    BOXLOITERDIRCHN);
-#if defined(USE_RX_MSP) && defined(USE_MSP_RC_OVERRIDE)
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXMSPRCOVERRIDE)),   BOXMSPRCOVERRIDE);
-#endif
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXAUTOLEVEL)),       BOXAUTOLEVEL);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXPLANWPMISSION)),   BOXPLANWPMISSION);
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXSOARING)),         BOXSOARING);
-#ifdef USE_MULTI_MISSION
-    CHECK_ACTIVE_BOX(IS_ENABLED(IS_RC_MODE_ACTIVE(BOXCHANGEMISSION)),   BOXCHANGEMISSION);
-#endif
+    // we assume that all boxId below BOXID_FLIGHTMODE_LAST except BOXARM are mapped to flightmode
+    STATIC_ASSERT(ARRAYLEN(boxIdToFlightModeMap) == BOXID_FLIGHTMODE_LAST + 1, FLIGHT_MODE_BOXID_MAP_INITIALIZER_does_not_match_boxId_e);
 
-    memset(mspBoxModeFlags, 0, sizeof(boxBitmask_t));
-    for (uint32_t i = 0; i < activeBoxIdCount; i++) {
-        if (activeBoxes[activeBoxIds[i]]) {
-            bitArraySet(mspBoxModeFlags->bits, i);
-        }
+    if (boxid == BOXARM) {
+        return ARMING_FLAG(ARMED);
+    } else if (boxid <= BOXID_FLIGHTMODE_LAST) {
+        return FLIGHT_MODE(1 << boxIdToFlightModeMap[boxid]);
+    } else {
+        return IS_RC_MODE_ACTIVE(boxid);
     }
 }
 
-uint16_t packSensorStatus(void)
+// pack used flightModeFlags into supplied array
+// returns number of bits used
+int packFlightModeFlags(boxBitmask_t *mspFlightModeFlags)
 {
-    // Sensor bits
-    uint16_t sensorStatus =
-            IS_ENABLED(sensors(SENSOR_GYRO))        << 0 |
-            IS_ENABLED(sensors(SENSOR_ACC))         << 1 |
-            IS_ENABLED(sensors(SENSOR_BARO))        << 2 |
-            IS_ENABLED(sensors(SENSOR_MAG))         << 3 |
-            IS_ENABLED(sensors(SENSOR_SONAR))       << 4 |
-            IS_ENABLED(sensors(SENSOR_RANGEFINDER)) << 4 |
-            IS_ENABLED(sensors(SENSOR_GPS))         << 5 |
-            IS_ENABLED(sensors(SENSOR_GPSMAG))      << 6 |
-            IS_ENABLED(sensors(SENSOR_OPTICALFLOW)) << 7;
-
-    // Hardware failure indication bit
-//    if (!isHardwareHealthy()) {
-//        sensorStatus |= 1 << 15;        // Bit 15 of sensor bit field indicates hardware failure
-//    }
-
-    return sensorStatus;
+    // Serialize the flags in the order we delivered them, ignoring BOXNAMES and BOXINDEXES
+    memset(mspFlightModeFlags, 0, sizeof(boxBitmask_t));
+    // map boxId_e enabled bits to MSP status indexes
+    // only active boxIds are sent in status over MSP, other bits are not counted
+    unsigned mspBoxIdx = 0;           // index of active boxId (matches sent permanentId and boxNames)
+    for (boxId_e boxId = 0; boxId < CHECKBOX_ITEM_COUNT; boxId++) {
+        if (activeBoxIdGet(boxId)) {
+            if (getBoxIdState(boxId))
+                bitArraySet(mspFlightModeFlags, mspBoxIdx);       // box is enabled
+            mspBoxIdx++;                                          // box is active, count it
+        }
+    }
+    // return count of used bits
+    return mspBoxIdx;
 }

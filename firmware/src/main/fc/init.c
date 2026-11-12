@@ -85,11 +85,8 @@
 #include "msc/usbd_storage.h"
 #endif
 
-//#include "msp/msp.h"
-//#include "msp/msp_serial.h"
-#include "msp/fc_msp.h"
-
-#include "navigation/navigation.h"
+#include "msp/msp.h"
+#include "msp/msp_serial.h"
 
 #include "osd/osd.h"
 
@@ -153,6 +150,8 @@ void init(void)
 
   activeAdjustmentRangeReset();
 
+  	// Initialize MSP
+  	mspInit();
 	tasksInitData();
 	cliOpen(_DEF_USB, 57600);
 
@@ -327,7 +326,7 @@ void init(void)
 
 void Param_Config_Init(void)
 {
-//	systemConfig_Init();
+	systemConfig_Init();
 //	pilotConfig_Init();
 	boardConfig_Init();
 //	sdcardConfig_Init();

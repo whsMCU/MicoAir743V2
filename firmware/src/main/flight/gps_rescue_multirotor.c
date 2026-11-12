@@ -905,7 +905,7 @@ float gpsRescueGetImuYawCogGain(void)
 
 bool gpsRescueIsConfigured(void)
 {
-    //return failsafeConfig()->failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE || isModeActivationConditionPresent(BOXGPSRESCUE);
+    return failsafeConfig.failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE || isModeActivationConditionPresent(BOXGPSRESCUE);
 }
 
 bool gpsRescueIsAvailable(void)

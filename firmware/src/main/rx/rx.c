@@ -52,9 +52,6 @@
 #include "flight/dyn_notch_filter.h"
 #include "flight/position.h"
 
-#include "navigation/navigation.h"
-#include "navigation/navigation_private.h"
-
 #include "rx/rx.h"
 #include "rx/crsf.h"
 #include "scheduler/tasks.h"
@@ -759,14 +756,14 @@ void processRxModes(uint32_t currentTimeUs)
   }
 #endif
 
-  if (sensors(SENSOR_ACC)) {
-      if (IS_RC_MODE_ACTIVE(BOXHEADINGHOLD)) {
-          if (!FLIGHT_MODE(HEADING_MODE)) {
+  if (sensors(SENSOR_ACC) || sensors(SENSOR_MAG)) {
+      if (IS_RC_MODE_ACTIVE(BOXMAG)) {
+          if (!FLIGHT_MODE(MAG_MODE)) {
               resetHeadingHoldTarget(DECIDEGREES_TO_DEGREES(attitude.values.yaw));
-              ENABLE_FLIGHT_MODE(HEADING_MODE);
+              ENABLE_FLIGHT_MODE(MAG_MODE);
           }
       } else {
-          DISABLE_FLIGHT_MODE(HEADING_MODE);
+          DISABLE_FLIGHT_MODE(MAG_MODE);
       }
   }
 

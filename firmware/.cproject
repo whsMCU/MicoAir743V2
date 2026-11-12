@@ -121,7 +121,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="src/main/drivers/etc|src/main/io/asyncfatfs|src/main/drivers/sdcard/temp|src/main/drivers/rangefinder/etc|MicoAir743V2_Cube" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="src/main/msp/etc|src/main/drivers/etc|src/main/io/asyncfatfs|src/main/drivers/sdcard/temp|src/main/drivers/rangefinder/etc|MicoAir743V2_Cube" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

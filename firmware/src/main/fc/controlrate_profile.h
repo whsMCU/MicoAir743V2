@@ -68,6 +68,7 @@ typedef struct controlRateConfig_s {
     char profileName[MAX_RATE_PROFILE_NAME_LENGTH + 1]; // Descriptive name for rate profile
     uint8_t quickRatesRcExpo;               // Sets expo on rc command for quick rates
     uint8_t levelExpo[2];                   // roll/pitch level mode expo
+    uint8_t thrHover8;
 } controlRateConfig_t;
 
 extern controlRateConfig_t controlRateProfiles[CONTROL_RATE_PROFILE_COUNT];

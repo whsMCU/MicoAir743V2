@@ -20,10 +20,12 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
-#include "runtime_config.h"
-#include "sensors/sensors.h"
+#include "hw.h"
 
+#include "fc/runtime_config.h"
+//#include "io/beeper.h"
 
 uint8_t armingFlags = 0;
 uint8_t stateFlags = 0;
@@ -31,12 +33,13 @@ uint16_t flightModeFlags = 0;
 
 static uint32_t enabledSensors = 0;
 
-// Must be no longer than OSD_WARNINGS_MAX_SIZE (11) to be displayed fully in OSD
+// Name must be no longer than OSD_WARNINGS_MAX_SIZE
+// try to keep names within OSD_WARNINGS_PREFFERED_SIZE
 const char *armingDisableFlagNames[]= {
     "NOGYRO",
     "FAILSAFE",
     "RXLOSS",
-    "BADRX",
+    "NOT_DISARMED",
     "BOXFAILSAFE",
     "RUNAWAY",
     "CRASH",
@@ -53,13 +56,18 @@ const char *armingDisableFlagNames[]= {
     "PARALYZE",
     "GPS",
     "RESCUE_SW",
-    "RPMFILTER",
+    "DSHOT_TELEM",
     "REBOOT_REQD",
     "DSHOT_BBANG",
     "NO_ACC_CAL",
     "MOTOR_PROTO",
-    "ARMSWITCH",
+    "FLIP_SWITCH",
+    "ALT_HOLD_SW",
+    "POS_HOLD_SW",
+    "AUTOPILOT_SW",
+    "ARM_SWITCH",
 };
+//STATIC_ASSERT(ARRAYLEN(armingDisableFlagNames) == ARMING_DISABLE_FLAGS_COUNT, armingDisableFlagNames_size_mismatch);
 
 static armingDisableFlags_e armingDisableFlags = 0;
 
@@ -83,6 +91,17 @@ armingDisableFlags_e getArmingDisableFlags(void)
     return armingDisableFlags;
 }
 
+// return name for given flag
+// will return first name (LSB) if multiple bits are passed
+const char *getArmingDisableFlagName(armingDisableFlags_e flag)
+{
+    if (!flag) {
+        return "NONE";
+    }
+    unsigned idx = ffs(flag & -flag) - 1;   // use LSB if there are multiple bits set
+    return idx < ARRAYLEN(armingDisableFlagNames) ? armingDisableFlagNames[idx] : "UNKNOWN";
+}
+
 /**
  * Enables the given flight mode.  A beep is sounded if the flight mode
  * has changed.  Returns the new 'flightModeFlags' value.
@@ -104,6 +123,7 @@ uint16_t enableFlightMode(flightModeFlags_e mask)
 uint16_t disableFlightMode(flightModeFlags_e mask)
 {
     uint16_t oldVal = flightModeFlags;
+
     flightModeFlags &= ~(mask);
     //if (flightModeFlags != oldVal)
         //beeperConfirmationBeeps(1);

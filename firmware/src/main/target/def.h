@@ -60,24 +60,31 @@
   #define ALT_HOLD_THROTTLE_NEUTRAL_ZONE 40
 #endif
 
-/********************************************************************/
-/****           altitude hold                                    ****/
-/********************************************************************/
+#ifndef BOX_USER1_NAME
+#define BOX_USER1_NAME "USER1"
+#endif
 
-  /* uncomment to disable the altitude hold feature.
-   * This is useful if all of the following apply
-   * + you have a baro
-   * + want altitude readout
-   * + do not use altitude hold feature
-   * + want to save memory space
-   */
-  //#define SUPPRESS_BARO_ALTHOLD
+#ifndef BOX_USER2_NAME
+#define BOX_USER2_NAME "USER2"
+#endif
 
-/* Natural alt change for rapid pilots. It's temporary switch OFF the althold when throttle stick is out of deadband defined with ALT_HOLD_THROTTLE_NEUTRAL_ZONE
- * but if it's commented: Smooth alt change routine is activated, for slow auto and aerophoto modes (in general solution from alexmos). It's slowly increase/decrease
- * altitude proportional to stick movement (+/-100 throttle gives about +/-50 cm in 1 second with cycle time about 3-4ms)
- */
-//#define ALTHOLD_FAST_THROTTLE_CHANGE
+#ifndef BOX_USER3_NAME
+#define BOX_USER3_NAME "USER3"
+#endif
+
+#ifndef BOX_USER4_NAME
+#define BOX_USER4_NAME "USER4"
+#endif
+
+
+
+#ifndef TARGET_BOARD_IDENTIFIER
+#define TARGET_BOARD_IDENTIFIER "H743"
+#endif
+
+#ifndef USBD_PRODUCT_STRING
+#define USBD_PRODUCT_STRING     "Betaflight - STM32H743"
+#endif
 
 #define USE_ACC
 #define USE_BARO
@@ -136,6 +143,10 @@
 #define FAST_IRQ_HANDLER FAST_CODE
 
 #define NOINLINE __attribute__((noinline))
+
+#ifndef RAM_CODE
+#define RAM_CODE
+#endif
 
 #ifdef USE_ITCM_RAM
 #if defined(ITCM_RAM_OPTIMISATION) && !defined(DEBUG)

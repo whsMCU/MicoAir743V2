@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 /*
@@ -24,12 +27,15 @@
 
 #pragma once
 
-#include "common/time.h"
-
-//#include "config/parameter_group.h"
+#include "common/unit.h"
 
 //#include "io/serial.h"
 
+//#include "pg/pg.h"
+
+#include "rx/rx.h"
+
+//#include "telemetry/ibus_shared.h"
 
 typedef enum {
     FRSKY_FORMAT_DMS = 0,
@@ -37,50 +43,69 @@ typedef enum {
 } frskyGpsCoordFormat_e;
 
 typedef enum {
-    FRSKY_UNIT_METRICS = 0,
-    FRSKY_UNIT_IMPERIALS
-} frskyUnit_e;
-
-typedef enum {
-    LTM_RATE_NORMAL,
-    LTM_RATE_MEDIUM,
-    LTM_RATE_SLOW
-} ltmUpdateRate_e;
-
-typedef enum {
-    SMARTPORT_FUEL_UNIT_PERCENT,
-    SMARTPORT_FUEL_UNIT_MAH,
-    SMARTPORT_FUEL_UNIT_MWH
-} smartportFuelUnit_e;
+    SENSOR_VOLTAGE         = 1 << 0,
+    SENSOR_CURRENT         = 1 << 1,
+    SENSOR_FUEL            = 1 << 2,
+    SENSOR_MODE            = 1 << 3,
+    SENSOR_ACC_X           = 1 << 4,
+    SENSOR_ACC_Y           = 1 << 5,
+    SENSOR_ACC_Z           = 1 << 6,
+    SENSOR_PITCH           = 1 << 7,
+    SENSOR_ROLL            = 1 << 8,
+    SENSOR_HEADING         = 1 << 9,
+    SENSOR_ALTITUDE        = 1 << 10,
+    SENSOR_VARIO           = 1 << 11,
+    SENSOR_LAT_LONG        = 1 << 12,
+    SENSOR_GROUND_SPEED    = 1 << 13,
+    SENSOR_DISTANCE        = 1 << 14,
+    ESC_SENSOR_CURRENT     = 1 << 15,
+    ESC_SENSOR_VOLTAGE     = 1 << 16,
+    ESC_SENSOR_RPM         = 1 << 17,
+    ESC_SENSOR_TEMPERATURE = 1 << 18,
+    ESC_SENSOR_ALL         = ESC_SENSOR_CURRENT \
+                            | ESC_SENSOR_VOLTAGE \
+                            | ESC_SENSOR_RPM \
+                            | ESC_SENSOR_TEMPERATURE,
+    SENSOR_TEMPERATURE     = 1 << 19,
+    SENSOR_CAP_USED        = 1 << 20,
+    SENSOR_ALL             = (1 << 21) - 1,
+} sensor_e;
 
 typedef struct telemetryConfig_s {
-    float gpsNoFixLatitude;
-    float gpsNoFixLongitude;
-    uint8_t telemetry_switch;               // Use aux channel to change serial output & baudrate( MSP / Telemetry ). It disables automatic switching to Telemetry when armed.
-    uint8_t telemetry_inverted;             // Flip the default inversion of the protocol - Same as serialrx_inverted in rx.c, but for telemetry.
-    frskyGpsCoordFormat_e frsky_coordinate_format;
-    frskyUnit_e frsky_unit;
-    uint8_t frsky_vfas_precision;
-    uint8_t frsky_pitch_roll;
-    uint8_t report_cell_voltage;
-    uint8_t hottAlarmSoundInterval;
+    int16_t gpsNoFixLatitude;
+    int16_t gpsNoFixLongitude;
+    uint8_t telemetry_inverted;
     uint8_t halfDuplex;
-    smartportFuelUnit_e smartportFuelUnit;
-    uint8_t ibusTelemetryType;
-    uint8_t ltmUpdateRate;
+    uint8_t frsky_coordinate_format;
+    uint8_t frsky_unit;
+    uint8_t frsky_vfas_precision;
+    uint8_t hottAlarmSoundInterval;
+    uint8_t pidValuesAsTelemetry;
+    uint8_t report_cell_voltage;
+    uint16_t mavlink_mah_as_heading_divisor;
+    uint32_t disabledSensors; // bit flags
+    uint8_t mavlink_min_txbuff; // The min TX buffer space value to send mavlink telemetry data 1...100%
+    uint8_t mavlink_extended_status_rate;
+    uint8_t mavlink_rc_channels_rate;
+    uint8_t mavlink_position_rate;
+    uint8_t mavlink_extra1_rate;
+    uint8_t mavlink_extra2_rate;
+    uint8_t mavlink_extra3_rate;
+    uint8_t crsf_tlm_accgyro;
 } telemetryConfig_t;
 
 extern telemetryConfig_t telemetryConfig;
 
-//#define TELEMETRY_SHAREABLE_PORT_FUNCTIONS_MASK (FUNCTION_TELEMETRY_FRSKY | FUNCTION_TELEMETRY_LTM | FUNCTION_TELEMETRY_IBUS)
 //extern serialPort_t *telemetrySharedPort;
 
 void telemetryConfig_Init(void);
 
 void telemetryInit(void);
-//bool telemetryCheckRxPortShared(const serialPortConfig_t *portConfig);
+//bool telemetryCheckRxPortShared(const serialPortConfig_t *portConfig, const SerialRXType serialrxProvider);
 
 void telemetryCheckState(void);
-void telemetryProcess(timeUs_t currentTimeUs);
+void telemetryProcess(uint32_t currentTime);
 
 //bool telemetryDetermineEnabledState(portSharing_e portSharing);
+
+bool telemetryIsSensorEnabled(sensor_e sensor);

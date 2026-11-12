@@ -146,7 +146,7 @@ bool compassInit(void)
 
      buildRotationMatrixFromAngles(&magDev.rotationMatrix, &compassConfig.mag_customAlignment);
 
-    ENABLE_FLIGHT_MODE(HEADING_MODE);
+    ENABLE_FLIGHT_MODE(MAG_MODE);
     magHold = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
 
     return true;
@@ -314,7 +314,7 @@ void taskUpdateMag(uint32_t currentTimeUs)
 #if defined(USE_GPS) || defined(USE_MAG)
 void updateMagHold(void)
 {
-    if (fabsf(rcData[YAW]-1500) < 15 && FLIGHT_MODE(HEADING_MODE))
+    if (fabsf(rcData[YAW]-1500) < 15 && FLIGHT_MODE(MAG_MODE))
     {
         int16_t dif = DECIDEGREES_TO_DEGREES(attitude.values.yaw) - magHold;
         if (dif <= -180)

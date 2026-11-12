@@ -64,16 +64,12 @@
 #include "rx/rx.h"
 #include "fc/rc_controls.h"
 
-#include "msp/fc_msp.h"
+#include "msp/msp.h"
 #include "msp/msp_serial.h"
-
-#include "navigation/navigation.h"
 
 #include "osd/osd.h"
 
 #include "scheduler/tasks.h"
-
-#include "msp/fc_msp.h"
 
 #include "telemetry/telemetry.h"
 #include "telemetry/crsf.h"
@@ -131,7 +127,8 @@ static void taskHandleSerial(uint32_t currentTimeUs)
     cliMain();
 
     // Allow MSP processing even if in CLI mode
-    mspSerialProcess(ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA, mspFcProcessCommand);
+    bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
+    mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
 }
 
 #ifdef USE_RANGEFINDER

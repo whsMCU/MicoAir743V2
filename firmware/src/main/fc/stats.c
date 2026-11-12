@@ -18,6 +18,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
 #include "hw.h"
 
 #ifdef USE_PERSISTENT_STATS
@@ -27,11 +28,19 @@
 //#include "config/config.h"
 #include "fc/dispatch.h"
 #include "fc/runtime_config.h"
-#include "fc/stats.h"
 
 //#include "io/beeper.h"
 #include "io/gps.h"
 
+//#include "pg/stats.h"
+
+#ifdef USE_BATTERY_CONTINUE
+#include "sensors/battery.h"
+#endif
+
+#include "sensors/gyro.h"
+
+#include "stats.h"
 
 #define STATS_SAVE_DELAY_US 500000 // Let disarming complete and save stats after this time
 
@@ -61,18 +70,26 @@ void statsInit(void)
     dispatchEnable();
 }
 
-void writeStats(struct dispatchEntry_s* self)
+void writeStats(dispatchEntry_t* self)
 {
     UNUSED(self);
 
     if (!ARMING_FLAG(ARMED)) {
         // Don't save if the user made config changes that have not yet been saved.
-//        if (!isConfigDirty()) {
-//            writeEEPROM();
-//
-//            // Repeat disarming beep indicating the stats save is complete
-//            //beeper(BEEPER_DISARMING);
-//        }
+        if (!isConfigDirty()) {
+
+            const bool gyroIsStill = fabsf(gyro.gyroADCf[FD_ROLL]) < statsConfig.statsSaveMoveLimit &&
+                fabsf(gyro.gyroADCf[FD_PITCH]) < statsConfig.statsSaveMoveLimit &&
+                fabsf(gyro.gyroADCf[FD_YAW]) < statsConfig.statsSaveMoveLimit;
+
+            if (gyroIsStill || statsConfig.statsSaveMoveLimit == 0) {
+                writeEEPROM();
+                // Repeat disarming beep indicating the stats save is complete
+                beeper(BEEPER_DISARMING);
+            } else {
+                dispatchAdd(&writeStatsEntry, STATS_SAVE_DELAY_US);
+            }
+        }
 
         saveRequired = false;
     }
@@ -99,6 +116,9 @@ void statsOnDisarm(void)
             statsConfig.stats_total_flights += 1;    // arm / flight counter
             statsConfig.stats_total_time_s += dtS;
             statsConfig.stats_total_dist_m += (DISTANCE_FLOWN_CM - arm_distance_cm) / 100;
+            #ifdef USE_BATTERY_CONTINUE
+            statsConfigMutable()->stats_mah_used = getMAhDrawn();
+#endif
 
             saveRequired = true;
         }
