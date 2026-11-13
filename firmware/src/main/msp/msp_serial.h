@@ -103,9 +103,9 @@ typedef struct __attribute__((packed)) {
 
 #define MSP_MAX_HEADER_SIZE     9
 
-struct serialPort_s;
 typedef struct mspPort_s {
-    struct serialPort_s *port; // null when port unused.
+    uint8_t port;       // UART channel (_DEF_UARTx)
+    bool portActive;    // false when port unused (channel 0 is valid, so can't use port==0 as 'unused')
     timeMs_t lastActivityMs;
     mspPendingSystemRequest_e pendingRequest;
     mspPortState_e portState;

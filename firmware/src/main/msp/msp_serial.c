@@ -56,6 +56,7 @@ static void resetMspPort(uint8_t ch, mspPort_t *mspPortToReset)
     memset(mspPortToReset, 0, sizeof(mspPort_t));
 
     mspPortToReset->port = ch;
+    mspPortToReset->portActive = true;
     //mspPortToReset->sharedWithTelemetry = sharedWithTelemetry;
     mspPortToReset->descriptor = mspDescriptorAlloc();
 }
@@ -303,11 +304,11 @@ static int mspSerialSendFrame(mspPort_t *msp, const uint8_t * hdr, int hdrLen, c
 {
     // MSP port might be turned into a CLI port, which will make
     // msp->port become NULL.
-    if (!msp->port) {
+    if (!msp->portActive) {
         return 0;
     }
     // VSP MSP port might be unconnected. To prevent blocking - check if it's connected first
-    if (!uartIsConnected((uint8_t)msp->port)) {
+    if (!uartIsConnected(msp->port)) {
         return 0;
     }
 
@@ -316,7 +317,7 @@ static int mspSerialSendFrame(mspPort_t *msp, const uint8_t * hdr, int hdrLen, c
     //     this allows us to transmit jumbo frames bigger than TX buffer (serialWriteBuf will block, but for jumbo frames we don't care)
     //  b) Response fits into TX buffer
     const int totalFrameLength = hdrLen + dataLen + crcLen;
-    if (!uartTxBufEmpty(ch) && ((int)uartTotalTxBytesFree(ch) < totalFrameLength))
+    if (!uartTxBufEmpty(msp->port) && ((int)uartTotalTxBytesFree(msp->port) < totalFrameLength))
         return 0;
 
     static DMA_DATA uint8_t frameBuf[16 + JUMBO_FRAME_SIZE_LIMIT + 2]; // 최대 크기 확보
@@ -336,7 +337,7 @@ static int mspSerialSendFrame(mspPort_t *msp, const uint8_t * hdr, int hdrLen, c
     //msp_tx_start_time = micros();
     SCB_CleanDCache_by_Addr((uint32_t *)((uint32_t)frameBuf & ~0x1F),
                             (((uint32_t)frameBuf & 0x1F) + totalFrameLength + 31) & ~0x1F);
-    uartWriteDMA(ch, frameBuf, totalFrameLength);
+    uartWriteDMA(msp->port, frameBuf, totalFrameLength);
 
     return totalFrameLength;
 }
@@ -547,7 +548,7 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn)
 {
     for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-        if (!mspPort->port) {
+        if (!mspPort->portActive) {
             continue;
         }
 
@@ -612,7 +613,7 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
 bool mspSerialWaiting(void)
 {
     for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-        if (!mspPort->port) {
+        if (!mspPort->portActive) {
             continue;
         }
 

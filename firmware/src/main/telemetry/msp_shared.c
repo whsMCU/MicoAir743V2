@@ -153,7 +153,7 @@ static void processMspPacket(void)
         sbufWriteU8(&responsePacket.buf, TELEMETRY_MSP_ERROR);
     }
     if (mspPostProcessFn) {
-        mspPostProcessFn(NULL);
+        mspPostProcessFn(0);
     }
 
     sbufSwitchToReader(&responsePacket.buf, responseBuffer);

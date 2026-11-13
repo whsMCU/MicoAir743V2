@@ -26,6 +26,8 @@
 #define DEFAULT_FEATURES 0
 #endif
 
+#define USE_RX_MSP
+
 #ifndef DEFAULT_RX_FEATURE
 
 #if ENABLE_RX_UDP

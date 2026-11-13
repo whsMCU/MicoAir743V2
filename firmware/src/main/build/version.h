@@ -54,8 +54,8 @@
 
 extern const char* const targetName;
 
-#define GIT_SHORT_REVISION_LENGTH   7 // lower case hexadecimal digits.
-extern const char* const shortGitRevision;
+//#define GIT_SHORT_REVISION_LENGTH   7 // lower case hexadecimal digits.
+//extern const char* const shortGitRevision;
 
 #define GIT_SHORT_CONFIG_REVISION_LENGTH   7 // lower case hexadecimal digits.
 extern const char* const shortConfigGitRevision;

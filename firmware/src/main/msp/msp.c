@@ -375,9 +375,9 @@ RAM_CODE static void fontUpdateCompletion(void)
 }
 #endif
 
-RAM_CODE static void mspRebootFn(serialPort_t *serialPort)
+RAM_CODE static void mspRebootFn(uint8_t ch)
 {
-    UNUSED(serialPort);
+    UNUSED(ch);
 
 //    motorShutdown();
 //
@@ -434,7 +434,7 @@ RAM_CODE static void mspReboot(dispatchEntry_t* self)
         return;
     }
 
-    mspRebootFn(NULL);
+    mspRebootFn(0);
 }
 
 dispatchEntry_t mspRebootEntry = {
@@ -805,7 +805,7 @@ RAM_CODE static bool mspCommonProcessOutCommand(mspDescriptor_t srcDesc, int16_t
     case MSP_BUILD_INFO:
         sbufWriteData(dst, buildDate, BUILD_DATE_LENGTH);
         sbufWriteData(dst, buildTime, BUILD_TIME_LENGTH);
-        sbufWriteData(dst, shortGitRevision, GIT_SHORT_REVISION_LENGTH);
+        //sbufWriteData(dst, shortGitRevision, GIT_SHORT_REVISION_LENGTH);
         // Added in API version 1.46
         //sbufWriteBuildInfoFlags(dst);
         break;
@@ -2924,18 +2924,18 @@ RAM_CODE static mspResult_e mspProcessInCommand(mspDescriptor_t srcDesc, int16_t
 
     case MSP_SET_RAW_RC:
 #ifdef USE_RX_MSP
-        {
-            uint8_t channelCount = dataSize / sizeof(uint16_t);
-            if (channelCount > MAX_SUPPORTED_RC_CHANNEL_COUNT) {
-                return MSP_RESULT_ERROR;
-            } else {
-                uint16_t frame[MAX_SUPPORTED_RC_CHANNEL_COUNT];
-                for (int i = 0; i < channelCount; i++) {
-                    frame[i] = sbufReadU16(src);
-                }
-                rxMspFrameReceive(frame, channelCount);
-            }
-        }
+//        {
+//            uint8_t channelCount = dataSize / sizeof(uint16_t);
+//            if (channelCount > MAX_SUPPORTED_RC_CHANNEL_COUNT) {
+//                return MSP_RESULT_ERROR;
+//            } else {
+//                uint16_t frame[MAX_SUPPORTED_RC_CHANNEL_COUNT];
+//                for (int i = 0; i < channelCount; i++) {
+//                    frame[i] = sbufReadU16(src);
+//                }
+//                rxMspFrameReceive(frame, channelCount);
+//            }
+//        }
 #endif
         break;
 #if defined(USE_ACC)

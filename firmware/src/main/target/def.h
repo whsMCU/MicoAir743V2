@@ -54,6 +54,14 @@
 
 #define MAX_SUPPORTED_MOTORS 8
 
+// Set the default cpu_overclock to the first level (108MHz) for F411
+// Helps with looptime stability as the CPU is borderline when running native gyro sampling
+#if defined(USE_OVERCLOCK) && defined(STM32F411xE)
+#define DEFAULT_CPU_OVERCLOCK 1
+#else
+#define DEFAULT_CPU_OVERCLOCK 0
+#endif
+
 
 
 #if !defined(ALT_HOLD_THROTTLE_NEUTRAL_ZONE)
@@ -85,6 +93,14 @@
 #define TARGET_BOARD_IDENTIFIER "H743"
 #endif
 
+// Setup crystal frequency on F4 for backward compatibility
+// Should be set to zero for generic targets to ensure USB is working
+// when unconfigured for targets with non-standard crystal.
+// Can be set at runtime with with CLI parameter 'system_hse_mhz'.
+#ifndef SYSTEM_HSE_MHZ
+#define SYSTEM_HSE_MHZ 0
+#endif
+
 #ifndef USBD_PRODUCT_STRING
 #define USBD_PRODUCT_STRING     "Betaflight - STM32H743"
 #endif
@@ -112,6 +128,7 @@
 #define USE_GPS
 #define USE_GPS_NMEA
 #define USE_GPS_UBLOX
+#define USE_SERIALRX_CRSF
 #define USE_CRSF_LINK_STATISTICS
 #define USE_RX_RSSI_DBM
 #define USE_RX_LINK_QUALITY_INFO

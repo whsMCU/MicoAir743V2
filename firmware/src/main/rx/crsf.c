@@ -36,20 +36,21 @@
 
 #include "config/config.h"
 
-#include "pg/rx.h"
+//#include "pg/rx.h"
 
-#include "drivers/persistent.h"
-#include "drivers/serial.h"
-#include "drivers/serial_uart.h"
-#include "drivers/system.h"
-#include "drivers/time.h"
+//#include "drivers/persistent.h"
+//#include "drivers/serial.h"
+//#include "drivers/serial_uart.h"
+//#include "drivers/system.h"
+//#include "drivers/time.h"
 
-#include "io/serial.h"
+//#include "io/serial.h"
 
 #include "rx/rx.h"
 #include "rx/crsf.h"
 
-#include "fc/tasks.h"
+//#include "fc/tasks.h"
+#include "scheduler/tasks.h"
 
 #include "telemetry/crsf.h"
 
