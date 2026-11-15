@@ -1,42 +1,53 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include <stdint.h>
-#include "hw.h"
-//#include "config/parameter_group.h"
+
 #include "drivers/rangefinder/rangefinder.h"
+
+//#include "pg/pg.h"
 
 typedef enum {
     RANGEFINDER_NONE        = 0,
-    RANGEFINDER_SRF10       = 1,
-    RANGEFINDER_VL53L0X     = 2,
-    RANGEFINDER_MSP         = 3,
-    RANGEFINDER_BENEWAKE    = 4,
-    RANGEFINDER_VL53L1X     = 5,
-    RANGEFINDER_US42        = 6,
-    RANGEFINDER_TOF10102I2C = 7,
-    RANGEFINDER_FAKE        = 8,
+    RANGEFINDER_HCSR04      = 1,
+    RANGEFINDER_TFMINI      = 2,
+    RANGEFINDER_TF02        = 3,
+    RANGEFINDER_MTF01       = 4,
+    RANGEFINDER_MTF02       = 5,
+    RANGEFINDER_MTF01P      = 6,
+    RANGEFINDER_MTF02P      = 7,
+    RANGEFINDER_TFNOVA        = 8,
+    RANGEFINDER_NOOPLOOP_F2   = 9,
+    RANGEFINDER_NOOPLOOP_F2P  = 10,
+    RANGEFINDER_NOOPLOOP_F2PH = 11,
+    RANGEFINDER_NOOPLOOP_F    = 12,
+    RANGEFINDER_NOOPLOOP_FP   = 13,
+    RANGEFINDER_NOOPLOOP_F2MINI = 14,
+    RANGEFINDER_UPT1          = 15,
+    RANGEFINDER_HARDWARE_COUNT,
 } rangefinderType_e;
 
 typedef struct rangefinderConfig_s {
     uint8_t rangefinder_hardware;
-    uint8_t use_median_filtering;
 } rangefinderConfig_t;
 
 extern rangefinderConfig_t rangefinderConfig;
@@ -47,6 +58,10 @@ typedef struct rangefinder_s {
     int32_t rawAltitude;
     int32_t calculatedAltitude;
     timeMs_t lastValidResponseTimeMs;
+
+    bool snrThresholdReached;
+    int32_t dynamicDistanceThreshold;
+    int16_t snr;
 } rangefinder_t;
 
 extern rangefinder_t rangefinder;
@@ -58,6 +73,6 @@ bool rangefinderInit(void);
 int32_t rangefinderGetLatestAltitude(void);
 int32_t rangefinderGetLatestRawAltitude(void);
 
-timeDelta_t rangefinderUpdate(void);
+void rangefinderUpdate(void);
 bool rangefinderProcess(float cosTiltAngle);
 bool rangefinderIsHealthy(void);

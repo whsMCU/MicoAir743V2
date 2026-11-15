@@ -22,25 +22,32 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hw.h"
+
+#include "build/build_config.h"
+
 #include "common/bitarray.h"
 #include "common/maths.h"
+
 #include "common/time.h"
 
-//#include "config/config.h"
-//#include "config/feature.h"
+#include "config/config.h"
+#include "config/feature.h"
 
-#include "rc_controls.h"
+#include "fc/rc_controls.h"
+
+//#include "io/piniobox.h"
+
+//#include "pg/pg.h"
+//#include "pg/pg_ids.h"
+//#include "pg/rx.h"
 
 #include "rx/rx.h"
 
 #include "rc_modes.h"
 
-#include "msp_box.h"
-
-#define STICKY_MODE_BOOT_DELAY_US 5e6
-
 boxBitmask_t rcModeActivationMask; // one bit per mode defined in boxId_e
-static boxBitmask_t stickyModesEverDisabled;
+STATIC_UNIT_TESTED boxBitmask_t stickyModesEverDisabled;
 
 static bool airmodeEnabled;
 
@@ -67,23 +74,25 @@ bool IS_RC_MODE_ACTIVE(boxId_e boxId)
     return bitArrayGet(&rcModeActivationMask, boxId);
 }
 
-void rcModeUpdate(boxBitmask_t *newState)
+void rcModeUpdate(const boxBitmask_t *newState)
 {
     rcModeActivationMask = *newState;
 }
 
-bool airmodeIsEnabled(void) {
+bool isAirmodeEnabled(void)
+{
     return airmodeEnabled;
 }
 
-bool isRangeActive(uint8_t auxChannelIndex, const channelRange_t *range) {
+bool isRangeActive(uint8_t auxChannelIndex, const channelRange_t *range)
+{
     if (!IS_RANGE_USABLE(range)) {
         return false;
     }
 
     const uint16_t channelValue = constrain(rcData[auxChannelIndex + NON_AUX_CHANNEL_COUNT], CHANNEL_RANGE_MIN, CHANNEL_RANGE_MAX - 1);
-    return (channelValue >= 900 + (range->startStep * CHANNEL_RANGE_STEP_WIDTH) &&
-            channelValue < 900 + (range->endStep * CHANNEL_RANGE_STEP_WIDTH));
+    return (channelValue >= 900 + (range->startStep * 25) &&
+            channelValue < 900 + (range->endStep * 25));
 }
 
 /*
@@ -97,7 +106,7 @@ bool isRangeActive(uint8_t auxChannelIndex, const channelRange_t *range) {
  *       T       F      - all previous AND macs active, no previous active OR macs
  *       T       T      - at least 1 previous inactive AND mac, no previous active OR macs
  */
-void updateMasksForMac(const modeActivationCondition_t *mac, boxBitmask_t *andMask, boxBitmask_t *newMask, bool bActive)
+static void updateMasksForMac(const modeActivationCondition_t *mac, boxBitmask_t *andMask, boxBitmask_t *newMask, bool bActive)
 {
     if (bitArrayGet(andMask, mac->modeId) || !bitArrayGet(newMask, mac->modeId)) {
         bool bAnd = mac->modeLogic == MODELOGIC_AND;
@@ -116,12 +125,14 @@ void updateMasksForMac(const modeActivationCondition_t *mac, boxBitmask_t *andMa
     }
 }
 
-void updateMasksForStickyModes(const modeActivationCondition_t *mac, boxBitmask_t *andMask, boxBitmask_t *newMask)
+static void updateMasksForStickyModes(const modeActivationCondition_t *mac, boxBitmask_t *andMask, boxBitmask_t *newMask, bool latchForever)
 {
-    if (IS_RC_MODE_ACTIVE(mac->modeId)) {
+    if (latchForever && IS_RC_MODE_ACTIVE(mac->modeId)) {
         bitArrayClr(andMask, mac->modeId);
         bitArraySet(newMask, mac->modeId);
-    } else {
+        return;
+    }
+
         bool bActive = isRangeActive(mac->auxChannelIndex, &mac->range);
 
         if (bitArrayGet(&stickyModesEverDisabled, mac->modeId)) {
@@ -129,25 +140,27 @@ void updateMasksForStickyModes(const modeActivationCondition_t *mac, boxBitmask_
         } else {
             if (micros() >= STICKY_MODE_BOOT_DELAY_US && !bActive) {
                 bitArraySet(&stickyModesEverDisabled, mac->modeId);
-            }
         }
     }
 }
 
 void updateActivatedModes(void)
 {
-    boxBitmask_t newMask, andMask, stickyModes;
+    boxBitmask_t newMask, andMask, stickyModes, latchModes;
     memset(&andMask, 0, sizeof(andMask));
     memset(&newMask, 0, sizeof(newMask));
     memset(&stickyModes, 0, sizeof(stickyModes));
-    //bitArraySet(&stickyModes, BOXFAILSAFE);
+    memset(&latchModes, 0, sizeof(latchModes));
+    bitArraySet(&stickyModes, BOXPARALYZE);
+    bitArraySet(&stickyModes, BOXBLACKBOXERASE);
+    bitArraySet(&latchModes, BOXPARALYZE);
 
     // determine which conditions set/clear the mode
     for (int i = 0; i < activeMacCount; i++) {
         const modeActivationCondition_t *mac = &modeActivationConditions[activeMacArray[i]];
 
         if (bitArrayGet(&stickyModes, mac->modeId)) {
-            updateMasksForStickyModes(mac, &andMask, &newMask);
+            updateMasksForStickyModes(mac, &andMask, &newMask, bitArrayGet(&latchModes, mac->modeId));
         } else if (mac->modeId < CHECKBOX_ITEM_COUNT) {
             bool bActive = isRangeActive(mac->auxChannelIndex, &mac->range);
             updateMasksForMac(mac, &andMask, &newMask, bActive);
@@ -166,7 +179,7 @@ void updateActivatedModes(void)
 
     rcModeUpdate(&newMask);
 
-    //airmodeEnabled = featureIsEnabled(FEATURE_AIRMODE) || IS_RC_MODE_ACTIVE(BOXAIRMODE);
+    airmodeEnabled = featureIsEnabled(FEATURE_AIRMODE) || IS_RC_MODE_ACTIVE(BOXAIRMODE);
 }
 
 bool isModeActivationConditionPresent(boxId_e modeId)
@@ -246,31 +259,7 @@ void analyzeModeActivationConditions(void)
             activeMacArray[activeMacCount++] = i;
         }
     }
-#ifdef USE_PINIOBOX
+#if defined(USE_PINIOBOX) && !ENABLE_SIMULATOR_MULTITHREAD
     pinioBoxTaskControl();
 #endif
-}
-
-void MSP_SET_MODE_RANGE(uint32_t i, uint8_t boxId, uint8_t auxChannelIndex, uint32_t start, uint32_t end){
-	uint32_t start_value = CHANNEL_VALUE_TO_STEP(start);
-	uint32_t end_value = CHANNEL_VALUE_TO_STEP(end);
-	  //i = sbufReadU8(src);
-	  if (i < MAX_MODE_ACTIVATION_CONDITION_COUNT) {
-	      modeActivationCondition_t *mac = &modeActivationConditions[i];
-	      //i = sbufReadU8(src);
-	      const box_t *box = findBoxByPermanentId(boxId);
-	      if (box) {
-	          mac->modeId = box->boxId;
-	          mac->auxChannelIndex = auxChannelIndex;
-	          mac->range.startStep = (uint8_t)start_value;
-	          mac->range.endStep = (uint8_t)end_value;
-//	          if (sbufBytesRemaining(src) != 0) {
-//	              mac->modeLogic = sbufReadU8(src);
-//
-//	              i = sbufReadU8(src);
-//	              mac->linkedTo = findBoxByPermanentId(i)->boxId;
-//	          }
-	          rcControlsInit();
-	      }
-	  }
 }

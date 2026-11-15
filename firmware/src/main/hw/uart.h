@@ -55,5 +55,7 @@ uint32_t uartGetBaud(uint8_t ch);
 bool uartSetBaud(uint8_t ch, uint32_t baud);
 baudRate_e lookupBaudRateIndex(uint32_t baudRate);
 
+void serialWriteBuf(uint8_t ch, uint8_t *data, int count);
+
 
 #endif /* SRC_COMMON_HW_INCLUDE_UART_H_ */

@@ -87,6 +87,7 @@
 
 #include "msp/msp.h"
 #include "msp/msp_serial.h"
+#include "msp/msp_box.h"
 
 #include "osd/osd.h"
 
@@ -175,6 +176,14 @@ void init(void)
 	Baro_Init();
 #endif
 
+#ifdef USE_RANGEFINDER
+    rangefinderInit();
+#endif
+
+#ifdef USE_OPTICALFLOW
+    opticalflowInit();
+#endif
+
 #ifdef USE_ADC_INTERNAL
 	adcInternalInit();
 #endif
@@ -243,14 +252,6 @@ void init(void)
     baroStartCalibration();
 #endif
 
-#ifdef USE_RANGEFINDER
-    rangefinderInit();
-#endif
-
-#ifdef USE_OPTICALFLOW
-    opflowInit();
-#endif
-
     batteryInit(); // always needs doing, regardless of features.
 
 #ifdef USE_PERSISTENT_STATS
@@ -291,9 +292,9 @@ void init(void)
 
     MSP_SET_MODE_RANGE(0,  0, 0, 1700, 2100); // SE : ARM
     MSP_SET_MODE_RANGE(1,  6, 1, 1700, 2100); // SA : HEADFREE
-    MSP_SET_MODE_RANGE(2,  3, 2, 1300, 2100); // SB : NAV ALTHOLD
-    MSP_SET_MODE_RANGE(3, 11, 2, 1700, 2100); // SB : NAV POSHOLD
-    MSP_SET_MODE_RANGE(4, 33, 2, 1300, 2100); // SB : SURFACE
+    MSP_SET_MODE_RANGE(2,  3, 2, 1300, 2100); // SB : ALTHOLD
+    MSP_SET_MODE_RANGE(3, 11, 2, 1700, 2100); // SB : POSHOLD
+    MSP_SET_MODE_RANGE(4,  1, 2,  900, 2100); // SB : ANGLE
     MSP_SET_MODE_RANGE(5, 27, 4, 1700, 2100); // SD : FALISAFE
     MSP_SET_MODE_RANGE(6, 30, 5, 1700, 2100); // SF : HOME RESET
 
@@ -332,7 +333,7 @@ void Param_Config_Init(void)
 	gpsRescueConfig_Init();
 #endif
 #ifdef USE_OPTICALFLOW
-	opflow_Init();
+	opticalflowConfig_Init();
 #endif
 	barometerConfig_Init();
 #ifdef USE_MAG

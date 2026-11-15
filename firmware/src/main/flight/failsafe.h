@@ -11,12 +11,6 @@
 #include "hw.h"
 #include "rx/rx.h"
 
-extern uint8_t failsafeFlags;
-
-#define DISABLE_FAILSAFE(mask) (failsafeFlags &= ~(mask))
-#define ENABLE_FAILSAFE(mask) (failsafeFlags |= (mask))
-#define FAILSAFE(mask) (failsafeFlags & (mask))
-
 #define FAILSAFE_POWER_ON_DELAY_US (1000 * 1000 * 5)
 #define MILLIS_PER_TENTH_SECOND      100
 #define MILLIS_PER_SECOND           1000

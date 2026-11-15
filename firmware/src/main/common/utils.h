@@ -27,7 +27,6 @@
 
 #define ARRAYLEN(x) (sizeof(x) / sizeof((x)[0]))
 #define ARRAYEND(x) (&(x)[ARRAYLEN(x)])
-#define ZERO_FARRAY(a) memset(a, 0, sizeof(a))
 
 #define CONST_CAST(type, value) ((type)(value))
 
@@ -93,6 +92,9 @@ http://resnet.uoregon.edu/~gurney_j/jmpc/bitwise.html
 #define BITCOUNT(x) (((BX_(x)+(BX_(x)>>4)) & 0x0F0F0F0F) % 255)
 #define BX_(x) ((x) - (((x)>>1)&0x77777777) - (((x)>>2)&0x33333333) - (((x)>>3)&0x11111111))
 
+static inline int popcount(unsigned x) { return __builtin_popcount(x); }
+static inline int popcount32(uint32_t x) { return __builtin_popcount(x); }
+static inline int popcount64(uint64_t x) { return __builtin_popcountll(x); }
 
 /*
  * https://groups.google.com/forum/?hl=en#!msg/comp.lang.c/attFnqwhvGk/sGBKXvIkY3AJ
@@ -122,9 +124,11 @@ http://resnet.uoregon.edu/~gurney_j/jmpc/bitwise.html
 static inline int16_t cmp16(uint16_t a, uint16_t b) { return (int16_t)(a-b); }
 static inline int32_t cmp32(uint32_t a, uint32_t b) { return (int32_t)(a-b); }
 
+static inline uint32_t llog2(uint32_t n) { return 31 - __builtin_clz(n | 1); }
+
 // using memcpy_fn will force memcpy function call, instead of inlining it. In most cases function call takes fewer instructions
 //  than inlined version (inlining is cheaper for very small moves < 8 bytes / 2 store instructions)
-#if defined(UNIT_TEST) || defined(SIMULATOR_BUILD)
+#if defined(UNIT_TEST) || ENABLE_SIMULATOR
 // Call memcpy when building unittest - this is easier that asm symbol name mangling (symbols start with _underscore on win32)
 #include <string.h>
 static inline void  memcpy_fn ( void * destination, const void * source, size_t num ) { memcpy(destination, source, num); }
@@ -132,9 +136,10 @@ static inline void  memcpy_fn ( void * destination, const void * source, size_t 
 void * memcpy_fn ( void * destination, const void * source, size_t num ) asm("memcpy");
 #endif
 
-
 #endif
 
-
+#if __GNUC__ > 6
+#define FALLTHROUGH ;__attribute__ ((fallthrough))
+#else
 #define FALLTHROUGH do {} while(0)
-
+#endif

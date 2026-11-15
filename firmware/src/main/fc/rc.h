@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "common/time.h"
+
 #include "fc/rc_controls.h"
 
 #ifdef USE_RC_SMOOTHING_FILTER
@@ -27,28 +29,33 @@
 #define RC_SMOOTHING_AUTO_FACTOR_MAX 250
 #endif
 
-#define THROTTLE_LOOKUP_LENGTH 12
-extern int16_t lookupThrottleRC[THROTTLE_LOOKUP_LENGTH];
+typedef struct feedforwardData_s {
+    float prevRcCommand[XYZ_AXIS_COUNT];
+    float prevRcCommandDeltaAbs[XYZ_AXIS_COUNT];
+    float prevSetpoint[XYZ_AXIS_COUNT];
+    float prevSetpointSpeed[XYZ_AXIS_COUNT];
+    float prevSetpointSpeedDelta[XYZ_AXIS_COUNT];
+    bool isPrevPacketDuplicate[XYZ_AXIS_COUNT];
+    float prevRxInterval[XYZ_AXIS_COUNT];
+    pt1Filter_t filterSetpointSpeed[XYZ_AXIS_COUNT];
+    pt1Filter_t filterSetpointDelta[XYZ_AXIS_COUNT];
+} feedforwardData_t;
 
 void processRcCommand(void);
 float getSetpointRate(int axis);
 float getRcDeflection(int axis);
+float getRcDeflectionRaw(int axis);
 float getRcDeflectionAbs(int axis);
-int16_t rcLookupThrottle(int32_t tmp);
-//void updateRcCommands(void);
+float getMaxRcDeflectionAbs(void);
+void updateRcCommands(void);
 void resetYawAxis(void);
 void initRcProcessing(void);
 bool isMotorsReversed(void);
 rcSmoothingFilter_t *getRcSmoothingData(void);
-bool rcSmoothingAutoCalculate(void);
-bool rcSmoothingInitializationComplete(void);
-float getRawSetpoint(int axis);
-float getRcCommandDelta(int axis);
-float applyCurve(int axis, float deflection);
-bool getShouldUpdateFeedforward();
 
 float getMaxRcRate(int axis);
+float getFeedforward(int axis);
 
-void updateRcRefreshRate(uint32_t currentTimeUs);
-uint16_t getCurrentRxRefreshRate(void);
+void updateRcRefreshRate(timeUs_t currentTimeUs, bool rxReceivingSignal);
+float getCurrentRxRateHz(void);
 bool getRxRateValid(void);

@@ -214,18 +214,10 @@ void taskSystemLoad(timeUs_t currentTimeUs)
         schedulerIgnoreTaskExecTime();
     }
 
-		if(rxRuntimeState.RxCount == 0)
-		{
-		 ENABLE_FAILSAFE(FAILSAFE_RX_LOSS_DETECTED);
-		}
-		rxRuntimeState.RxCount = 0;
-
 #if ENABLE_SIMULATOR
     averageSystemLoadPercent = 0;
 #endif
 }
-
-
 
 uint32_t getCpuPercentageLate(void)
 {

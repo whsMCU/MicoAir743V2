@@ -42,14 +42,16 @@ typedef struct positionConfig_s {
 
 extern positionConfig_t positionConfig;
 
+void position_Init(void);
+void positionConfig_Init(void);
+
 float getAltitudeCm(void);
 float getAltitudeDerivative(void);
 // Raw Kalman Z state for low-latency altitude control (no display PT2).
 float getAltitudeCmControl(void);
 float getAltitudeDerivativeControl(void);
-void calculateEstimatedAltitude(timeUs_t currentTimeUs);
-void position_Init(void);
-void positionConfig_Init(void);
+void calculateEstimatedAltitude(void);
+void positionInit(void);
 int32_t getEstimatedAltitudeCm(void);
 float getAltitudeAsl(void);
 int16_t getEstimatedVario(void);

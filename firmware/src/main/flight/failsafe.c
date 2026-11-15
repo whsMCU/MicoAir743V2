@@ -34,7 +34,7 @@
 //#include "drivers/time.h"
 //#include "drivers/usb_io.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 #include "fc/core.h"
 #include "fc/rc_controls.h"
 #include "fc/rc_modes.h"

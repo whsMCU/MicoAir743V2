@@ -31,26 +31,40 @@
 
 #include "common/axis.h"
 #include "common/maths.h"
-#include "common/time.h"
 
-//#include "config/config.h"
+#include "config/config.h"
+
+//#include "drivers/bus.h"
+//#include "drivers/bus_i2c.h"
+//#include "drivers/bus_i2c_busdev.h"
+//#include "drivers/bus_spi.h"
+#include "drivers/compass/compass.h"
+// #include "drivers/compass/compass_ak8975.h"
+// #include "drivers/compass/compass_ak8963.h"
+// #include "drivers/compass/compass_virtual.h"
+// #include "drivers/compass/compass_hmc5883l.h"
+// #include "drivers/compass/compass_lis2mdl.h"
+// #include "drivers/compass/compass_lis3mdl.h"
+// #include "drivers/compass/compass_mmc560x.h"
+// #include "drivers/compass/compass_mpu925x_ak8963.h"
+#include "drivers/compass/compass_qmc5883l.h"
+//#include "drivers/compass/compass_ist8310.h"
+
+//#include "drivers/io.h"
+//#include "drivers/light_led.h"
+//#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
-#include "fc/rc_controls.h"
-
 #include "flight/imu.h"
-
-#include "rx/rx.h"
 
 #include "scheduler/scheduler.h"
 
 #include "sensors/boardalignment.h"
 #include "sensors/gyro.h"
 #include "sensors/gyro_init.h"
-#include "sensors/compass.h"
 #include "sensors/sensors.h"
+
 #include "compass.h"
-#include "compass/compass_qmc5883l.h"
 
 #ifdef _USE_HW_CLI
 static void cliQmc5883l(cli_args_t *args);
@@ -87,6 +101,23 @@ compassConfig_t compassConfig;
 // default compass read interval, for those with no specified ODR, will be TASK_COMPASS_RATE_HZ
 static uint32_t compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
 
+#ifndef MAG_ALIGN
+#define MAG_ALIGN ALIGN_DEFAULT
+#endif
+#ifndef MAG_ALIGN_ROLL
+#define MAG_ALIGN_ROLL 0
+#endif
+#ifndef MAG_ALIGN_PITCH
+#define MAG_ALIGN_PITCH 0
+#endif
+#ifndef MAG_ALIGN_YAW
+#define MAG_ALIGN_YAW 0
+#endif
+
+#ifndef MAG_I2C_ADDRESS
+#define MAG_I2C_ADDRESS 0
+#endif
+
 void compassConfig_Init(void)
 {
   compassConfig.mag_alignment = ALIGN_DEFAULT;
@@ -109,13 +140,14 @@ bool compassDetect(magDev_t *magDev, sensor_align_e *alignment)
       *alignment = CW180_DEG;
 
       magHardware = MAG_QMC5883L;
-      sensorsSet(SENSOR_MAG);
     }
 
     if (magHardware == MAG_NONE) {
         return false;
     }
 
+    detectedSensors[SENSOR_INDEX_MAG] = magHardware;
+    sensorsSet(SENSOR_MAG);
     return true;
 }
 
@@ -144,17 +176,34 @@ bool compassInit(void)
          magDev.magAlignment = compassConfig.mag_alignment;
      }
 
-     buildRotationMatrixFromAngles(&magDev.rotationMatrix, &compassConfig.mag_customAlignment);
+         // Custom alignments are applied via a transposed rotation matrix (matrixTrnVectorMul),
+    // which reverses rotation direction. Negate angles for mag so the resulting rotation
+    // matches the user-entered convention and the standard CW alignments.
+    sensorAlignment_t magCustomAlignment = compassConfig.mag_customAlignment;
+    magCustomAlignment.roll = -magCustomAlignment.roll;
+    magCustomAlignment.pitch = -magCustomAlignment.pitch;
+    magCustomAlignment.yaw = -magCustomAlignment.yaw;
 
-    ENABLE_FLIGHT_MODE(MAG_MODE);
-    magHold = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
+    buildRotationMatrixFromAngles(&magDev.rotationMatrix, &compassConfig.mag_customAlignment);
+
+    compassBiasEstimatorInit(&compassBiasEstimator, LAMBDA_MIN, P0);
+
+//    if (magDev.magOdrHz) {
+    // For Mags that send data at a fixed ODR, we wait some quiet period after a read before checking for new data
+    // allow two re-check intervals, plus a margin for clock variations in mag vs FC
+    uint16_t odrInterval = (1000 * 1000) / 200;//magDev.magOdrHz;
+    compassReadIntervalUs =  odrInterval - (2 * COMPASS_RECHECK_INTERVAL_US) - (odrInterval / 20);
+//    } else {
+//        // Mags which have no specified ODR will be pinged at the compass task rate
+//        compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
+//    }
 
     return true;
 }
 
-bool compassIsHealthy(void)
+bool compassEnabledAndCalibrated(void)
 {
-    return (mag.magADC.x != 0) && (mag.magADC.y != 0) && (mag.magADC.z != 0);
+    return sensors(SENSOR_MAG) && (imuConfig.trust_mag) && (mag.magADC.x != 0) && (mag.magADC.y != 0) && (mag.magADC.z != 0);
 }
 
 void compassStartCalibration(void)
@@ -301,35 +350,6 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
     return compassReadIntervalUs;
 }
 
-void taskUpdateMag(uint32_t currentTimeUs)
-{
-    UNUSED(currentTimeUs);
-		const uint32_t newDeadline = compassUpdate(currentTimeUs);
-		if (newDeadline != 0) {
-				rescheduleTask(TASK_SELF, newDeadline);
-		}
-
-}
-
-#if defined(USE_GPS) || defined(USE_MAG)
-void updateMagHold(void)
-{
-    if (fabsf(rcData[YAW]-1500) < 15 && FLIGHT_MODE(MAG_MODE))
-    {
-        int16_t dif = DECIDEGREES_TO_DEGREES(attitude.values.yaw) - magHold;
-        if (dif <= -180)
-            dif += 360;
-        if (dif >= +180)
-            dif -= 360;
-        dif *= -GET_DIRECTION(rcControlsConfig.yaw_control_reversed);
-//        if (isUpright()) {
-//            rcCommand[YAW] -= dif * currentPidProfile->pid[PID_MAG].P / 30;    // 18 deg
-//        }
-    } else
-    {
-      magHold = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
-    }
-}
 // initialize the compass bias estimator
 void compassBiasEstimatorInit(compassBiasEstimator_t *cBE, const float lambda_min, const float p0)
 {
@@ -426,8 +446,7 @@ void compassBiasEstimatorApply(compassBiasEstimator_t *cBE, vector3_t *mag)
     // update lambda
     cBE->lambda = cBE->lambda_min + (1.0f - cBE->lambda_min) * sq(zn);
 }
-
-#endif
+#endif // USE_MAG
 
 #ifdef _USE_HW_CLI
 void cliQmc5883l(cli_args_t *args)
@@ -480,5 +499,3 @@ if (args->argc == 1 && args->isStr(0, "compass_show") == true)
   }
 }
 #endif
-
-#endif // USE_MAG

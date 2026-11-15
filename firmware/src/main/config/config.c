@@ -767,14 +767,14 @@ void writeEEPROM(void)
 #endif
     systemConfig.configurationState = CONFIGURATION_STATE_CONFIGURED;
 
-    writeUnmodifiedConfigToEEPROM();
+    //writeUnmodifiedConfigToEEPROM();
 }
 
 bool resetEEPROM(void)
 {
     //resetConfig();
 
-    writeUnmodifiedConfigToEEPROM();
+    //writeUnmodifiedConfigToEEPROM();
 
     return true;
 }

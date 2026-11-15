@@ -22,27 +22,46 @@
 #include <stdint.h>
 #include <math.h>
 
+#include "hw.h"
+
+#ifdef USE_BARO
+
 #include "build/debug.h"
 
 #include "common/maths.h"
+#include "common/filter.h"
+
+//#include "pg/pg.h"
+//#include "pg/pg_ids.h"
+
+#include "drivers/barometer/barometer.h"
+// #include "drivers/barometer/barometer_bmp085.h"
+// #include "drivers/barometer/barometer_bmp280.h"
+// #include "drivers/barometer/barometer_bmp388.h"
+// #include "drivers/barometer/barometer_bmp5xx.h"
+#include "drivers/barometer/barometer_dps310.h"
+// #include "drivers/barometer/barometer_qmp6988.h"
+// #include "drivers/barometer/barometer_virtual.h"
+// #include "drivers/barometer/barometer_ms5611.h"
+// #include "drivers/barometer/barometer_lps.h"
+// #include "drivers/barometer/barometer_2smpb_02b.h"
+// #include "drivers/barometer/barometer_lps22df.h"
+// #include "drivers/bus.h"
+// #include "drivers/bus_i2c_busdev.h"
+// #include "drivers/bus_spi.h"
+// #include "drivers/io.h"
+// #include "drivers/time.h"
 
 #include "fc/runtime_config.h"
 
 #include "sensors/barometer.h"
 #include "sensors/sensors.h"
 
-#include "drivers/barometer/barometer.h"
-#include "drivers/barometer/barometer_dps310.h"
-
 #include "scheduler/scheduler.h"
-
-
-#ifdef USE_BARO_DPS310
 
 #ifdef _USE_HW_CLI
 static void cliDps310(cli_args_t *args);
 #endif
-
 
 baro_t baro;                        // barometer access functions
 
@@ -116,54 +135,6 @@ void baroSetGroundLevel(void)
     calibrationCycleCount = 0;
 }
 
-#define PRESSURE_SAMPLES_MEDIAN 3
-
-static int32_t applyBarometerMedianFilter(int32_t newPressureReading)
-{
-    static int32_t barometerFilterSamples[PRESSURE_SAMPLES_MEDIAN];
-    static int currentFilterSampleIndex = 0;
-    static bool medianFilterReady = false;
-    int nextSampleIndex;
-
-    nextSampleIndex = (currentFilterSampleIndex + 1);
-    if (nextSampleIndex == PRESSURE_SAMPLES_MEDIAN) {
-        nextSampleIndex = 0;
-        medianFilterReady = true;
-    }
-
-    barometerFilterSamples[currentFilterSampleIndex] = newPressureReading;
-    currentFilterSampleIndex = nextSampleIndex;
-
-    if (medianFilterReady)
-        return quickMedianFilter3(barometerFilterSamples);
-    else
-        return newPressureReading;
-}
-
-static uint32_t recalculateBarometerTotal(uint32_t pressureTotal, int32_t newPressureReading)
-{
-    static int32_t barometerSamples[BARO_SAMPLE_COUNT_MAX + 1];
-    static int currentSampleIndex = 0;
-    int nextSampleIndex;
-
-    // store current pressure in barometerSamples
-    if (currentSampleIndex >= barometerConfig.baro_sample_count) {
-        nextSampleIndex = 0;
-        baroReady = true;
-    } else {
-        nextSampleIndex = (currentSampleIndex + 1);
-    }
-    barometerSamples[currentSampleIndex] = applyBarometerMedianFilter(newPressureReading);
-
-    // recalculate pressure total
-    pressureTotal += barometerSamples[currentSampleIndex];
-    pressureTotal -= barometerSamples[nextSampleIndex];
-
-    currentSampleIndex = nextSampleIndex;
-
-    return pressureTotal;
-}
-
 typedef enum {
     BARO_STATE_TEMPERATURE_READ = 0,
     BARO_STATE_TEMPERATURE_SAMPLE,
@@ -182,15 +153,6 @@ bool isBaroReady(void)
 static float pressureToAltitude(const float pressure)
 {
     return (1.0f - powf(pressure / 101325.0f, 0.190295f)) * 4433000.0f;
-}
-
-void taskUpdateBaro(timeUs_t currentTimeUs)
-{
-    UNUSED(currentTimeUs);
-    const uint32_t newDeadline = baroUpdate(currentTimeUs);
-    if (newDeadline != 0) {
-        rescheduleTask(TASK_SELF, newDeadline);
-    }
 }
 
 static void performBaroCalibrationCycle(const float altitude);

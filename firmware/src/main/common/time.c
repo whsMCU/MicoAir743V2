@@ -37,7 +37,7 @@
 
 //#include "pg/pg_ids.h"
 
-//#include "drivers/time.h"
+#include "drivers/time.h"
 
 #ifdef USE_RTC_TIME
 

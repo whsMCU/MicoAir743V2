@@ -22,11 +22,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "hw.h"
+
 #include "common/utils.h"
 
-#include "time.h"
+#include "common/time.h"
 
-#include "dispatch.h"
+#include "fc/dispatch.h"
 
 #include "scheduler/scheduler.h"
 

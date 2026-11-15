@@ -20,23 +20,42 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
-
 #include <math.h>
+
+#include "hw.h"
+
+//#include "blackbox/blackbox.h"
+
+#include "build/build_config.h"
 
 #include "common/axis.h"
 #include "common/maths.h"
 
-//#include "config/feature.h"
-//#include "config/config.h"
+#include "config/feature.h"
 
-//#include "fc/core.h"
-//#include "rc.h"
+//#include "drivers/camera_control.h"
 
+#include "config/config.h"
+#include "fc/core.h"
+#include "fc/rc.h"
 #include "fc/runtime_config.h"
+#include "fc/rc_modes.h"
 
 #include "flight/pid.h"
-//#include "flight/failsafe.h"
+#include "flight/failsafe.h"
+
+//#include "io/beeper.h"
+//#include "io/usb_cdc_hid.h"
+//#include "io/dashboard.h"
+//#include "io/gimbal_control.h"
+#include "io/gps.h"
+//#include "io/vtx_control.h"
+
+//#include "pg/pg.h"
+//#include "pg/pg_ids.h"
+//#include "pg/rx.h"
 
 #include "rx/rx.h"
 
@@ -49,7 +68,6 @@
 #include "sensors/gyro.h"
 
 #include "rc_controls.h"
-#include "rc_modes.h"
 
 // true if arming is done via the sticks (as opposed to a switch)
 static bool isUsingSticksToArm = true;
@@ -63,10 +81,6 @@ void rcControlsConfig_Init(void)
 {
 	rcControlsConfig.deadband = 5;
 	rcControlsConfig.yaw_deadband = 5;
-	rcControlsConfig.pos_hold_deadband = 10;
-	rcControlsConfig.alt_hold_deadband = 40;
-	rcControlsConfig.alt_hold_fast_change = 1;
-	rcControlsConfig.mid_throttle_deadband = 50;
 	rcControlsConfig.yaw_control_reversed = true;
 }
 
@@ -75,6 +89,7 @@ void armingConfig_Init(void)
 {
 	armingConfig.gyro_cal_on_first_arm = 0;  // TODO - Cleanup retarded arm support
 	armingConfig.auto_disarm_delay = 5;
+    armingConfig.prearm_allow_rearm = 0;
 }
 
 flight3DConfig_t flight3DConfig;
@@ -105,28 +120,23 @@ void clearWasLastDisarmUserRequested(void)
     disarmUserRequested = false;
 }
 
-bool areSticksInApModePosition(uint16_t ap_mode)
-{
-    return fabsf(rcCommand[ROLL]) < ap_mode && fabsf(rcCommand[PITCH]) < ap_mode;
-}
 
-//throttleStatus_e calculateThrottleStatus(void)
-//{
-//    if (featureIsEnabled(FEATURE_3D)) {
-//        if (IS_RC_MODE_ACTIVE(BOX3D) || flight3DConfig.switched_mode3d) {
-//            if (rcData[THROTTLE] < rxConfig.mincheck) {
-//                return THROTTLE_LOW;
-//            }
-//        } else if ((rcData[THROTTLE] > (rxConfig.midrc - flight3DConfig.deadband3d_throttle) && rcData[THROTTLE] < (rxConfig.midrc + flight3DConfig.deadband3d_throttle))) {
-//            return THROTTLE_LOW;
-//        }
-//    } else
-//		if (rcData[THROTTLE] < rxConfig.mincheck) {
-//        return THROTTLE_LOW;
-//    }
-//
-//    return THROTTLE_HIGH;
-//}
+throttleStatus_e calculateThrottleStatus(void)
+{
+    if (featureIsEnabled(FEATURE_3D)) {
+        if (IS_RC_MODE_ACTIVE(BOX3D) || flight3DConfig.switched_mode3d) {
+            if (rcData[THROTTLE] < rxConfig.mincheck) {
+                return THROTTLE_LOW;
+            }
+        } else if ((rcData[THROTTLE] > (rxConfig.midrc - flight3DConfig.deadband3d_throttle) && rcData[THROTTLE] < (rxConfig.midrc + flight3DConfig.deadband3d_throttle))) {
+            return THROTTLE_LOW;
+        }
+    } else if (rcData[THROTTLE] < rxConfig.mincheck) {
+        return THROTTLE_LOW;
+    }
+
+    return THROTTLE_HIGH;
+}
 
 #define ARM_DELAY_MS        500
 #define STICK_DELAY_MS      50
@@ -136,7 +146,7 @@ bool areSticksInApModePosition(uint16_t ap_mode)
     doNotRepeat = false; \
 }
 
-void processRcStickPositions()
+void processRcStickPositions(void)
 {
     // time the sticks are maintained
     static int16_t rcDelayMs;
@@ -169,6 +179,72 @@ void processRcStickPositions()
     rcSticks = stTmp;
 
     // perform actions
+    if (!isUsingSticksToArm) {
+        if (IS_RC_MODE_ACTIVE(BOXARM)) {
+            rcDisarmTicks = 0;
+            // Arming via ARM BOX
+            tryArm();
+        } else {
+            resetTryingToArm();
+            // Disarming via ARM BOX
+              disarmUserRequested = true;
+            resetArmingDisabled();
+            const bool boxFailsafeSwitchIsOn = IS_RC_MODE_ACTIVE(BOXFAILSAFE);
+            if (ARMING_FLAG(ARMED) && (failsafeIsReceivingRxData() || boxFailsafeSwitchIsOn)) {
+                // in a true signal loss situation, allow disarm only once we regain validated RxData (failsafeIsReceivingRxData = true),
+                // to avoid potentially false disarm signals soon after link recover
+                // Note that BOXFAILSAFE will also drive failsafeIsReceivingRxData false (immediately at start or end)
+                // That's why we explicitly allow disarm here if BOXFAILSAFE switch is active
+                // Note that BOXGPSRESCUE mode does not trigger failsafe - we can always disarm in that mode
+                rcDisarmTicks++;
+                if (rcDisarmTicks > 3) {
+                    // require three duplicate disarm values in a row before we disarm
+                    disarm(DISARM_REASON_SWITCH);
+                }
+            }
+        }
+    } else if (rcSticks == THR_LO + YAW_LO + PIT_CE + ROL_CE) {
+        if (rcDelayMs >= ARM_DELAY_MS && !doNotRepeat) {
+            doNotRepeat = true;
+            // Disarm on throttle down + yaw
+             disarmUserRequested = true;
+            resetTryingToArm();
+            if (ARMING_FLAG(ARMED)){
+                disarm(DISARM_REASON_STICKS);
+           } else {
+                //beeper(BEEPER_DISARM_REPEAT);     // sound tone while stick held
+                repeatAfter(STICK_AUTOREPEAT_MS); // disarm tone will repeat
+
+#ifdef USE_RUNAWAY_TAKEOFF
+                // Unset the ARMING_DISABLED_RUNAWAY_TAKEOFF arming disabled flag that might have been set
+                // by a runaway pidSum detection auto-disarm.
+                // This forces the pilot to explicitly perform a disarm sequence (even though we're implicitly disarmed)
+                // before they're able to rearm
+                unsetArmingDisabled(ARMING_DISABLED_RUNAWAY_TAKEOFF);
+#endif
+                unsetArmingDisabled(ARMING_DISABLED_CRASH_DETECTED);
+            }
+        }
+        return;
+    } else if (rcSticks == THR_LO + YAW_HI + PIT_CE + ROL_CE && !IS_RC_MODE_ACTIVE(BOXSTICKCOMMANDDISABLE)) { // disable stick arming if STICK COMMAND DISABLE SW is active
+        if (rcDelayMs >= ARM_DELAY_MS && !doNotRepeat) {
+            doNotRepeat = true;
+            if (!ARMING_FLAG(ARMED)) {
+                // Arm via YAW
+                tryArm();
+                if (isTryingToArm() ||
+                    ((getArmingDisableFlags() == ARMING_DISABLED_CALIBRATING) && armingConfig.gyro_cal_on_first_arm)) {
+                    doNotRepeat = false;
+                }
+            } else {
+                resetArmingDisabled();
+            }
+        }
+        return;
+    } else {
+        resetTryingToArm();
+    }
+
     if (ARMING_FLAG(ARMED) || doNotRepeat || rcDelayMs <= STICK_DELAY_MS || (getArmingDisableFlags() & (ARMING_DISABLED_RUNAWAY_TAKEOFF | ARMING_DISABLED_CRASH_DETECTED))) {
         return;
     }
@@ -188,17 +264,21 @@ void processRcStickPositions()
         gyroStartCalibration(false);
 
 #ifdef USE_GPS
-       //GPS_reset_home_position();
+        if (featureIsEnabled(FEATURE_GPS)) {
+            GPS_reset_home_position();
+        }
 #endif
 
 #ifdef USE_BARO
+        if (sensors(SENSOR_BARO)) {
         baroSetGroundLevel();
+        }
 #endif
 
         return;
     }
 
-    if (rcSticks == THR_LO + YAW_LO + PIT_HI + ROL_HI) {
+    if (featureIsEnabled(FEATURE_INFLIGHT_ACC_CAL) && (rcSticks == THR_LO + YAW_LO + PIT_HI + ROL_HI)) {
         // Inflight ACC Calibration
         //handleInflightCalibrationStickPosition();
         return;
@@ -241,8 +321,7 @@ void processRcStickPositions()
     }
 #endif
 
-
-    if (FLIGHT_MODE(ANGLE_MODE|HORIZON_MODE)) {
+    if (FLIGHT_MODE(ANGLE_MODE | HORIZON_MODE)) {
         // in ANGLE or HORIZON mode, so use sticks to apply accelerometer trims
         rollAndPitchTrims_t accelerometerTrimsDelta;
         memset(&accelerometerTrimsDelta, 0, sizeof(accelerometerTrimsDelta));
@@ -351,7 +430,6 @@ void processRcStickPositions()
             _PITCH.in.kd -= 0.1;
             shouldApplyRollAndPitchTrimDelta = true;
             break;
-
         }
         if (shouldApplyRollAndPitchTrimDelta) {
 #if defined(USE_ACC)
@@ -430,30 +508,8 @@ void processRcStickPositions()
 #endif
 }
 
-int32_t getRcStickDeflection(int32_t axis, uint16_t midrc) {
-    return MIN(ABS(rcData[axis] - midrc), 500);
-}
-
 void rcControlsInit(void)
 {
     analyzeModeActivationConditions();
-    //isUsingSticksToArm = !isModeActivationConditionPresent(BOXARM) && systemConfig.enableStickArming;
-}
-
-throttleStatus_e FAST_CODE NOINLINE calculateThrottleStatus(void)
-{
-  int value = rcData[THROTTLE];    // THROTTLE_STATUS_TYPE_RC
-
-  //const uint16_t mid_throttle_deadband = rcControlsConfig.mid_throttle_deadband;
-  //bool midThrottle = value > (PWM_RANGE_MIDDLE - mid_throttle_deadband) && value < (PWM_RANGE_MIDDLE + mid_throttle_deadband);
-  if ((value < rxConfig.mincheck)) {
-      return THROTTLE_LOW;
-  }
-
-  return THROTTLE_HIGH;
-}
-
-bool throttleStickIsLow(void)
-{
-    return calculateThrottleStatus() == THROTTLE_LOW;
+    isUsingSticksToArm = !isModeActivationConditionPresent(BOXARM) && systemConfig.enableStickArming;
 }

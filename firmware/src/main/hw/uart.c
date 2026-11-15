@@ -1096,6 +1096,11 @@ bool uartSetBaud(uint8_t ch, uint32_t baud)
 	return ret;
 }
 
+void serialWriteBuf(uint8_t ch, uint8_t *data, int count)
+{
+  uartWriteIT(ch, data, count);
+}
+
 baudRate_e lookupBaudRateIndex(uint32_t baudRate)
 {
     for (unsigned index = 0; index < ARRAYLEN(baudRates); index++) {
@@ -1191,22 +1196,16 @@ FAST_CODE void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 	if(huart->Instance == USART6)
 	{
-		rxRuntimeState.callbackTime = micros() - pre_time;
-    pre_time = micros();
-    rxRuntimeState.RxCallback_Flag = true;
 		HAL_UART_Receive_IT(&huart6, (uint8_t *)&rx_buf[_DEF_UART6], 1);
 		qbufferRxWrite(&ring_buffer[_DEF_UART6], (const uint8_t *)&rx_buf[_DEF_UART6], 1);
 //      HAL_UARTEx_ReceiveToIdle_DMA(&huart6, (uint8_t *)&rx_buf[_DEF_UART6][0], MAX_SIZE);
 //      __HAL_DMA_DISABLE_IT(&hdma_usart6_rx, DMA_IT_HT);
-
-		rxRuntimeState.uartAvalable = uartAvailable(_DEF_UART6);
 		while(uartAvailable(_DEF_UART6))
 		{
 			crsfDataReceive(uartRead(_DEF_UART6), (void*) &rxRuntimeState);
 		}
-
-    rxRuntimeState.RxCallback_Flag = false;
 	}
+
   if(huart->Instance == UART7)
   {
   	qbufferRxWrite(&ring_buffer[_DEF_UART7], (const uint8_t *)&rx_buf[_DEF_UART7], 1);

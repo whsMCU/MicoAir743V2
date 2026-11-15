@@ -39,6 +39,7 @@
 #include "flight/rpm_filter.h"
 
 #include "fc/rc_controls.h"
+#include "fc/core.h"
 
 #include "rx/rx.h"
 
@@ -218,7 +219,7 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 	heading = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
 
   static timeUs_t previousUpdateTimeUs;
-  float dT = (float)US2S(currentTimeUs - previousUpdateTimeUs);
+  float dT = (float)((currentTimeUs - previousUpdateTimeUs) * 1e-6);
   previousUpdateTimeUs = currentTimeUs;
 
   cycleTime = getTaskDeltaTimeUs(TASK_SELF);
@@ -310,11 +311,11 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 
   motorWriteAll();
 
-#if defined(USE_GPS) || defined(USE_MAG)
-    if (sensors(SENSOR_GPS) || sensors(SENSOR_MAG)) {
-        updateMagHold();
-    }
-#endif
+//#if defined(USE_GPS) || defined(USE_MAG)
+//    if (sensors(SENSOR_GPS) || sensors(SENSOR_MAG)) {
+//        updateMagHold();
+//    }
+//#endif
 }
 
 void mixerSetThrottleAngleCorrection(int correctionValue)

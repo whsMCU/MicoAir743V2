@@ -20,7 +20,6 @@
 
 #pragma once
 
-#include "hw.h"
 #include "common/time.h"
 //#include "pg/pg.h"
 #include "drivers/barometer/barometer.h"
@@ -81,8 +80,6 @@ bool baroDetect(baroDev_t *dev);
 bool baroIsCalibrated(void);
 void baroStartCalibration(void);
 void baroSetGroundLevel(void);
-void taskUpdateBaro(timeUs_t currentTimeUs);
 uint32_t baroUpdate(timeUs_t currentTimeUs);
 bool isBaroReady(void);
 float getBaroAltitude(void);
-

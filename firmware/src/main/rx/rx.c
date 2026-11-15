@@ -24,49 +24,79 @@
 
 #include <string.h>
 
+#include "hw.h"
+
+#include "build/build_config.h"
 #include "build/debug.h"
 
 #include "common/maths.h"
 #include "common/utils.h"
-#include "common/time.h"
-#include "common/axis.h"
 #include "common/filter.h"
 
-#include "config/sdcard.h"
-//#include "config/config.h"
+#include "config/config.h"
 //#include "config/config_reset.h"
-//#include "config/feature.h"
+#include "config/feature.h"
 
-#include "io/gps.h"
+//#include "drivers/adc.h"
+//#include "drivers/rx/rx_pwm.h"
+//#include "drivers/time.h"
 
 #include "fc/rc_controls.h"
-#include "fc/rc_adjustments.h"
 #include "fc/rc_modes.h"
-#include "fc/stats.h"
-#include "fc/rc.h"
 #include "fc/runtime_config.h"
-
-#include "flight/failsafe.h"
-#include "flight/imu.h"
-#include "flight/pid.h"
-#include "flight/dyn_notch_filter.h"
-#include "flight/position.h"
-
-#include "rx/rx.h"
-#include "rx/crsf.h"
 #include "scheduler/tasks.h"
 
-#include "sensors/sensors.h"
-#include "sensors/opticalflow.h"
-#include "sensors/rangefinder.h"
+#include "flight/failsafe.h"
+
+//#include "io/serial.h"
+
+//#include "pg/pg.h"
+//#include "pg/pg_ids.h"
+//#include "pg/rx.h"
+
+#include "rx/rx.h"
+//#include "rx/pwm.h"
+//#include "rx/fport.h"
+//#include "rx/sbus.h"
+//#include "rx/spektrum.h"
+//#include "rx/srxl2.h"
+//#include "rx/sumd.h"
+//#include "rx/sumh.h"
+//#include "rx/msp.h"
+//#include "rx/xbus.h"
+//#include "rx/ibus.h"
+//#include "rx/jetiexbus.h"
+#include "rx/crsf.h"
+//#include "rx/ghst.h"
+//#include "rx/rx_spi.h"
+//#include "rx/targetcustomserial.h"
+//#include "rx/msp_override.h"
+//#include "rx/mavlink.h"
 
 const char rcChannelLetters[] = "AERT12345678abcdefgh";
 
 static uint16_t rssi = 0;                  // range: [0;1023]
-static int16_t rssiDbm = CRSF_RSSI_MIN;    // range: [-130,20]
-static uint32_t lastMspRssiUpdateUs = 0;
+static uint16_t rssiRaw = 0;               // range: [0;1023]
+static timeUs_t lastRssiSmoothingUs = 0;
+#ifdef USE_RX_RSSI_DBM
+static int8_t activeAntenna;
+static int16_t rssiDbm = CRSF_RSSI_MIN;    // range: [-130,0]
+static int16_t rssiDbmRaw = CRSF_RSSI_MIN; // range: [-130,0]
+#endif //USE_RX_RSSI_DBM
+#ifdef USE_RX_RSNR
+static int16_t rsnr = CRSF_SNR_MIN;        // range: [-30,20]
+static int16_t rsnrRaw = CRSF_SNR_MIN;     // range: [-30,20]
+#endif //USE_RX_RSNR
+static timeUs_t lastMspRssiUpdateUs = 0;
 
 static pt1Filter_t frameErrFilter;
+static pt1Filter_t rssiFilter;
+#ifdef USE_RX_RSSI_DBM
+static pt1Filter_t rssiDbmFilter;
+#endif //USE_RX_RSSI_DBM
+#ifdef USE_RX_RSNR
+static pt1Filter_t rsnrFilter;
+#endif //USE_RX_RSNR
 
 #ifdef USE_RX_LINK_QUALITY_INFO
 static uint16_t linkQuality = 0;
@@ -92,33 +122,21 @@ static uint8_t rxChannelCount;
 
 static timeUs_t needRxSignalBefore = 0;
 static timeUs_t suspendRxSignalUntil = 0;
+static uint8_t  skipRxSamples = 0;
 
 static float rcRaw[MAX_SUPPORTED_RC_CHANNEL_COUNT];     // last received raw value, as it comes
-uint16_t rcData[MAX_SUPPORTED_RC_CHANNEL_COUNT];           // scaled, modified, checked and constrained values
-
+float rcData[MAX_SUPPORTED_RC_CHANNEL_COUNT];           // scaled, modified, checked and constrained values
 uint32_t validRxSignalTimeout[MAX_SUPPORTED_RC_CHANNEL_COUNT];
-
-bool isRXDataNew;
 
 #define MAX_INVALID_PULSE_TIME_MS 300                   // hold time in milliseconds after bad channel or Rx link loss
 // will not be actioned until the nearest multiple of 100ms
 #define PPM_AND_PWM_SAMPLE_COUNT 3
 
-#define DELAY_20_MS (20 * 1000)                         // 20ms in us
-#define DELAY_100_MS (100 * 1000)                       // 100ms in us
+#define RSSI_UPDATE_INTERVAL (20 * 1000)                // 20ms in us
+#define RX_FRAME_RECHECK_INTERVAL (50 * 1000)           // 50ms in us
+#define RXLOSS_TRIGGER_INTERVAL (150 * 1000)            // 150ms in us
 #define DELAY_1500_MS (1500 * 1000)                     // 1.5 seconds in us
 #define SKIP_RC_SAMPLES_ON_RESUME  2                    // flush 2 samples to drop wrong measurements (timing independent)
-
-#define DEFAULT_AUX_CHANNEL_COUNT       6
-
-typedef enum {
-    RX_STATE_CHECK,
-    RX_STATE_MODES,
-    RX_STATE_UPDATE,
-    RX_STATE_COUNT
-} rxState_e;
-
-static rxState_e rxState = RX_STATE_CHECK;
 
 rxRuntimeState_t rxRuntimeState;
 static uint8_t rcSampleIndex = 0;
@@ -127,40 +145,37 @@ rxConfig_t rxConfig;
 
 void rxConfig_Init(void)
 {
-//	rxConfig.halfDuplex = 0;
-//	rxConfig.serialrx_provider = SERIALRX_CRSF;
-//	rxConfig.serialrx_inverted = 0;
-//	rxConfig.spektrum_sat_bind = 0;
-//	rxConfig.spektrum_sat_bind_autoreset = 1;
+	rxConfig.halfDuplex = 0;
+	rxConfig.serialrx_provider = SERIALRX_CRSF;
+	rxConfig.serialrx_inverted = 0;
+	rxConfig.spektrum_sat_bind = 0;
+	rxConfig.spektrum_sat_bind_autoreset = 1;
 	rxConfig.midrc = RX_MID_USEC;
 	rxConfig.mincheck = 1050;
 	rxConfig.maxcheck = 1900;
-
-//	rxConfig.rx_min_usec = RX_MIN_USEC;          // any of first 4 channels below this value will trigger rx loss detection
-//	rxConfig.rx_max_usec = RX_MAX_USEC;         // any of first 4 channels above this value will trigger rx loss detection
-//	rxConfig.rssi_src_frame_errors = false;
-//	rxConfig.rssi_channel = 0;
+	rxConfig.rx_min_usec = RX_MIN_USEC;          // any of first 4 channels below this value will trigger rx loss detection
+	rxConfig.rx_max_usec = RX_MAX_USEC;         // any of first 4 channels above this value will trigger rx loss detection
+	rxConfig.rssi_src_frame_errors = false;
+	rxConfig.rssi_channel = 0;
 	rxConfig.rssi_scale = RSSI_SCALE_DEFAULT;
 	rxConfig.rssi_offset = 0;
 	rxConfig.rssi_invert = 0;
-//	rxConfig.rssi_src_frame_lpf_period = 30;
-//	rxConfig.fpvCamAngleDegrees = 0;
-//	rxConfig.airModeActivateThreshold = 25;
-//	rxConfig.max_aux_channel = DEFAULT_AUX_CHANNEL_COUNT;
-//	rxConfig.rc_smoothing_mode = 1;
-//	rxConfig.rc_smoothing_setpoint_cutoff = 0;
-//	rxConfig.rc_smoothing_feedforward_cutoff = 0;
-//	rxConfig.rc_smoothing_throttle_cutoff = 0;
-//	rxConfig.rc_smoothing_debug_axis = ROLL;
-//	rxConfig.rc_smoothing_auto_factor_rpy = 30;
-//	rxConfig.rc_smoothing_auto_factor_throttle = 30;
-//	rxConfig.srxl2_unit_id = 1;
-//	rxConfig.srxl2_baud_fast = true;
-//	rxConfig.sbus_baud_fast = false;
-	rxConfig.crsf_use_rx_snr = false;
-//	rxConfig.msp_override_channels_mask = 0;
-//	rxConfig.crsf_use_negotiated_baud = false;
-
+	rxConfig.rssi_src_frame_lpf_period = 30;
+	rxConfig.rssi_smoothing = 125,
+	rxConfig.fpvCamAngleDegrees = 0;
+	rxConfig.airModeActivateThreshold = 25;
+	rxConfig.max_aux_channel = DEFAULT_AUX_CHANNEL_COUNT;
+	rxConfig.rc_smoothing = 1;
+	rxConfig.rc_smoothing_setpoint_cutoff = 0;
+	rxConfig.rc_smoothing_throttle_cutoff = 0;
+	rxConfig.rc_smoothing_debug_axis = ROLL;
+	rxConfig.rc_smoothing_auto_factor_rpy = 30;
+	rxConfig.rc_smoothing_auto_factor_throttle = 30;
+	rxConfig.srxl2_unit_id = 1;
+	rxConfig.srxl2_baud_fast = true;
+	rxConfig.sbus_baud_fast = false;
+	rxConfig.msp_override_channels_mask = 0;
+	rxConfig.crsf_use_negotiated_baud = false;
 
   parseRcChannels("AETR1234", &rxConfig);
 }
@@ -171,8 +186,8 @@ void rxChannelRangeConfigs_Init(void)
 {
     // set default calibration to full range and 1:1 mapping
     for (int i = 0; i < NON_AUX_CHANNEL_COUNT; i++) {
-        rxChannelRangeConfigs[i].min = 989;
-        rxChannelRangeConfigs[i].max = 2012;
+        rxChannelRangeConfigs[i].min = PWM_RANGE_MIN;
+        rxChannelRangeConfigs[i].max = PWM_RANGE_MAX;
     }
 }
 
@@ -202,7 +217,7 @@ static float nullReadRawRC(const rxRuntimeState_t *rxRuntimeState, uint8_t chann
     UNUSED(rxRuntimeState);
     UNUSED(channel);
 
-    return 0; //PPM_RCVR_TIMEOUT
+    return PPM_RCVR_TIMEOUT;
 }
 
 static uint8_t nullFrameStatus(rxRuntimeState_t *rxRuntimeState)
@@ -219,7 +234,44 @@ static bool nullProcessFrame(const rxRuntimeState_t *rxRuntimeState)
     return true;
 }
 
-bool isPulseValid(uint16_t pulseDuration)
+#if ENABLE_RX_UDP
+static volatile uint16_t udpChannelData[MAX_SUPPORTED_RC_CHANNEL_COUNT];
+static volatile uint8_t udpChannelCount = 0;
+static volatile bool udpFrameReceived = false;
+
+static float readRCUdp(const rxRuntimeState_t *rxRuntimeState, uint8_t channel)
+{
+    UNUSED(rxRuntimeState);
+    return udpChannelData[channel];
+}
+
+static uint8_t frameStatusUdp(rxRuntimeState_t *state)
+{
+    if (udpFrameReceived) {
+        // Sync the runtime channel count from the transport on every consumed
+        // frame so both rxRuntimeState.channelCount and the static
+        // rxChannelCount snapshot (updated below) reflect the actual frame.
+        const uint8_t count = udpChannelCount;
+        state->channelCount = count;
+        rxChannelCount = MIN(rxConfig()->max_aux_channel + NON_AUX_CHANNEL_COUNT, count);
+        udpFrameReceived = false;
+        return RX_FRAME_COMPLETE;
+    }
+    return RX_FRAME_PENDING;
+}
+
+void rxUpdateUdpChannels(const uint16_t *channels, uint8_t channelCount)
+{
+    const uint8_t count = MIN(channelCount, (uint8_t)MAX_SUPPORTED_RC_CHANNEL_COUNT);
+    for (uint8_t i = 0; i < count; i++) {
+        udpChannelData[i] = channels[i];
+    }
+    udpChannelCount = count;
+    udpFrameReceived = true;
+}
+#endif
+
+STATIC_UNIT_TESTED bool isPulseValid(uint16_t pulseDuration)
 {
     return  pulseDuration >= rxConfig.rx_min_usec &&
             pulseDuration <= rxConfig.rx_max_usec;
@@ -244,23 +296,69 @@ void rxInit(void)
     rxRuntimeState.rcReadRawFn = nullReadRawRC;
     rxRuntimeState.rcFrameStatusFn = nullFrameStatus;
     rxRuntimeState.rcProcessFrameFn = nullProcessFrame;
-    rxRuntimeState.lastRcFrameTimeUs = 0;
+    rxRuntimeState.lastRcFrameTimeUs = 0;              // zero when driver does not provide timing info
     rcSampleIndex = 0;
 
-    for (int i = 0; i < MAX_SUPPORTED_RC_CHANNEL_COUNT; i++) {
-        rcData[i] = rxConfig.midrc;
-        validRxSignalTimeout[i] = millis() + MAX_INVALID_PULSE_TIME_MS;
+    for (int i = 0; i < NON_AUX_CHANNEL_COUNT; i++) {
+        scaleRangefInit(&rxRuntimeState.scaleRange[i], rxChannelRangeConfigs[i].min, rxChannelRangeConfigs[i].max, PWM_RANGE_MIN, PWM_RANGE_MAX);
     }
 
-    rcData[THROTTLE] = rxConfig.rx_min_usec;
+    uint32_t now = millis();
+    for (int i = 0; i < MAX_SUPPORTED_RC_CHANNEL_COUNT; i++) {
+        rcData[i] = rxConfig.midrc;
+        validRxSignalTimeout[i] = now + MAX_INVALID_PULSE_TIME_MS;
+    }
+
+    rcData[THROTTLE] = (featureIsEnabled(FEATURE_3D)) ? rxConfig.midrc : rxConfig.rx_min_usec;
+
+    // Initialize ARM switch to OFF position when arming via switch is defined
+    // TODO - move to rc_mode.c
+    for (int i = 0; i < MAX_MODE_ACTIVATION_CONDITION_COUNT; i++) {
+        const modeActivationCondition_t *modeActivationCondition = &modeActivationConditions[i];
+        if (modeActivationCondition->modeId == BOXARM && IS_RANGE_USABLE(&modeActivationCondition->range)) {
+            // ARM switch is defined, determine an OFF value
+            float value;
+            if (modeActivationCondition->range.startStep > 0) {
+                value = MODE_STEP_TO_CHANNEL_VALUE((modeActivationCondition->range.startStep - 1));
+            } else {
+                value = MODE_STEP_TO_CHANNEL_VALUE((modeActivationCondition->range.endStep + 1));
+            }
+            // Initialize ARM AUX channel to OFF value
+            rcData[modeActivationCondition->auxChannelIndex + NON_AUX_CHANNEL_COUNT] = value;
+        }
+    }
 
 	const bool enabled = serialRxInit(&rxRuntimeState);
 	if (!enabled) {
 		rxRuntimeState.rcReadRawFn = nullReadRawRC;
 		rxRuntimeState.rcFrameStatusFn = nullFrameStatus;
-	}
+    }
+#if defined(USE_ADC)
+    if (featureIsEnabled(FEATURE_RSSI_ADC)) {
+        rssiSource = RSSI_SOURCE_ADC;
+    } else
+#endif
+    if (rxConfig.rssi_channel > 0) {
+        rssiSource = RSSI_SOURCE_RX_CHANNEL;
+    }
 
-    rxChannelCount = MIN(14 + NON_AUX_CHANNEL_COUNT, rxRuntimeState.channelCount);
+    // Setup source frame RSSI filtering to take averaged values every FRAME_ERR_RESAMPLE_US
+    pt1FilterInit(&frameErrFilter, pt1FilterGain(GET_FRAME_ERR_LPF_FREQUENCY(rxConfig.rssi_src_frame_lpf_period), FRAME_ERR_RESAMPLE_US * 1e-6f));
+
+    // Configurable amount of filtering to remove excessive jumpiness of the values on the osd
+    float k = (256.0f - rxConfig.rssi_smoothing) / 256.0f;
+
+    pt1FilterInit(&rssiFilter, k);
+
+#ifdef USE_RX_RSSI_DBM
+    pt1FilterInit(&rssiDbmFilter, k);
+#endif //USE_RX_RSSI_DBM
+
+#ifdef USE_RX_RSNR
+    pt1FilterInit(&rsnrFilter, k);
+#endif //USE_RX_RSNR
+
+    rxChannelCount = MIN(rxConfig.max_aux_channel + NON_AUX_CHANNEL_COUNT, rxRuntimeState.channelCount);
     
     #ifdef _USE_HW_CLI
         cliAdd("rx", cliRx);
@@ -272,150 +370,37 @@ bool isRxReceivingSignal(void)
     return rxSignalReceived;
 }
 
-static void updateRcCommands(void)
+bool rxAreFlightChannelsValid(void)
 {
-    //isRxDataNew = true;
-
-    for (int axis = 0; axis < 3; axis++) {
-        // non coupled PID reduction scaler used in PID controller 1 and PID controller 2.
-
-        float tmp = MIN(ABS((rcData[axis] - rxConfig.midrc)), 500);
-        if (axis == ROLL || axis == PITCH) {
-            if (tmp > rcControlsConfig.deadband) {
-                tmp -= rcControlsConfig.deadband;
-            } else {
-                tmp = 0;
-            }
-            rcCommand[axis] = tmp;
-        } else {
-            if (tmp > rcControlsConfig.yaw_deadband) {
-                tmp -= rcControlsConfig.yaw_deadband;
-            } else {
-                tmp = 0;
-            }
-            rcCommand[axis] = tmp * -GET_DIRECTION(rcControlsConfig.yaw_control_reversed);
-        }
-        if (rcData[axis] < rxConfig.midrc) {
-            rcCommand[axis] = -rcCommand[axis];
-        }
-    }
-
-    int32_t tmp;
-
-		tmp = constrain(rcData[THROTTLE], rxConfig.mincheck, PWM_RANGE_MAX);
-		tmp = (uint32_t)(tmp - rxConfig.mincheck) * PWM_RANGE_MIN / (PWM_RANGE_MAX - rxConfig.mincheck);
-
-    rcCommand[THROTTLE] = rcLookupThrottle(tmp);
-
-	if (FLIGHT_MODE(HEADFREE_MODE)) {
-	 static t_fp_vector_def  rcCommandBuff;
-
-	 rcCommandBuff.X = rcCommand[ROLL];
-	 rcCommandBuff.Y = rcCommand[PITCH];
-	 if ((!FLIGHT_MODE(ANGLE_MODE) && (!FLIGHT_MODE(HORIZON_MODE)) && (!FLIGHT_MODE(GPS_RESCUE_MODE)))) {
-		 rcCommandBuff.Z = rcCommand[YAW];
-	 } else {
-		 rcCommandBuff.Z = 0;
-	 }
-	 imuQuaternionHeadfreeTransformVectorEarthToBody(&rcCommandBuff);
-	 rcCommand[ROLL] = rcCommandBuff.X;
-	 rcCommand[PITCH] = rcCommandBuff.Y;
-	 if ((!FLIGHT_MODE(ANGLE_MODE)&&(!FLIGHT_MODE(HORIZON_MODE)) && (!FLIGHT_MODE(GPS_RESCUE_MODE)))) {
-		 rcCommand[YAW] = rcCommandBuff.Z;
-	 }
-	}
-
-//	for (int axis = ROLL; axis <= YAW; axis++)
-//	{
-//	  float angleRate;
-//
-//    // scale rcCommandf to range [-1.0, 1.0]
-//    float rcCommandf;
-//    if (axis == FD_YAW) {
-//        rcCommandf = rcCommand[axis] / rcCommandYawDivider;
-//    } else {
-//        rcCommandf = rcCommand[axis] / rcCommandDivider;
-//    }
-//
-//    const float rcCommandfAbs = fabsf(rcCommandf);
-//
-//    angleRate = applyRates(axis, rcCommandf, rcCommandfAbs);
-//
-//    rcCommand[axis] = constrainf(angleRate, -1.0f * currentControlRateProfile->rate_limit[axis], 1.0f * currentControlRateProfile->rate_limit[axis]);
-//	}
+    return rxFlightChannelsValid;
 }
 
-bool taskUpdateRxMainInProgress(void)
+void suspendRxSignal(void)
 {
-    return (rxState != RX_STATE_CHECK);
+#if defined(USE_RX_PWM) || defined(USE_RX_PPM)
+    if (rxRuntimeState.rxProvider == RX_PROVIDER_PARALLEL_PWM || rxRuntimeState.rxProvider == RX_PROVIDER_PPM) {
+        suspendRxSignalUntil = micros() + DELAY_1500_MS;  // 1.5s
+        skipRxSamples = SKIP_RC_SAMPLES_ON_RESUME;
+    }
+#endif
+    failsafeOnRxSuspend(DELAY_1500_MS);  // 1.5s
 }
 
-// taskUpdateRxMain() has occasional peaks in execution time so normal moving average duration estimation doesn't work
-// Decay the estimated max task duration by 1/(1 << RX_TASK_DECAY_SHIFT) on every invocation
-#define RX_TASK_DECAY_SHIFT 6
-// Add a margin to the task duration estimation
-#define RX_TASK_MARGIN 1
-
-void taskUpdateRxMain(uint32_t currentTimeUs)
+void resumeRxSignal(void)
 {
-  static timeDelta_t rxStateDurationFractionUs[RX_STATE_COUNT];
-  timeDelta_t executeTimeUs;
-  rxState_e oldRxState = rxState;
-  timeDelta_t anticipatedExecutionTime;
-
-  // Where we are using a state machine call schedulerIgnoreTaskExecRate() for all states bar one
-  if (rxState != RX_STATE_UPDATE) {
-      schedulerIgnoreTaskExecRate();
-  }
-
-    switch (rxState) {
-    default:
-    case RX_STATE_CHECK:
-        processRx(currentTimeUs);
-        rxState = RX_STATE_MODES;
-        break;
-
-    case RX_STATE_MODES:
-        processRxModes(currentTimeUs);
-        rxState = RX_STATE_UPDATE;
-        break;
-
-    case RX_STATE_UPDATE:
-        //updateRcCommands sets rcCommand, which is needed by updateAltHoldState and updateSonarAltHoldState
-        updateRcCommands();
-        //updateArmingStatus();
-        isRXDataNew = true;
-        rxState = RX_STATE_CHECK;
-        break;
+#if defined(USE_RX_PWM) || defined(USE_RX_PPM)
+    if (rxRuntimeState.rxProvider == RX_PROVIDER_PARALLEL_PWM || rxRuntimeState.rxProvider == RX_PROVIDER_PPM) {
+        suspendRxSignalUntil = micros();
+        skipRxSamples = SKIP_RC_SAMPLES_ON_RESUME;
     }
-    if (!schedulerGetIgnoreTaskExecTime()) {
-        executeTimeUs = micros() - currentTimeUs + RX_TASK_MARGIN;
-
-        // If the scheduler has reduced the anticipatedExecutionTime due to task aging, pick that up
-        anticipatedExecutionTime = schedulerGetNextStateTime();
-        if (anticipatedExecutionTime != (rxStateDurationFractionUs[oldRxState] >> RX_TASK_DECAY_SHIFT)) {
-            rxStateDurationFractionUs[oldRxState] = anticipatedExecutionTime << RX_TASK_DECAY_SHIFT;
-        }
-
-        if (executeTimeUs > (rxStateDurationFractionUs[oldRxState] >> RX_TASK_DECAY_SHIFT)) {
-            rxStateDurationFractionUs[oldRxState] = executeTimeUs << RX_TASK_DECAY_SHIFT;
-        } else {
-            // Slowly decay the max time
-            rxStateDurationFractionUs[oldRxState]--;
-        }
-    }
-
-    if (debugMode == DEBUG_RX_STATE_TIME) {
-        debug[oldRxState] = rxStateDurationFractionUs[oldRxState] >> RX_TASK_DECAY_SHIFT;
-    }
-
-    schedulerSetNextStateTime(rxStateDurationFractionUs[rxState] >> RX_TASK_DECAY_SHIFT);
+#endif
+    failsafeOnRxResume();
 }
 
 #ifdef USE_RX_LINK_QUALITY_INFO
 #define LINK_QUALITY_SAMPLE_COUNT 16
 
-uint16_t updateLinkQualitySamples(uint16_t value)
+STATIC_UNIT_TESTED uint16_t updateLinkQualitySamples(uint16_t value)
 {
     static uint16_t samples[LINK_QUALITY_SAMPLE_COUNT];
     static uint8_t sampleIndex = 0;
@@ -433,7 +418,7 @@ void rxSetRfMode(uint8_t rfModeValue)
 }
 #endif
 
-void setLinkQuality(bool validFrame, uint32_t currentDeltaTimeUs)
+static void setLinkQuality(bool validFrame, timeDelta_t currentDeltaTimeUs)
 {
     static uint16_t rssiSum = 0;
     static uint16_t rssiCount = 0;
@@ -484,11 +469,12 @@ bool rxUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     return taskUpdateRxMainInProgress() || rxDataProcessingRequired || auxiliaryProcessingRequired;
 }
 
-void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
+FAST_CODE_NOINLINE void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 {
-    bool signalReceived = false;
+    bool rxDataReceived = false;
     bool useDataDrivenProcessing = true;
-    timeDelta_t needRxSignalMaxDelayUs = DELAY_100_MS;
+    timeDelta_t needRxSignalMaxDelayUs = RXLOSS_TRIGGER_INTERVAL;
+    timeDelta_t reCheckRxSignalInterval = RX_FRAME_RECHECK_INTERVAL;
 
     DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 2, MIN(2000, currentDeltaTimeUs / 100));
 
@@ -499,12 +485,10 @@ void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
 
     const uint8_t frameStatus = rxRuntimeState.rcFrameStatusFn(&rxRuntimeState);
     DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 1, (frameStatus & RX_FRAME_FAILSAFE));
-    signalReceived = (frameStatus & RX_FRAME_COMPLETE) && !(frameStatus & (RX_FRAME_FAILSAFE | RX_FRAME_DROPPED));
-    setLinkQuality(signalReceived, currentDeltaTimeUs);
-    //auxiliaryProcessingRequired |= (frameStatus & RX_FRAME_PROCESSING_REQUIRED);
-
-
-    if (signalReceived) {
+            rxDataReceived = (frameStatus & RX_FRAME_COMPLETE) && !(frameStatus & (RX_FRAME_FAILSAFE | RX_FRAME_DROPPED));
+            setLinkQuality(rxDataReceived, currentDeltaTimeUs);
+            auxiliaryProcessingRequired |= (frameStatus & RX_FRAME_PROCESSING_REQUIRED);
+    if (rxDataReceived) {
         //  true only when a new packet arrives
         needRxSignalBefore = currentTimeUs + needRxSignalMaxDelayUs;
         rxSignalReceived = true; // immediately process packet data
@@ -515,28 +499,98 @@ void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
     } else {
         //  watch for next packet
         if (cmpTimeUs(currentTimeUs, needRxSignalBefore) > 0) {
-            //  initial time to signalReceived failure is 100ms, then we check every 100ms
-            rxSignalReceived = false;
-            needRxSignalBefore = currentTimeUs + needRxSignalMaxDelayUs;
-            //  review and process rcData values every 100ms in case failsafe changed them
+            // initial time to rxDataReceived failure is RXLOSS_TRIGGER_INTERVAL (150ms),
+            // after that, we check every RX_FRAME_RECHECK_INTERVAL (50ms)
+            rxSignalReceived = false; // results in `RXLOSS` message etc
+            needRxSignalBefore += reCheckRxSignalInterval;
             rxDataProcessingRequired = true;
         }
     }
 
-    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 0, rxSignalReceived);
+#if defined(USE_RX_MSP_OVERRIDE)
+    if (IS_RC_MODE_ACTIVE(BOXMSPOVERRIDE) && rxConfig.msp_override_channels_mask && rxConfig.msp_override_failsafe) {
+        if (rxMspOverrideFrameStatus() & RX_FRAME_COMPLETE) {
+            rxSignalReceived = true;
+            rxDataProcessingRequired = true;
+            needRxSignalBefore = currentTimeUs + needRxSignalMaxDelayUs;
+        }
+    }
+#endif
+
+    // DEBUG_SET(DEBUG_FAILSAFE, 1, rxSignalReceived);
+    // DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 0, rxSignalReceived);
 }
 
+#if defined(USE_RX_PWM) || defined(USE_RX_PPM)
+static uint16_t calculateChannelMovingAverage(uint8_t chan, uint16_t sample)
+{
+    static int16_t rcSamples[MAX_SUPPORTED_RX_PARALLEL_PWM_OR_PPM_CHANNEL_COUNT][PPM_AND_PWM_SAMPLE_COUNT];
+    static int16_t rcDataMean[MAX_SUPPORTED_RX_PARALLEL_PWM_OR_PPM_CHANNEL_COUNT];
+    static bool rxSamplesCollected = false;
 
-#define PPM_RCVR_TIMEOUT            0
+    const uint8_t currentSampleIndex = rcSampleIndex % PPM_AND_PWM_SAMPLE_COUNT;
 
-static float applyRxChannelRangeConfiguraton(float sample, const rxChannelRangeConfig_t *range)
+    // update the recent samples and compute the average of them
+    rcSamples[chan][currentSampleIndex] = sample;
+
+    // avoid returning an incorrect average which would otherwise occur before enough samples
+    if (!rxSamplesCollected) {
+        if (rcSampleIndex < PPM_AND_PWM_SAMPLE_COUNT) {
+            return sample;
+        }
+        rxSamplesCollected = true;
+    }
+
+    rcDataMean[chan] = 0;
+    for (int sampleIndex = 0; sampleIndex < PPM_AND_PWM_SAMPLE_COUNT; sampleIndex++) {
+        rcDataMean[chan] += rcSamples[chan][sampleIndex];
+    }
+    return rcDataMean[chan] / PPM_AND_PWM_SAMPLE_COUNT;
+}
+#endif
+
+static uint16_t getRxfailValue(uint8_t channel)
+{
+    const rxFailsafeChannelConfig_t *channelFailsafeConfig = &rxFailsafeChannelConfigs[channel];
+    const bool boxFailsafeSwitchIsOn = IS_RC_MODE_ACTIVE(BOXFAILSAFE);
+
+    switch (channelFailsafeConfig->mode) {
+    case RX_FAILSAFE_MODE_AUTO:
+        switch (channel) {
+        case ROLL:
+        case PITCH:
+        case YAW:
+            return rxConfig.midrc;
+        case THROTTLE:
+            if (featureIsEnabled(FEATURE_3D) && !IS_RC_MODE_ACTIVE(BOX3D) && !flight3DConfig.switched_mode3d) {
+                return rxConfig.midrc;
+            } else {
+                return rxConfig.rx_min_usec;
+            }
+        }
+
+    FALLTHROUGH;
+    default:
+    case RX_FAILSAFE_MODE_INVALID:
+    case RX_FAILSAFE_MODE_HOLD:
+        if (boxFailsafeSwitchIsOn) {
+            return rcRaw[channel]; // current values are allowed through on held channels with switch induced failsafe
+        } else {
+            return rcData[channel]; // last good value
+        }
+    case RX_FAILSAFE_MODE_SET:
+        return RXFAIL_STEP_TO_CHANNEL_VALUE(channelFailsafeConfig->step);
+    }
+}
+
+STATIC_UNIT_TESTED float applyRxChannelRangeConfiguraton(float sample, scaleRangef_t *scaler)
 {
     // Avoid corruption of channel with a value of PPM_RCVR_TIMEOUT
     if (sample == PPM_RCVR_TIMEOUT) {
         return PPM_RCVR_TIMEOUT;
     }
 
-    sample = scaleRangef(sample, range->min, range->max, PWM_RANGE_MIN, PWM_RANGE_MAX);
+    sample = scaleRangefApply(scaler, sample);
     // out of range channel values are now constrained after the validity check in detectAndApplySignalLossBehaviour()
     return sample;
 }
@@ -544,274 +598,143 @@ static float applyRxChannelRangeConfiguraton(float sample, const rxChannelRangeC
 static void readRxChannelsApplyRanges(void)
 {
     for (int channel = 0; channel < rxChannelCount; channel++) {
-			const uint8_t rawChannel = channel < RX_MAPPABLE_CHANNEL_COUNT ? rxConfig.rcmap[channel] : channel;
+
+        const uint8_t rawChannel = channel < RX_MAPPABLE_CHANNEL_COUNT ? rxConfig.rcmap[channel] : channel;
+
 			// sample the channel
 			float sample;
+#if defined(USE_RX_MSP_OVERRIDE)
+        if (rxConfig()->msp_override_channels_mask) {
+            sample = rxMspOverrideReadRawRc(&rxRuntimeState, rxConfig(), rawChannel);
+        } else
+#endif
+        {
 			sample = rxRuntimeState.rcReadRawFn(&rxRuntimeState, rawChannel);
+        }
+
 			// apply the rx calibration
 			if (channel < NON_AUX_CHANNEL_COUNT) {
-					sample = applyRxChannelRangeConfiguraton(sample, &rxChannelRangeConfigs[channel]);
+            sample = applyRxChannelRangeConfiguraton(sample, &rxRuntimeState.scaleRange[channel]);
 			}
+
 			rcRaw[channel] = sample;
-			rcData[channel] = (uint16_t)sample;
     }
 }
 
-//void detectAndApplySignalLossBehaviour(void)
-//{
-//    const uint32_t currentTimeMs = millis();
-//    const bool failsafeAuxSwitch = IS_RC_MODE_ACTIVE(BOXFAILSAFE);
-//    rxFlightChannelsValid = rxSignalReceived && !failsafeAuxSwitch;
-//    //  set rxFlightChannelsValid false when a packet is bad or we use a failsafe switch
-//
-//    for (int channel = 0; channel < rxChannelCount; channel++) {
-//        float sample = rcRaw[channel]; // sample has latest RC value, rcData has last 'accepted valid' value
-//        const bool thisChannelValid = rxFlightChannelsValid && isPulseValid(sample);
-//        // if the whole packet is bad, consider all channels bad
-//
-//        if (thisChannelValid) {
-//            //  reset the invalid pulse period timer for every good channel
-//            validRxSignalTimeout[channel] = currentTimeMs + MAX_INVALID_PULSE_TIME_MS;
-//        }
-//
-//        if (ARMING_FLAG(ARMED) && failsafeIsActive()) {
-//            // while in failsafe Stage 2, whether Rx loss or switch induced, pass valid incoming flight channel values
-//            // this allows GPS Rescue to detect the 30% requirement for termination
-//            if (channel < NON_AUX_CHANNEL_COUNT) {
-//                if (!thisChannelValid) {
-//                    if (channel == THROTTLE ) {
-//                        sample = failsafeConfig.failsafe_throttle; // stage 2 failsafe throttle value
-//                    } else {
-//                        sample = rxConfig.midrc;
-//                    }
-//                }
-//            } else {
-//                //  During Stage 2, set aux channels as per Stage 1 configuration
-//                sample = getRxfailValue(channel);
-//            }
-//        } else {
-//            if (failsafeAuxSwitch) {
-//                sample = getRxfailValue(channel);
-//                //  set channels to Stage 1 values immediately failsafe switch is activated
-//            } else if (!thisChannelValid) {
-//                if (cmp32(currentTimeMs, validRxSignalTimeout[channel]) < 0) {
-//                    // first 300ms of Stage 1 failsafe
-//                    sample = rcData[channel];
-//                    //  HOLD last valid value on bad channel/s for MAX_INVALID_PULSE_TIME_MS (300ms)
-//                } else {
-//                    // remaining Stage 1 failsafe period after 300ms
-//                    if (channel < NON_AUX_CHANNEL_COUNT) {
-//                        rxFlightChannelsValid = false;
-//                        //  declare signal lost after 300ms of any one bad flight channel
-//                    }
-//                    sample = getRxfailValue(channel);
-//                    // set channels that are invalid for more than 300ms to Stage 1 values
-//                }
-//            }
-//        }
-//
-//        sample = constrainf(sample, PWM_PULSE_MIN, PWM_PULSE_MAX);
-//
-//#if defined(USE_PWM) || defined(USE_PPM)
-//        if (rxRuntimeState.rxProvider == RX_PROVIDER_PARALLEL_PWM || rxRuntimeState.rxProvider == RX_PROVIDER_PPM) {
-//            //  smooth output for PWM and PPM using moving average
-//            rcData[channel] = calculateChannelMovingAverage(channel, sample);
-//        } else
-//#endif
-//
-//        {
-//            //  set rcData to either validated incoming values, or failsafe-modified values
-//            rcData[channel] = sample;
-//        }
-//    }
-//
-//    if (rxFlightChannelsValid) {
-//        failsafeOnValidDataReceived();
-//        //  --> start the timer to exit stage 2 failsafe
-//    } else {
-//        failsafeOnValidDataFailed();
-//        //  -> start timer to enter stage2 failsafe
-//    }
-//
-//    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 3, rcData[THROTTLE]);
-//}
-
-bool calculateRxChannelsAndUpdateFailsafe(uint32_t currentTimeUs)
+static void detectAndApplySignalLossBehaviour(void)
 {
+    const uint32_t currentTimeMs = millis();
+    const bool boxFailsafeSwitchIsOn = IS_RC_MODE_ACTIVE(BOXFAILSAFE);
+    rxFlightChannelsValid = rxSignalReceived && !boxFailsafeSwitchIsOn;
+    // rxFlightChannelsValid is false after RXLOSS_TRIGGER_INTERVAL of no packets, or as soon as use the BOXFAILSAFE switch is actioned
+    // rxFlightChannelsValid is true the instant we get a good packet or the BOXFAILSAFE switch is reverted
+    // can also go false with good packets but where one flight channel is bad > 300ms (PPM type receiver error)
 
-  if (!rxDataProcessingRequired) {
-      return false;
-  }
+    for (int channel = 0; channel < rxChannelCount; channel++) {
+        float sample = rcRaw[channel]; // sample has latest RC value, rcData has last 'accepted valid' value
+        const bool thisChannelValid = rxFlightChannelsValid && isPulseValid(sample);
+        // if the whole packet is bad, or BOXFAILSAFE switch is actioned, consider all channels bad
+        if (thisChannelValid) {
+            //  reset the invalid pulse period timer for every good channel
+            validRxSignalTimeout[channel] = currentTimeMs + MAX_INVALID_PULSE_TIME_MS;
+        }
 
-  rxDataProcessingRequired = false;
+        if (failsafeIsActive()) {
+            // we are in failsafe Stage 2, whether Rx loss or BOXFAILSAFE induced
+            // pass valid incoming flight channel values to FC,
+            // so that GPS Rescue can get the 30% requirement for termination of the rescue
+            if (channel < NON_AUX_CHANNEL_COUNT) {
+                if (!thisChannelValid) {
+                    if (channel == THROTTLE ) {
+                        sample = failsafeConfig.failsafe_throttle;
+                        // stage 2 failsafe throttle value. In GPS Rescue Flight mode, altitude control overrides, late in mixer.c
+                    } else {
+                        sample = rxConfig.midrc;
+                    }
+                }
+            } else {
+                // set aux channels as per Stage 1 failsafe hold/set values, allow all for Failsafe and GPS rescue MODE switches
+                sample = getRxfailValue(channel);
+            }
+        } else {
+            // we are normal, or in failsafe stage 1
+            if (boxFailsafeSwitchIsOn) {
+                // BOXFAILSAFE active, but not in stage 2 yet, use stage 1 values
+                sample = getRxfailValue(channel);
+                //  set channels to Stage 1 values immediately failsafe switch is activated
+            } else if (!thisChannelValid) {
+                // everything is normal but this channel was invalid
+                if (cmp32(currentTimeMs, validRxSignalTimeout[channel]) < 0) {
+                    // first 300ms of Stage 1 failsafe
+                    sample = rcData[channel];
+                    //  HOLD last valid value on bad channel/s for MAX_INVALID_PULSE_TIME_MS (300ms)
+                } else {
+                    // remaining Stage 1 failsafe period after 300ms
+                    if (channel < NON_AUX_CHANNEL_COUNT) {
+                        rxFlightChannelsValid = false;
+                        //  declare signal lost after 300ms of any one bad flight channel
+                    }
+                    sample = getRxfailValue(channel);
+                    // set channels that are invalid for more than 300ms to Stage 1 values
+                }
+            }
+            // everything is normal, ie rcData[channel] will be set to rcRaw(channel) via 'sample'
+        }
+
+        sample = constrainf(sample, PWM_PULSE_MIN, PWM_PULSE_MAX);
+
+#if defined(USE_RX_PWM) || defined(USE_RX_PPM)
+        if (rxRuntimeState.rxProvider == RX_PROVIDER_PARALLEL_PWM || rxRuntimeState.rxProvider == RX_PROVIDER_PPM) {
+            //  smooth output for PWM and PPM using moving average
+            rcData[channel] = calculateChannelMovingAverage(channel, sample);
+        } else
+#endif
+
+        {
+            //  set rcData to either validated incoming values, or failsafe-modified values
+            rcData[channel] = sample;
+        }
+    }
+
+    if (rxFlightChannelsValid) {
+        failsafeOnValidDataReceived();
+        //  --> start the timer to exit stage 2 failsafe 100ms after losing all packets or the BOXFAILSAFE switch is actioned
+    } else {
+        failsafeOnValidDataFailed();
+        //  -> start stage 1 timer to enter stage2 failsafe the instant we get a good packet or the BOXFAILSAFE switch is reverted
+    }
+
+    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 3, rcData[THROTTLE]);
+}
+
+bool calculateRxChannelsAndUpdateFailsafe(timeUs_t currentTimeUs)
+{
+    if (auxiliaryProcessingRequired) {
+        rxRuntimeState.rcProcessFrameFn(&rxRuntimeState);
+        auxiliaryProcessingRequired = false;
+    }
+
+    if (!rxDataProcessingRequired) {
+        return false;
+    }
+
+    rxDataProcessingRequired = false;
+
+    // only proceed when no more samples to skip and suspend period is over
+    if (skipRxSamples || currentTimeUs <= suspendRxSignalUntil) {
+        if (currentTimeUs > suspendRxSignalUntil) {
+            skipRxSamples--;
+        }
+
+    return true;
+    }
 
     readRxChannelsApplyRanges();            // returns rcRaw
-    //detectAndApplySignalLossBehaviour();    // returns rcData
+    detectAndApplySignalLossBehaviour();    // returns rcData
 
     rcSampleIndex++;
 
     return true;
-}
-
-/*
- * processRx called from taskUpdateRxMain
- */
-bool processRx(timeUs_t currentTimeUs)
-{
-    if (!calculateRxChannelsAndUpdateFailsafe(currentTimeUs)) {
-        return false;
-    }
-
-    updateRcRefreshRate(currentTimeUs);
-
-    updateRSSI(currentTimeUs);
-
-    //const throttleStatus_e throttleStatus = calculateThrottleStatus(THROTTLE_STATUS_TYPE_RC);
-    //const uint8_t throttlePercent = calculateThrottlePercentAbs();
-
-//    /* In airmode iterm should be prevented to grow when Low thottle and Roll + Pitch Centered.
-//     This is needed to prevent iterm winding on the ground, but keep full stabilisation on 0 throttle while in air */
-//    if (throttleStatus == THROTTLE_LOW && !airmodeIsActivated && !launchControlActive) {
-//      Reset_All_PID_Integrator();
-//    }
-
-    return true;
-}
-
-unsigned short rx_SwArm_Prev = 0;
-bool armingSwitchIsActive;
-void processRxModes(uint32_t currentTimeUs)
-{
-  armingSwitchIsActive= IS_RC_MODE_ACTIVE(BOXARM);
-	if(rcData[ARM] == 2000 && rx_SwArm_Prev != 2000)
-	{
-		if(rcData[THROTTLE] <1030)
-		{
-			ENABLE_ARMING_FLAG(ARMED);
-			ENABLE_ARMING_FLAG(WAS_EVER_ARMED);
-			yaw_heading_reference = (float)DECIDEGREES_TO_DEGREES(attitude.values.yaw);
-			headFreeModeHold = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
-			imuQuaternionHeadfreeOffsetSet();
-
-#if defined(USE_DYN_NOTCH_FILTER)
-      resetMaxFFT();
-#endif
-			GPS_reset_home_position();
-#ifdef USE_PERSISTENT_STATS
-			 statsOnArm();
-#endif
-		}
-		else
-		{
-			UNUSED(currentTimeUs); //Alarm
-		}
-
-	}
-	rx_SwArm_Prev = rcData[ARM];
-
-	if(rcData[ARM] != 2000)
-	{
-		DISABLE_ARMING_FLAG(ARMED);
-		statsOnDisarm();
-	}
-
-	ENABLE_FLIGHT_MODE(ANGLE_MODE);
-
-#ifdef USE_GPS1
-  static uint8_t GPSNavReset = 1;
-  if (STATE(GPS_FIX) && GpsNav.GPS_numSat >= 5 ) {
-    if (rcData[SC] >= 1500) {  // if both GPS_HOME & GPS_HOLD are checked => GPS_HOME is the priority
-      if (!FLIGHT_MODE(NAV_RTH_MODE))  {
-        ENABLE_FLIGHT_MODE(NAV_RTH_MODE);
-        DISABLE_FLIGHT_MODE(NAV_POSHOLD_MODE);
-        GPSNavReset = 0;
-        GPS_set_next_wp(&GpsNav.GPS_home[LAT],&GpsNav.GPS_home[LON]);
-        GpsNav.nav_mode = NAV_MODE_WP;
-      }
-    } else {
-      DISABLE_FLIGHT_MODE(NAV_RTH_MODE);
-      if ((rcData[SC] >= 1950) && abs(rcCommand[ROLL])< AP_MODE && abs(rcCommand[PITCH]) < AP_MODE) {
-        if (!FLIGHT_MODE(NAV_POSHOLD_MODE)) {
-          ENABLE_FLIGHT_MODE(NAV_POSHOLD_MODE);
-          GPSNavReset = 0;
-          GpsNav.GPS_hold[LAT] = GpsNav.GPS_coord[LAT];
-          GpsNav.GPS_hold[LON] = GpsNav.GPS_coord[LON];
-          GPS_set_next_wp(&GpsNav.GPS_hold[LAT],&GpsNav.GPS_hold[LON]);
-          GpsNav.nav_mode = NAV_MODE_POSHOLD;
-        }
-      } else {
-        DISABLE_FLIGHT_MODE(NAV_POSHOLD_MODE);
-        // both boxes are unselected here, nav is reset if not already done
-        if (GPSNavReset == 0 ) {
-          GPSNavReset = 1;
-          GPS_reset_nav();
-        }
-      }
-    }
-  } else {
-    DISABLE_FLIGHT_MODE(NAV_RTH_MODE);
-    DISABLE_FLIGHT_MODE(NAV_POSHOLD_MODE);
-
-    GpsNav.nav_mode = NAV_MODE_NONE;
-  }
-#endif
-
-  if (sensors(SENSOR_ACC) || sensors(SENSOR_MAG)) {
-      if (IS_RC_MODE_ACTIVE(BOXMAG)) {
-          if (!FLIGHT_MODE(MAG_MODE)) {
-              resetHeadingHoldTarget(DECIDEGREES_TO_DEGREES(attitude.values.yaw));
-              ENABLE_FLIGHT_MODE(MAG_MODE);
-          }
-      } else {
-          DISABLE_FLIGHT_MODE(MAG_MODE);
-      }
-  }
-
-  #if defined(USE_MAG)
-      if (sensors(SENSOR_ACC) || sensors(SENSOR_MAG)) {
-          if (IS_RC_MODE_ACTIVE(BOXHEADFREE)) {
-              if (!FLIGHT_MODE(HEADFREE_MODE)) {
-                  ENABLE_FLIGHT_MODE(HEADFREE_MODE);
-              }
-          } else {
-              DISABLE_FLIGHT_MODE(HEADFREE_MODE);
-          }
-          if (IS_RC_MODE_ACTIVE(BOXHEADADJ)) {
-              headFreeModeHold = DECIDEGREES_TO_DEGREES(attitude.values.yaw); // acquire new heading
-          }
-      }
-  #endif
-
-  #ifdef USE_GPS_RESCUE
-    if (ARMING_FLAG(ARMED) && (IS_RC_MODE_ACTIVE(BOXGPSRESCUE))) { // || (failsafeIsActive() && failsafeConfig()->failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE
-        if (!FLIGHT_MODE(GPS_RESCUE_MODE)) {
-            ENABLE_FLIGHT_MODE(GPS_RESCUE_MODE);
-        }
-    } else {
-        DISABLE_FLIGHT_MODE(GPS_RESCUE_MODE);
-    }
-  #endif
-
-  if (!ARMING_FLAG(ARMED))
-  {
-    processRcStickPositions();
-  }
-
-  updateActivatedModes();
-
-  if (!ARMING_FLAG(ARMED)) {
-      processRcAdjustments();
-  }
-
-  if(rcData[SF] == 2000)
-  {
-    writeSDCard(PID_Roll_in);
-    writeSDCard(PID_Roll_out);
-    writeSDCard(PID_pitch_in);
-    writeSDCard(PID_pitch_out);
-    writeSDCard(PID_yaw_heading);
-    writeSDCard(PID_yaw_rate);
-  }
 }
 
 void parseRcChannels(const char *input, rxConfig_t *rxConfig)
@@ -831,20 +754,7 @@ void setRssiDirect(uint16_t newRssi, rssiSource_e source)
     }
 
     rssi = newRssi;
-}
-
-#define RSSI_SAMPLE_COUNT 16
-
-static uint16_t updateRssiSamples(uint16_t value)
-{
-    static uint16_t samples[RSSI_SAMPLE_COUNT];
-    static uint8_t sampleIndex = 0;
-    static unsigned sum = 0;
-
-    sum += value - samples[sampleIndex];
-    samples[sampleIndex] = value;
-    sampleIndex = (sampleIndex + 1) % RSSI_SAMPLE_COUNT;
-    return sum / RSSI_SAMPLE_COUNT;
+    rssiRaw = newRssi;
 }
 
 void setRssi(uint16_t rssiValue, rssiSource_e source)
@@ -855,10 +765,9 @@ void setRssi(uint16_t rssiValue, rssiSource_e source)
 
     // Filter RSSI value
     if (source == RSSI_SOURCE_FRAME_ERRORS) {
-        rssi = pt1FilterApply(&frameErrFilter, rssiValue);
+        rssiRaw = pt1FilterApply(&frameErrFilter, rssiValue);
     } else {
-        // calculate new sample mean
-        rssi = updateRssiSamples(rssiValue);
+        rssiRaw = rssiValue;
     }
 }
 
@@ -874,16 +783,18 @@ void setRssiMsp(uint8_t newMspRssi)
     }
 }
 
+DEFINE_SCALE_FN(scaleRangePwmRssi, PWM_RANGE_MIN, PWM_RANGE_MAX, 0, RSSI_MAX_VALUE)
+
 static void updateRSSIPWM(void)
 {
     // Read value of AUX channel as rssi
-    int16_t pwmRssi = rcData[rxConfig.rssi_channel - 1]; //.rssi_channel = 0
+    int16_t pwmRssi = rcData[rxConfig.rssi_channel - 1];
 
     // Range of rawPwmRssi is [1000;2000]. rssi should be in [0;1023];
-    setRssiDirect(scaleRange(constrain(pwmRssi, PWM_RANGE_MIN, PWM_RANGE_MAX), PWM_RANGE_MIN, PWM_RANGE_MAX, 0, RSSI_MAX_VALUE), RSSI_SOURCE_RX_CHANNEL);
+    setRssiDirect(scaleRangePwmRssi(constrain(pwmRssi, PWM_RANGE_MIN, PWM_RANGE_MAX)), RSSI_SOURCE_RX_CHANNEL);
 }
 
-static void updateRSSIADC(uint32_t currentTimeUs)
+static void updateRSSIADC(timeUs_t currentTimeUs)
 {
 #ifndef USE_ADC
     UNUSED(currentTimeUs);
@@ -893,7 +804,7 @@ static void updateRSSIADC(uint32_t currentTimeUs)
     if ((int32_t)(currentTimeUs - rssiUpdateAt) < 0) {
         return;
     }
-    rssiUpdateAt = currentTimeUs + DELAY_20_MS;
+    rssiUpdateAt = currentTimeUs + RSSI_UPDATE_INTERVAL;
 
     const uint16_t adcRssiSample = adcGetValue(ADC_RSSI);
     uint16_t rssiValue = adcRssiSample / RSSI_ADC_DIVISOR;
@@ -902,7 +813,7 @@ static void updateRSSIADC(uint32_t currentTimeUs)
 #endif
 }
 
-void updateRSSI(uint32_t currentTimeUs)
+void updateRSSI(timeUs_t currentTimeUs)
 {
     switch (rssiSource) {
     case RSSI_SOURCE_RX_CHANNEL:
@@ -919,6 +830,37 @@ void updateRSSI(uint32_t currentTimeUs)
     default:
         break;
     }
+
+    if (cmpTimeUs(currentTimeUs, lastRssiSmoothingUs) > 250000) { // 0.25s
+        lastRssiSmoothingUs = currentTimeUs;
+    } else {
+        if (lastRssiSmoothingUs != currentTimeUs) { // avoid div by 0
+            float k = (256.0f - rxConfig.rssi_smoothing) / 256.0f;
+            float factor = ((currentTimeUs - lastRssiSmoothingUs) / 1000000.0f) / (1.0f / 4.0f);
+            float k2  = (k * factor) / ((k * factor) - k + 1);
+
+            if (rssi != rssiRaw) {
+                pt1FilterUpdateCutoff(&rssiFilter, k2);
+                rssi = pt1FilterApply(&rssiFilter, rssiRaw);
+            }
+
+#ifdef USE_RX_RSSI_DBM
+            if (rssiDbm != rssiDbmRaw) {
+                pt1FilterUpdateCutoff(&rssiDbmFilter, k2);
+                rssiDbm = pt1FilterApply(&rssiDbmFilter, rssiDbmRaw);
+            }
+#endif //USE_RX_RSSI_DBM
+
+#ifdef USE_RX_RSNR
+            if (rsnr != rsnrRaw) {
+                pt1FilterUpdateCutoff(&rsnrFilter, k2);
+                rsnr = pt1FilterApply(&rsnrFilter, rsnrRaw);
+            }
+#endif //USE_RX_RSNR
+
+            lastRssiSmoothingUs = currentTimeUs;
+        }
+    }
 }
 
 uint16_t getRssi(void)
@@ -933,28 +875,17 @@ uint16_t getRssi(void)
     return rxConfig.rssi_scale / 100.0f * rssiValue + rxConfig.rssi_offset * RSSI_OFFSET_SCALING; //.rssi_scale = 100, .rssi_offset = 0
 }
 
+DEFINE_SCALE_FN(scaleRangeRssiPercent, 0, RSSI_MAX_VALUE, 0, 100)
+
 uint8_t getRssiPercent(void)
 {
-    return scaleRange(getRssi(), 0, RSSI_MAX_VALUE, 0, 100);
+    return scaleRangeRssiPercent(getRssi());
 }
 
+#ifdef USE_RX_RSSI_DBM
 int16_t getRssiDbm(void)
 {
     return rssiDbm;
-}
-
-#define RSSI_SAMPLE_COUNT_DBM 16
-
-static int16_t updateRssiDbmSamples(int16_t value)
-{
-    static int16_t samplesdbm[RSSI_SAMPLE_COUNT_DBM];
-    static uint8_t sampledbmIndex = 0;
-    static int sumdbm = 0;
-
-    sumdbm += value - samplesdbm[sampledbmIndex];
-    samplesdbm[sampledbmIndex] = value;
-    sampledbmIndex = (sampledbmIndex + 1) % RSSI_SAMPLE_COUNT_DBM;
-    return sumdbm / RSSI_SAMPLE_COUNT_DBM;
 }
 
 void setRssiDbm(int16_t rssiDbmValue, rssiSource_e source)
@@ -963,7 +894,7 @@ void setRssiDbm(int16_t rssiDbmValue, rssiSource_e source)
         return;
     }
 
-    rssiDbm = updateRssiDbmSamples(rssiDbmValue);
+    rssiDbmRaw = rssiDbmValue;
 }
 
 void setRssiDbmDirect(int16_t newRssiDbm, rssiSource_e source)
@@ -973,7 +904,38 @@ void setRssiDbmDirect(int16_t newRssiDbm, rssiSource_e source)
     }
 
     rssiDbm = newRssiDbm;
+    rssiDbmRaw = newRssiDbm;
 }
+
+int8_t getActiveAntenna(void)
+{
+    return activeAntenna;
+}
+
+void setActiveAntenna(int8_t antenna)
+{
+    activeAntenna = antenna;
+}
+
+#endif //USE_RX_RSSI_DBM
+
+#ifdef USE_RX_RSNR
+int16_t getRsnr(void)
+{
+    return rsnr;
+}
+
+void setRsnr(int16_t rsnrValue)
+{
+    rsnrRaw = rsnrValue;
+}
+
+void setRsnrDirect(int16_t newRsnr)
+{
+    rsnr = newRsnr;
+    rsnrRaw = newRsnr;
+}
+#endif //USE_RX_RSNR
 
 #ifdef USE_RX_LINK_QUALITY_INFO
 uint16_t rxGetLinkQuality(void)
@@ -986,9 +948,11 @@ uint8_t rxGetRfMode(void)
     return rfMode;
 }
 
+DEFINE_SCALE_FN(scaleRangeLinkQuality, 0, LINK_QUALITY_MAX_VALUE, 0, 100)
+
 uint16_t rxGetLinkQualityPercent(void)
 {
-    return (linkQualitySource == LQ_SOURCE_NONE) ? scaleRange(linkQuality, 0, LINK_QUALITY_MAX_VALUE, 0, 100) : linkQuality;
+    return (linkQualitySource == LQ_SOURCE_NONE) ? scaleRangeLinkQuality(linkQuality) : linkQuality;
 }
 #endif
 
@@ -999,55 +963,9 @@ uint16_t rxGetUplinkTxPwrMw(void)
 }
 #endif
 
-uint16_t rxGetRefreshRate(void)
-{
-    return rxRuntimeState.rxRefreshRate;
-}
-
 bool isRssiConfigured(void)
 {
     return rssiSource != RSSI_SOURCE_NONE;
-}
-
-int32_t rxGetFrameDelta(int32_t *frameAgeUs)
-{
-    static uint32_t previousFrameTimeUs = 0;
-    static int32_t frameTimeDeltaUs = 0;
-
-    if (rxRuntimeState.rcFrameTimeUsFn) {
-        const uint32_t frameTimeUs = rxRuntimeState.rcFrameTimeUsFn();
-
-        *frameAgeUs = cmpTimeUs(micros(), frameTimeUs);
-
-        const int32_t deltaUs = cmpTimeUs(frameTimeUs, previousFrameTimeUs);
-        if (deltaUs) {
-            frameTimeDeltaUs = deltaUs;
-            previousFrameTimeUs = frameTimeUs;
-        }
-    }
-
-    return frameTimeDeltaUs;
-}
-
-uint32_t rxFrameTimeUs(void)
-{
-    return rxRuntimeState.lastRcFrameTimeUs;
-}
-
-// calculate the throttle stick percent - integer math is good enough here.
-// returns negative values for reversed thrust in 3D mode
-int8_t calculateThrottlePercent(void)
-{
-    uint8_t ret = 0;
-    int channelData = constrain(rcData[THROTTLE], PWM_RANGE_MIN, PWM_RANGE_MAX);
-
-    ret = ABS(constrain(((channelData - rxConfig.mincheck) * 100) / (PWM_RANGE_MAX - rxConfig.mincheck), 0, 100));
-    return ret;
-}
-
-uint8_t calculateThrottlePercentAbs(void)
-{
-    return ABS(calculateThrottlePercent());
 }
 
 #ifdef _USE_HW_CLI

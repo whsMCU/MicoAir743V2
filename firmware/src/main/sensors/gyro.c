@@ -305,16 +305,6 @@ FAST_CODE void gyroUpdate(timeUs_t currentTimeUs)
   DEBUG_SET(DEBUG_GYRO_RAW, 1, (bmi270.gyro.gyroADC.x));
   DEBUG_SET(DEBUG_GYRO_RAW, 2, (bmi270.gyro.gyroADC.y));
   DEBUG_SET(DEBUG_GYRO_RAW, 3, (bmi270.gyro.gyroADC.z));
-
-#ifdef USE_OPTICALFLOW
-  // getTaskDeltaTime() returns delta time frozen at the moment of entering the scheduler. currentTime is frozen at the very same point.
-  // To make busy-waiting timeout work we need to account for time spent within busy-waiting loop
-  const timeDelta_t currentDeltaTime = getTaskDeltaTimeUs(TASK_SELF);
-
-    if (sensors(SENSOR_OPTICALFLOW)) {
-        opflowGyroUpdateCallback(currentDeltaTime);
-    }
-#endif
 }
 
 static FAST_CODE void filterGyro(void)

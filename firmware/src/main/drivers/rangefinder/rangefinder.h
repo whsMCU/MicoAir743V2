@@ -1,39 +1,43 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/time.h"
-//#include "drivers/io.h"
-//#include "drivers/bus.h"
+#include "drivers/io_types.h"
 
 #define RANGEFINDER_OUT_OF_RANGE        (-1)
 #define RANGEFINDER_HARDWARE_FAILURE    (-2)
 #define RANGEFINDER_NO_NEW_DATA         (-3)
 
-struct rangefinderDev_s;
+typedef struct rangefinderHardwarePins_s {
+    ioTag_t triggerTag;
+    ioTag_t echoTag;
+} rangefinderHardwarePins_t;
 
+struct rangefinderDev_s;
 typedef void (*rangefinderOpInitFuncPtr)(struct rangefinderDev_s * dev);
 typedef void (*rangefinderOpStartFuncPtr)(struct rangefinderDev_s * dev);
 typedef int32_t (*rangefinderOpReadFuncPtr)(struct rangefinderDev_s * dev);
 
 typedef struct rangefinderDev_s {
-    //busDevice_t * busDev;           // Device on a bus (if applicable)
-
     timeMs_t delayMs;
     int16_t maxRangeCm;
 
@@ -46,3 +50,7 @@ typedef struct rangefinderDev_s {
     rangefinderOpStartFuncPtr update;
     rangefinderOpReadFuncPtr read;
 } rangefinderDev_t;
+
+extern int16_t rangefinderMaxRangeCm;
+extern int16_t rangefinderMaxAltWithTiltCm;
+extern int16_t rangefinderCfAltCm;

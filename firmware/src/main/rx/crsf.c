@@ -481,7 +481,7 @@ void crsfDataReceive(uint16_t c, void *data)
                 case CRSF_FRAMETYPE_COMMAND:
                     if ((crsfFrame.bytes[fullFrameLength - 2] == crsfFrameCmdCRC()) &&
                         (crsfFrame.bytes[3] == CRSF_ADDRESS_FLIGHT_CONTROLLER)) {
-                        //crsfProcessCommand(crsfFrame.frame.payload + CRSF_FRAME_ORIGIN_DEST_SIZE);
+                        crsfProcessCommand(crsfFrame.frame.payload + CRSF_FRAME_ORIGIN_DEST_SIZE);
                     }
                     break;
 #endif
@@ -517,8 +517,7 @@ STATIC_UNIT_TESTED uint8_t crsfFrameStatus(rxRuntimeState_t *rxRuntimeState)
 #endif
     if (crsfFrameDone) {
         crsfFrameDone = false;
-        DISABLE_FAILSAFE(FAILSAFE_RX_LOSS_DETECTED);
-        rxRuntimeState->RxCount++;
+
         // unpack the RC channels
         if (crsfChannelDataFrame.frame.type == CRSF_FRAMETYPE_RC_CHANNELS_PACKED) {
             // use ordinary RC frame structure (0x16)
@@ -646,7 +645,7 @@ void crsfRxSendTelemetryData(void)
 {
     // if there is telemetry data to write
     if (telemetryBufLen > 0) {
-        serialWriteBuf(_DEF_UART2, telemetryBuf, telemetryBufLen);
+        serialWriteBuf(_DEF_UART6, telemetryBuf, telemetryBufLen);
         telemetryBufLen = 0; // reset telemetry buffer
     }
 }
@@ -667,6 +666,9 @@ bool crsfRxInit(rxRuntimeState_t *rxRuntimeState)
     rxRuntimeState->rcFrameStatusFn = crsfFrameStatus;
 
     uint32_t crsfBaudrate = CRSF_BAUDRATE;
+    #if defined(USE_CRSF_V3)
+    crsfBaudrate = rxConfig->crsf_use_negotiated_baud ? getCrsfCachedBaudrate() : CRSF_BAUDRATE;
+#endif
     uartOpen(_DEF_UART6, crsfBaudrate);
 
     if (rssiSource == RSSI_SOURCE_NONE) {
@@ -723,19 +725,17 @@ bool crsfRxIsActive(void)
 
 void crsfRxBind(void)
 {
-    if (serialPort != NULL) {
-        uint8_t bindFrame[] = {
-            CRSF_SYNC_BYTE,
-            0x07,  // frame length
-            CRSF_FRAMETYPE_COMMAND,
-            CRSF_ADDRESS_CRSF_RECEIVER,
-            CRSF_ADDRESS_FLIGHT_CONTROLLER,
-            CRSF_COMMAND_SUBCMD_RX,
-            CRSF_COMMAND_SUBCMD_RX_BIND,
-            0x9E,  // Command CRC8
-            0xE8,  // Packet CRC8
-        };
-        serialWriteBuf(_DEF_UART2, bindFrame, 9);
-    }
+		uint8_t bindFrame[] = {
+				CRSF_SYNC_BYTE,
+				0x07,  // frame length
+				CRSF_FRAMETYPE_COMMAND,
+				CRSF_ADDRESS_CRSF_RECEIVER,
+				CRSF_ADDRESS_FLIGHT_CONTROLLER,
+				CRSF_COMMAND_SUBCMD_RX,
+				CRSF_COMMAND_SUBCMD_RX_BIND,
+				0x9E,  // Command CRC8
+				0xE8,  // Packet CRC8
+		};
+		serialWriteBuf(_DEF_UART6, bindFrame, 9);
 }
 #endif

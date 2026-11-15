@@ -42,10 +42,15 @@
 #include "common/sdft.h"
 #include "common/utils.h"
 
-#include "sensors/gyro.h"
-#include "rx/rx.h"
+#include "config/feature.h"
 
-#include "flight/dyn_notch_filter.h"
+#include "drivers/time.h"
+
+#include "fc/core.h"
+
+#include "sensors/gyro.h"
+
+#include "dyn_notch_filter.h"
 
 // SDFT_SAMPLE_SIZE defaults to 72 (common/sdft.h).
 // We get 36 frequency bins from 72 consecutive data values, called SDFT_BIN_COUNT (common/sdft.h)

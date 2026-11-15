@@ -95,18 +95,18 @@ typedef enum {
 // type to hold enough bits for CHECKBOX_ITEM_COUNT. Struct used for value-like behavior
 typedef struct boxBitmask_s { uint32_t bits[(CHECKBOX_ITEM_COUNT + 31) / 32]; } boxBitmask_t;
 
-#define MAX_MODE_ACTIVATION_CONDITION_COUNT 40
+#define MAX_MODE_ACTIVATION_CONDITION_COUNT 20
+
+#define STICKY_MODE_BOOT_DELAY_US (5 * 1000 * 1000)
 
 #define CHANNEL_RANGE_MIN 900
 #define CHANNEL_RANGE_MAX 2100
 
-#define CHANNEL_RANGE_STEP_WIDTH 25
-
-#define MODE_STEP_TO_CHANNEL_VALUE(step) (CHANNEL_RANGE_MIN + CHANNEL_RANGE_STEP_WIDTH * step)
-#define CHANNEL_VALUE_TO_STEP(channelValue) ((constrain(channelValue, CHANNEL_RANGE_MIN, CHANNEL_RANGE_MAX) - CHANNEL_RANGE_MIN) / CHANNEL_RANGE_STEP_WIDTH)
+#define MODE_STEP_TO_CHANNEL_VALUE(step) (CHANNEL_RANGE_MIN + 25 * step)
+#define CHANNEL_VALUE_TO_STEP(channelValue) ((constrain(channelValue, CHANNEL_RANGE_MIN, CHANNEL_RANGE_MAX) - CHANNEL_RANGE_MIN) / 25)
 
 #define MIN_MODE_RANGE_STEP 0
-#define MAX_MODE_RANGE_STEP ((CHANNEL_RANGE_MAX - CHANNEL_RANGE_MIN) / CHANNEL_RANGE_STEP_WIDTH)
+#define MAX_MODE_RANGE_STEP ((CHANNEL_RANGE_MAX - CHANNEL_RANGE_MIN) / 25)
 
 // steps are 25 apart
 // a value of 0 corresponds to a channel value of 900 or less
@@ -130,12 +130,10 @@ extern modeActivationCondition_t modeActivationConditions[MAX_MODE_ACTIVATION_CO
 #if defined(USE_CUSTOM_BOX_NAMES)
 
 #define MAX_BOX_USER_NAME_LENGTH 16
-
+#define BOX_USER_NAME_COUNT      4
+//STATIC_ASSERT(BOXUSER4 + 1 - BOXUSER1 == BOX_USER_NAME_COUNT, "Invalid BOX_USER_NAME_COUNT");
 typedef struct modeActivationConfig_s {
-    char box_user_1_name[MAX_BOX_USER_NAME_LENGTH];
-    char box_user_2_name[MAX_BOX_USER_NAME_LENGTH];
-    char box_user_3_name[MAX_BOX_USER_NAME_LENGTH];
-    char box_user_4_name[MAX_BOX_USER_NAME_LENGTH];
+    char box_user_names[BOX_USER_NAME_COUNT][MAX_BOX_USER_NAME_LENGTH];
 } modeActivationConfig_t;
 
 PG_DECLARE(modeActivationConfig_t, modeActivationConfig);
@@ -148,9 +146,9 @@ typedef struct modeActivationProfile_s {
 #define IS_RANGE_USABLE(range) ((range)->startStep < (range)->endStep)
 
 bool IS_RC_MODE_ACTIVE(boxId_e boxId);
-void rcModeUpdate(boxBitmask_t *newState);
+void rcModeUpdate(const boxBitmask_t *newState);
 
-bool airmodeIsEnabled(void);
+bool isAirmodeEnabled(void);
 
 bool isRangeActive(uint8_t auxChannelIndex, const channelRange_t *range);
 void updateActivatedModes(void);
@@ -159,4 +157,3 @@ bool isModeActivationConditionLinked(boxId_e modeId);
 void removeModeActivationCondition(boxId_e modeId);
 bool isModeActivationConditionConfigured(const modeActivationCondition_t *mac, const modeActivationCondition_t *emptyMac);
 void analyzeModeActivationConditions(void);
-void MSP_SET_MODE_RANGE(uint32_t i, uint8_t boxId, uint8_t auxChannelIndex, uint32_t start, uint32_t end);

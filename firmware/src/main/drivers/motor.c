@@ -32,6 +32,7 @@
 #include "flight/pid.h"
 
 #include "fc/runtime_config.h"
+#include "fc/rc_controls.h"
 
 #include "drivers/dshot.h"
 #include "drivers/motor.h"
@@ -132,7 +133,7 @@ FAST_CODE void motorWriteAll(void)
 {
   if(ARMING_FLAG(ARMED))
   {
-    if(failsafeFlags == 0)
+    if(true)//failsafeFlags == 0
     {
       if(rcData[THROTTLE] > 1030)
       {

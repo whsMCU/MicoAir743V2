@@ -58,27 +58,38 @@ extern const char * const osdLaunchControlModeNames[LAUNCH_CONTROL_MODE_COUNT];
 
 extern throttleCorrectionConfig_t throttleCorrectionConfig;
 
+union rollAndPitchTrims_u;
+void handleInflightCalibrationStickPosition(void);
+
+void resetArmingDisabled(void);
+
 void throttleCorrectionConfig_Init(void);
 
 void disarm(flightLogDisarmReason_e reason);
 void tryArm(void);
 
+bool processRx(timeUs_t currentTimeUs);
+void processRxModes(timeUs_t currentTimeUs);
+void updateArmingStatus(void);
+
 void taskGyroSample(timeUs_t currentTimeUs);
-
 bool gyroFilterReady(void);
-
 bool pidLoopReady(void);
-
 void taskFiltering(timeUs_t currentTimeUs);
-
 void taskMainPidLoop(timeUs_t currentTimeUs);
 
-bool areSticksActive(uint8_t stickPercentLimit);
-
 bool isCrashFlipModeActive(void);
+int8_t calculateThrottlePercent(void);
+uint8_t calculateThrottlePercentAbs(void);
+bool areSticksActive(uint8_t stickPercentLimit);
+void runawayTakeoffTemporaryDisable(uint8_t disableFlag);
+bool wasThrottleRaised(void);
 timeUs_t getLastDisarmTimeUs(void);
 bool isTryingToArm(void);
 void resetTryingToArm(void);
+
+void subTaskTelemetryPollSensors(timeUs_t currentTimeUs);
+
 bool isLaunchControlActive(void);
 
 #endif /* SRC_MAIN_FC_CORE_H_ */

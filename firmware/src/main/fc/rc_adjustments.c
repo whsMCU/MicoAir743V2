@@ -24,6 +24,10 @@
 
 #include <math.h>
 
+#include "hw.h"
+
+//#include "blackbox/blackbox.h"
+//#include "blackbox/blackbox_fielddefs.h"
 
 #include "build/build_config.h"
 
@@ -31,21 +35,28 @@
 #include "common/maths.h"
 #include "common/utils.h"
 
-//#include "config/feature.h"
+#include "config/feature.h"
 
-#include "time.h"
+#include "common/time.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 //#include "fc/controlrate_profile.h"
 #include "fc/rc_controls.h"
-//#include "fc/rc.h"
+#include "fc/rc.h"
 
 #include "flight/pid.h"
 //#include "flight/pid_init.h"
+//#include "config/simplified_tuning.h"
 
-#include "io/ledstrip.h"
+// #include "io/beeper.h"
+// #include "io/ledstrip.h"
+// #include "io/pidaudio.h"
 
 #include "osd/osd.h"
+
+// #include "pg/pg.h"
+// #include "pg/pg_ids.h"
+// #include "pg/rx.h"
 
 #include "rx/rx.h"
 
@@ -79,11 +90,11 @@ uint8_t pidAudioPositionToModeMap[7] = {
     // Note: Last 3 positions are currently pending implementations and use PID_AUDIO_OFF for now.
 };
 
-static int stepwiseAdjustmentCount = ADJUSTMENT_RANGE_COUNT_INVALID;
-static timedAdjustmentState_t stepwiseAdjustments[MAX_ADJUSTMENT_RANGE_COUNT];
+STATIC_UNIT_TESTED int stepwiseAdjustmentCount = ADJUSTMENT_RANGE_COUNT_INVALID;
+STATIC_UNIT_TESTED timedAdjustmentState_t stepwiseAdjustments[MAX_ADJUSTMENT_RANGE_COUNT];
 
-static int continuosAdjustmentCount;
-static continuosAdjustmentState_t continuosAdjustments[MAX_ADJUSTMENT_RANGE_COUNT];
+STATIC_UNIT_TESTED int continuosAdjustmentCount;
+STATIC_UNIT_TESTED continuosAdjustmentState_t continuosAdjustments[MAX_ADJUSTMENT_RANGE_COUNT];
 
 static void blackboxLogInflightAdjustmentEvent(adjustmentFunction_e adjustmentFunction, int32_t newValue)
 {
@@ -223,7 +234,20 @@ static const adjustmentConfig_t defaultAdjustmentConfigs[ADJUSTMENT_FUNCTION_COU
         .adjustmentFunction = ADJUSTMENT_LED_PROFILE,
         .mode = ADJUSTMENT_MODE_SELECT,
         .data = { .switchPositions = 3 }
+    }, {
+        .adjustmentFunction = ADJUSTMENT_LED_DIMMER,
+        .mode = ADJUSTMENT_MODE_SELECT,
+        .data = { .switchPositions = 100 }
+    }, {
+        .adjustmentFunction = ADJUSTMENT_SIMPLIFIED_MASTER_MULTIPLIER,
+        .mode = ADJUSTMENT_MODE_SELECT,
+        .data = { .switchPositions = 100 }
     }
+//		{
+//        .adjustmentFunction = ADJUSTMENT_BATTERY_PROFILE,
+//        .mode = ADJUSTMENT_MODE_SELECT,
+//        .data = { .switchPositions = BATTERY_PROFILE_COUNT }
+//    }
 };
 
 #if defined(USE_OSD) && defined(USE_OSD_ADJUSTMENTS)
@@ -252,15 +276,15 @@ static const char * const adjustmentLabels[] = {
     "PITCH/ROLL F",
     "FF TRANSITION",
     "HORIZON STRENGTH",
-    "ROLL RC RATE",
-    "PITCH RC RATE",
-    "ROLL RC EXPO",
-    "PITCH RC EXPO",
     "PID AUDIO",
     "PITCH F",
     "ROLL F",
     "YAW F",
     "OSD PROFILE",
+    "LED PROFILE",
+    "LED DIMMER",
+    "SLIDER MASTER MULTIPLIER",
+    "BATTERY PROFILE",
 };
 
 static int adjustmentRangeNameIndex = 0;
@@ -523,9 +547,9 @@ static uint8_t applySelectAdjustment(adjustmentFunction_e adjustmentFunction, ui
         break;
     case ADJUSTMENT_LED_PROFILE:
 #ifdef USE_LED_STRIP
-        if (getLedProfile() != position) {
-            setLedProfile(position);
-        }
+//        if (getLedProfile() != position) {
+//            setLedProfile(position);
+//        }
 #endif
         break;
 
@@ -545,7 +569,7 @@ static uint8_t applySelectAdjustment(adjustmentFunction_e adjustmentFunction, ui
 static void calcActiveAdjustmentRanges(void)
 {
     // This initialisation upsets the scheduler task duration estimation
-    //schedulerIgnoreTaskExecTime();
+    schedulerIgnoreTaskExecTime();
 
     adjustmentRange_t defaultAdjustmentRange;
     memset(&defaultAdjustmentRange, 0, sizeof(defaultAdjustmentRange));
@@ -725,7 +749,7 @@ void processRcAdjustments(void)
     // Recalculate the new active adjustments if required
     if (stepwiseAdjustmentCount == ADJUSTMENT_RANGE_COUNT_INVALID) {
         // This can take up to 30us and is only call when not armed so ignore this timing as it doesn't impact flight
-        //schedulerIgnoreTaskExecTime();
+        schedulerIgnoreTaskExecTime();
         calcActiveAdjustmentRanges();
     }
 

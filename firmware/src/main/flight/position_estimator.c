@@ -31,7 +31,7 @@
 #include "common/maths.h"
 #include "common/vector.h"
 
-//#include "drivers/time.h"
+#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
 
@@ -39,6 +39,8 @@
 #include "flight/position_estimator.h"
 #include "flight/position_filter.h"
 #include "flight/position.h"
+
+//#include "sensors/acceleration.h"
 #include "sensors/sensors.h"
 #include "drivers/accgyro/accgyro_spi_bmi270.h"
 
@@ -145,9 +147,9 @@ static bool positionEstimatorWantXYFusion(void)
 
 #if defined(USE_OPTICALFLOW) && defined(USE_RANGEFINDER)
     if (sensors(SENSOR_OPTICALFLOW) && sensors(SENSOR_RANGEFINDER) &&
-        opflowIsHealthy() && rangefinderIsHealthy()) {
+        isOpticalflowHealthy() && rangefinderIsHealthy()) {
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-        if (posHoldConfig()->positionSource != POSHOLD_SOURCE_GPS_ONLY) {
+        if (posHoldConfig.positionSource != POSHOLD_SOURCE_GPS_ONLY) {
             return true;
         }
 #else
@@ -331,7 +333,7 @@ static uint16_t gpsDopOrFallback(uint16_t preferredDop, uint16_t fallbackDop)
 static float opticalFlowR(int16_t quality)
 {
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    const int minQuality = posHoldConfig()->opticalflowQualityMin;
+    const int minQuality = posHoldConfig.opticalflowQualityMin;
 #else
     const int minQuality = 30;
 #endif
@@ -499,12 +501,12 @@ static void feedOpticalFlowMeasurements(timeUs_t nowUs)
         return;
     }
 
-    if (!sensors(SENSOR_OPTICALFLOW) || !opflowIsHealthy()) {
+    if (!sensors(SENSOR_OPTICALFLOW) || !isOpticalflowHealthy()) {
         return;
     }
 
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    const uint8_t posSource = posHoldConfig()->positionSource;
+    const uint8_t posSource = posHoldConfig.positionSource;
     if (posSource == POSHOLD_SOURCE_GPS_ONLY) {
         return;
     }
@@ -518,7 +520,7 @@ static void feedOpticalFlowMeasurements(timeUs_t nowUs)
 #ifdef USE_RANGEFINDER
     float maxRangeCm = positionConfig.rangefinder_max_range_cm;
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    maxRangeCm = fminf(maxRangeCm, (float)posHoldConfig()->opticalflowMaxRange);
+    maxRangeCm = fminf(maxRangeCm, (float)posHoldConfig.opticalflowMaxRange);
 #endif
     float altitudeCmF;
     if (!rangefinderSampleAltitudeCm(&altitudeCmF, maxRangeCm)) {
@@ -530,12 +532,12 @@ static void feedOpticalFlowMeasurements(timeUs_t nowUs)
     return;  // Optical flow requires rangefinder for altitude scaling
 #endif
 
-    const opflow_t *flow = getOpticalFlowData();
+    const opticalflow_t *flow = getOpticalFlowData();
     if (flow == NULL) {
         return;
     }
 
-    const float flowR = opticalFlowR(flow->rawQuality);
+    const float flowR = opticalFlowR(flow->quality);
     if (flowR < 0.0f) {
         return;  // quality too low
     }

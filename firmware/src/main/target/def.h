@@ -101,6 +101,15 @@
 #define SYSTEM_HSE_MHZ 0
 #endif
 
+#define PPM_RCVR_TIMEOUT            0
+#define BATTERY_PROFILE_COUNT 3
+
+#if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
+#define DEFAULT_AUX_CHANNEL_COUNT       MAX_AUX_CHANNEL_COUNT
+#else
+#define DEFAULT_AUX_CHANNEL_COUNT       6
+#endif
+
 #ifndef USBD_PRODUCT_STRING
 #define USBD_PRODUCT_STRING     "Betaflight - STM32H743"
 #endif
@@ -121,13 +130,16 @@
 #define USE_ALTITUDE_HOLD
 
 #define USE_MAG
-//#define USE_OPTICALFLOW
-//#define USE_OPFLOW_MSP
-//#define USE_RANGEFINDER
-//#define USE_RANGEFINDER_MSP
+
+#define USE_OPTICALFLOW
+
+#define USE_RANGEFINDER
+
 #define USE_GPS
 #define USE_GPS_NMEA
 #define USE_GPS_UBLOX
+
+#define USE_SERIALRX
 #define USE_SERIALRX_CRSF
 #define USE_CRSF_LINK_STATISTICS
 #define USE_RX_RSSI_DBM

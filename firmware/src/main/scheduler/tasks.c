@@ -29,9 +29,12 @@
 #include "config/sdcard.h"
 #include "config/feature.h"
 
-#include "fc/dispatch.h"
-#include "fc/runtime_config.h"
+#include "config/config.h"
 #include "fc/core.h"
+#include "fc/rc.h"
+#include "fc/dispatch.h"
+#include "fc/rc_controls.h"
+#include "fc/runtime_config.h"
 
 #include "flight/imu.h"
 #include "flight/failsafe.h"
@@ -131,6 +134,132 @@ static void taskHandleSerial(uint32_t currentTimeUs)
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
 }
 
+typedef enum {
+    RX_STATE_CHECK,
+    RX_STATE_MODES,
+    RX_STATE_UPDATE,
+    RX_STATE_COUNT
+} rxState_e;
+
+static rxState_e rxState = RX_STATE_CHECK;
+
+bool taskUpdateRxMainInProgress(void)
+{
+    return (rxState != RX_STATE_CHECK);
+}
+
+static void taskUpdateRxMain(timeUs_t currentTimeUs)
+{
+    static timeDelta_t rxStateDurationFractionUs[RX_STATE_COUNT];
+    timeDelta_t executeTimeUs;
+    rxState_e oldRxState = rxState;
+    timeDelta_t anticipatedExecutionTime;
+
+    // Where we are using a state machine call schedulerIgnoreTaskExecRate() for all states bar one
+    if (rxState != RX_STATE_UPDATE) {
+        schedulerIgnoreTaskExecRate();
+    }
+
+    switch (rxState) {
+    default:
+    case RX_STATE_CHECK:
+        if (!processRx(currentTimeUs)) {
+            rxState = RX_STATE_CHECK;
+            break;
+        }
+        rxState = RX_STATE_MODES;
+        break;
+
+    case RX_STATE_MODES:
+        processRxModes(currentTimeUs);
+        rxState = RX_STATE_UPDATE;
+        break;
+
+    case RX_STATE_UPDATE:
+        // updateRcCommands sets rcCommand, which is needed by updateAltHold
+        updateRcCommands();
+        updateArmingStatus();
+
+#ifdef USE_USB_CDC_HID
+        if (!ARMING_FLAG(ARMED)) {
+            sendRcDataToHid();
+        }
+#endif
+        rxState = RX_STATE_CHECK;
+        break;
+    }
+
+    if (!schedulerGetIgnoreTaskExecTime()) {
+        executeTimeUs = micros() - currentTimeUs + RX_TASK_MARGIN;
+
+        // If the scheduler has reduced the anticipatedExecutionTime due to task aging, pick that up
+        anticipatedExecutionTime = schedulerGetNextStateTime();
+        if (anticipatedExecutionTime != (rxStateDurationFractionUs[oldRxState] >> RX_TASK_DECAY_SHIFT)) {
+            rxStateDurationFractionUs[oldRxState] = anticipatedExecutionTime << RX_TASK_DECAY_SHIFT;
+        }
+
+        if (executeTimeUs > (rxStateDurationFractionUs[oldRxState] >> RX_TASK_DECAY_SHIFT)) {
+            rxStateDurationFractionUs[oldRxState] = executeTimeUs << RX_TASK_DECAY_SHIFT;
+        } else {
+            // Slowly decay the max time
+            rxStateDurationFractionUs[oldRxState]--;
+        }
+    }
+
+    if (debugMode == DEBUG_RX_STATE_TIME) {
+        debug[oldRxState] = rxStateDurationFractionUs[oldRxState] >> RX_TASK_DECAY_SHIFT;
+    }
+
+    schedulerSetNextStateTime(rxStateDurationFractionUs[rxState] >> RX_TASK_DECAY_SHIFT);
+}
+
+#ifdef USE_GPS_RESCUE
+static void taskGpsRescue(timeUs_t currentTimeUs)
+{
+    UNUSED(currentTimeUs);
+
+    if (gpsRescueIsConfigured()) {
+        gpsRescueUpdate();
+    }
+}
+#endif
+
+#ifdef USE_BARO
+static void taskUpdateBaro(timeUs_t currentTimeUs)
+{
+    UNUSED(currentTimeUs);
+
+    if (sensors(SENSOR_BARO)) {
+        const uint32_t newDeadline = baroUpdate(currentTimeUs);
+        if (newDeadline != 0) {
+            rescheduleTask(TASK_SELF, newDeadline);
+        }
+    }
+}
+#endif
+
+#ifdef USE_MAG
+static void taskUpdateMag(timeUs_t currentTimeUs)
+{
+    UNUSED(currentTimeUs);
+
+    if (sensors(SENSOR_MAG)) {
+        const uint32_t newDeadline = compassUpdate(currentTimeUs);
+        if (newDeadline != 0) {
+            rescheduleTask(TASK_SELF, newDeadline);
+        }
+    }
+}
+#endif
+
+#if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
+static void taskCalculateAltitude(timeUs_t currentTimeUs)
+{
+    UNUSED(currentTimeUs);
+    calculateEstimatedAltitude();
+}
+#endif // USE_BARO || USE_GPS
+
 #ifdef USE_RANGEFINDER
 void taskUpdateRangefinder(timeUs_t currentTimeUs)
 {
@@ -139,40 +268,20 @@ void taskUpdateRangefinder(timeUs_t currentTimeUs)
     if (!sensors(SENSOR_RANGEFINDER))
         return;
 
-    // Update and adjust task to update at required rate
-    const uint32_t newDeadline = rangefinderUpdate();
-    if (newDeadline != 0) {
-        rescheduleTask(TASK_SELF, newDeadline);
-    }
+    rangefinderUpdate();
 
-    /*
-     * Process raw rangefinder readout
-     */
-    if (rangefinderProcess(getCosTiltAngle())) {
-        updatePositionEstimator_SurfaceTopic(currentTimeUs, rangefinderGetLatestAltitude());
-    }
+    rangefinderProcess(getCosTiltAngle());
 }
 #endif
 
 #ifdef USE_OPTICALFLOW
-void taskUpdateOpticalFlow(timeUs_t currentTimeUs)
+void taskUpdateOpticalflow(timeUs_t currentTimeUs)
 {
     if (!sensors(SENSOR_OPTICALFLOW))
         return;
 
-    opflowUpdate(currentTimeUs);
-    updatePositionEstimator_OpticalFlowTopic(currentTimeUs);
-}
-#endif
-
-#ifdef USE_GPS_RESCUE
-static void taskGpsRescue(timeUs_t currentTimeUs)
-{
-    UNUSED(currentTimeUs);
-
-    //if (gpsRescueIsConfigured()) {
-        gpsRescueUpdate();
-    //}
+    opticalflowUpdate();
+    opticalflowProcess();
 }
 #endif
 
@@ -275,7 +384,7 @@ task_attribute_t task_attributes[TASK_COUNT] = {
 #endif
 
 #if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
-    [TASK_ALTITUDE] = DEFINE_TASK("ALTITUDE", NULL, NULL, calculateEstimatedAltitude, TASK_PERIOD_HZ(TASK_ALTITUDE_RATE_HZ), TASK_PRIORITY_LOW),
+    [TASK_ALTITUDE] = DEFINE_TASK("ALTITUDE", NULL, NULL, taskCalculateAltitude, TASK_PERIOD_HZ(TASK_ALTITUDE_RATE_HZ), TASK_PRIORITY_LOW),
 #endif
 
 #ifdef USE_OSD
@@ -303,7 +412,7 @@ task_attribute_t task_attributes[TASK_COUNT] = {
 #endif
 
 #ifdef USE_OPTICALFLOW
-    [TASK_OPTICALFLOW] = DEFINE_TASK("OPTICALFLOW", NULL, NULL, taskUpdateOpticalFlow, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOWEST),
+    [TASK_OPTICALFLOW] = DEFINE_TASK("OPTICALFLOW", NULL, NULL, taskUpdateOpticalflow, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOWEST),
 #endif
 };
 

@@ -46,11 +46,6 @@
 
 static mspPort_t mspPorts[MAX_MSP_PORT_COUNT];
 
-void serialWriteBuf(uint8_t ch, uint8_t *data, int count)
-{
-  uartWriteIT(ch, data, count);
-}
-
 static void resetMspPort(uint8_t ch, mspPort_t *mspPortToReset)
 {
     memset(mspPortToReset, 0, sizeof(mspPort_t));
@@ -89,15 +84,15 @@ void mspSerialAllocatePorts(void)
 //}
 
 #if defined(USE_TELEMETRY)
-//void mspSerialReleaseSharedTelemetryPorts(void)
-//{
-//    for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
-//        if (candidateMspPort->sharedWithTelemetry) {
-//            closeSerialPort(candidateMspPort->port);
-//            memset(candidateMspPort, 0, sizeof(mspPort_t));
-//        }
-//    }
-//}
+void mspSerialReleaseSharedTelemetryPorts(void)
+{
+    for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
+        if (candidateMspPort->sharedWithTelemetry) {
+            //closeSerialPort(candidateMspPort->port);
+            memset(candidateMspPort, 0, sizeof(mspPort_t));
+        }
+    }
+}
 #endif
 static void mspSerialProcessReceivedPacketData(mspPort_t *mspPort, uint8_t c)
 {

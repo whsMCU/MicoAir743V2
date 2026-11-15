@@ -23,6 +23,7 @@
 #include "hw.h"
 
 #include "common/time.h"
+#include "common/maths.h"
 
 
 #define STICK_CHANNEL_COUNT 4
@@ -63,6 +64,26 @@ typedef enum {
     RX_FRAME_DROPPED = (1 << 3)
 } rxFrameState_e;
 
+typedef enum {
+    SERIALRX_NONE = 0,
+    SERIALRX_SPEKTRUM2048 = 1,
+    SERIALRX_SBUS = 2,
+    SERIALRX_SUMD = 3,
+    SERIALRX_SUMH = 4,
+    SERIALRX_XBUS_MODE_B = 5,
+    SERIALRX_XBUS_MODE_B_RJ01 = 6,
+    SERIALRX_IBUS = 7,
+    SERIALRX_JETIEXBUS = 8,
+    SERIALRX_CRSF = 9,
+    SERIALRX_SRXL = 10,
+    SERIALRX_TARGET_CUSTOM = 11,
+    SERIALRX_FPORT = 12,
+    SERIALRX_SRXL2 = 13,
+    SERIALRX_GHST = 14,
+    SERIALRX_SPEKTRUM1024 = 15,
+    SERIALRX_MAVLINK = 16,
+} SerialRXType;
+
 #define RX_MAPPABLE_CHANNEL_COUNT 8
 
 typedef struct rxConfig_s {
@@ -87,24 +108,20 @@ typedef struct rxConfig_s {
     uint8_t max_aux_channel;
     uint8_t rssi_src_frame_errors;             // true to use frame drop flags in the rx protocol
     int8_t rssi_offset;                        // offset applied to the RSSI value before it is returned
-    uint8_t rc_smoothing_mode;                 // Whether filter based rc smoothing is on or off
+    uint8_t rc_smoothing;                      // Whether filter based rc smoothing is on or off
     uint8_t rc_smoothing_setpoint_cutoff;      // Filter cutoff frequency for the setpoint filter (0 = auto)
-    uint8_t rc_smoothing_feedforward_cutoff;   // Filter cutoff frequency for the feedforward filter (0 = auto)
     uint8_t rc_smoothing_throttle_cutoff;      // Filter cutoff frequency for the setpoint filter (0 = auto)
     uint8_t rc_smoothing_debug_axis;           // Axis to log as debug values when debug_mode = RC_SMOOTHING
     uint8_t rc_smoothing_auto_factor_rpy;      // Used to adjust the "smoothness" determined by the auto cutoff calculations
     uint8_t rc_smoothing_auto_factor_throttle; // Used to adjust the "smoothness" determined by the auto cutoff calculations
     uint8_t rssi_src_frame_lpf_period;         // Period of the cutoff frequency for the source frame RSSI filter (in 0.1 s)
+    uint8_t rssi_smoothing;                    // Smoothing factor to reduce jumpiness of rssi, rssiDbm and rsnr
     uint8_t srxl2_unit_id;                     // Spektrum SRXL2 RX unit id
     uint8_t srxl2_baud_fast;                   // Select Spektrum SRXL2 fast baud rate
     uint8_t sbus_baud_fast;                    // Select SBus fast baud rate
-    uint8_t crsf_use_rx_snr;                   // Use RX SNR (in dB) instead of RSSI dBm for CRSF
     uint32_t msp_override_channels_mask;       // Channels to override when the MSP override mode is enabled
+    uint8_t msp_override_failsafe;             // if false then extra RC link is always required in msp_override mode, true - allows control via msp_override without extra RC link (autonomous use case)
     uint8_t crsf_use_negotiated_baud;          // Use negotiated baud rate for CRSF V3
-
-    uint8_t deadband;                       // introduce a deadband around the stick center for pitch and roll axis. Must be greater than zero.
-    uint8_t yaw_deadband;                   // introduce a deadband around the stick center for yaw axis. Must be greater than zero.
-    bool yaw_control_reversed;            // invert control direction of yaw
 } rxConfig_t;
 
 extern rxConfig_t rxConfig;
@@ -125,31 +142,12 @@ extern bool isRXDataNew;
 
 extern const char rcChannelLetters[];
 
-extern uint16_t rcData[MAX_SUPPORTED_RC_CHANNEL_COUNT];       // interval [1000;2000]
+extern float rcData[MAX_SUPPORTED_RC_CHANNEL_COUNT];       // interval [1000;2000]
 
 #define RSSI_SCALE_MIN 1
 #define RSSI_SCALE_MAX 255
 
 #define RSSI_SCALE_DEFAULT 100
-
-typedef enum rc_alias {
-    ROLL = 0, //rcData[0], 	ROLL
-    PITCH,		//rcData[1],	PITCH
-    YAW,			//rcData[2],	YAW
-    THROTTLE,	//rcData[3],	THROTTLE
-		ARM,			//rcData[4],	ARMED
-		SA,			//rcData[5],	SA
-		SB,			//rcData[6],	SB
-		SC,			//rcData[7],	SC
-		SD,			//rcData[8],	SD
-		SF,			//rcData[9],	SF
-		S1,			//rcData[10],	S1
-		S2,			//rcData[11],	S2
-    AUX9,
-    AUX10,
-    AUX11,
-    AUX12
-} rc_alias_e;
 
 typedef enum {
     RX_FAILSAFE_MODE_AUTO = 0,
@@ -181,7 +179,7 @@ struct rxRuntimeState_s;
 typedef float (*rcReadRawDataFnPtr)(const struct rxRuntimeState_s *rxRuntimeState, uint8_t chan); // used by receiver driver to return channel data
 typedef uint8_t (*rcFrameStatusFnPtr)(struct rxRuntimeState_s *rxRuntimeState);
 typedef bool (*rcProcessFrameFnPtr)(const struct rxRuntimeState_s *rxRuntimeState);
-typedef uint32_t rcGetFrameTimeUsFn(void);  // used to retrieve the timestamp in microseconds for the last channel data frame
+typedef timeUs_t rcGetFrameTimeUsFn(void);  // used to retrieve the timestamp in microseconds for the last channel data frame
 
 typedef enum {
     RX_PROVIDER_NONE = 0,
@@ -195,19 +193,13 @@ typedef enum {
 typedef struct rxRuntimeState_s {
     rxProvider_t        rxProvider;
     uint8_t             channelCount; // number of RC channels as reported by current input driver
-    uint16_t            rxRefreshRate;
     rcReadRawDataFnPtr  rcReadRawFn;
     rcFrameStatusFnPtr  rcFrameStatusFn;
     rcProcessFrameFnPtr rcProcessFrameFn;
-    rcGetFrameTimeUsFn *rcFrameTimeUsFn;
     uint16_t            *channelData;
     void                *frameData;
-    uint32_t            lastRcFrameTimeUs;
-    uint32_t 						FrameTime;
-    uint32_t            callbackTime;
-    uint32_t            uartAvalable;
-    bool            	  RxCallback_Flag;
-    uint32_t            RxCount;
+    timeUs_t            lastRcFrameTimeUs;
+    scaleRangef_t       scaleRange[NON_AUX_CHANNEL_COUNT];
 } rxRuntimeState_t;
 
 typedef enum {
@@ -218,6 +210,7 @@ typedef enum {
     RSSI_SOURCE_MSP,
     RSSI_SOURCE_FRAME_ERRORS,
     RSSI_SOURCE_RX_PROTOCOL_CRSF,
+    RSSI_SOURCE_RX_PROTOCOL_MAVLINK,
 } rssiSource_e;
 
 extern rssiSource_e rssiSource;
@@ -226,6 +219,7 @@ typedef enum {
     LQ_SOURCE_NONE = 0,
     LQ_SOURCE_RX_PROTOCOL_CRSF,
     LQ_SOURCE_RX_PROTOCOL_GHST,
+    LQ_SOURCE_RX_PROTOCOL_MAVLINK,
 } linkQualitySource_e;
 
 extern linkQualitySource_e linkQualitySource;
@@ -238,7 +232,6 @@ void rxFailsafeChannelConfigs_Init(void);
 
 void rxInit(void);
 void rxProcessPending(bool state);
-bool taskUpdateRxMainInProgress(void);
 bool rxUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs);
 void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs);
 bool isRxReceivingSignal(void);
@@ -254,21 +247,30 @@ void parseRcChannels(const char *input, struct rxConfig_s *rxConfig);
 void setRssiDirect(uint16_t newRssi, rssiSource_e source);
 void setRssi(uint16_t rssiValue, rssiSource_e source);
 void setRssiMsp(uint8_t newMspRssi);
-void updateRSSI(uint32_t currentTimeUs);
+void updateRSSI(timeUs_t currentTimeUs);
 uint16_t getRssi(void);
 uint8_t getRssiPercent(void);
 bool isRssiConfigured(void);
 
 #define LINK_QUALITY_MAX_VALUE 1023
 
-void setLinkQuality(bool validFrame, uint32_t currentDeltaTimeUs);
 uint16_t rxGetLinkQuality(void);
 void setLinkQualityDirect(uint16_t linkqualityValue);
 uint16_t rxGetLinkQualityPercent(void);
 
+#ifdef USE_RX_RSSI_DBM
 int16_t getRssiDbm(void);
 void setRssiDbm(int16_t newRssiDbm, rssiSource_e source);
 void setRssiDbmDirect(int16_t newRssiDbm, rssiSource_e source);
+int8_t getActiveAntenna(void);
+void setActiveAntenna(int8_t antenna);
+#endif //USE_RX_RSSI_DBM
+
+#ifdef USE_RX_RSNR
+int16_t getRsnr(void);
+void setRsnr(int16_t newRsnr);
+void setRsnrDirect(int16_t newRsnr);
+#endif //USE_RX_RSNR
 
 void rxSetRfMode(uint8_t rfModeValue);
 uint8_t rxGetRfMode(void);
@@ -281,16 +283,6 @@ void resetAllRxChannelRangeConfigurations(rxChannelRangeConfig_t *rxChannelRange
 void suspendRxSignal(void);
 void resumeRxSignal(void);
 
-uint16_t rxGetRefreshRate(void);
+timeDelta_t rxGetFrameDelta(void);
 
-int32_t rxGetFrameDelta(int32_t *frameAgeUs);
-
-uint32_t rxFrameTimeUs(void);
-
-int8_t calculateThrottlePercent(void);
-uint8_t calculateThrottlePercentAbs(void);
-
-void taskUpdateRxMain(uint32_t currentTimeUs);
-void processRxModes(uint32_t currentTimeUs);
-
-bool processRx(timeUs_t currentTimeUs);
+timeUs_t rxFrameTimeUs(void);

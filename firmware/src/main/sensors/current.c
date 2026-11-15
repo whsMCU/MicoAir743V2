@@ -18,15 +18,23 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "stdbool.h"
-#include "stdint.h"
-#include "string.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
+#include "hw.h"
+
+#include "build/build_config.h"
 #include "build/debug.h"
 
 #include "common/maths.h"
 #include "common/utils.h"
 #include "common/filter.h"
+
+//#include "drivers/adc.h"
+
+//#include "pg/pg.h"
+//#include "pg/pg_ids.h"
 
 #include "sensors/adcinternal.h"
 #include "sensors/battery.h"
@@ -81,12 +89,12 @@ void currentMeterReset(currentMeter_t *meter)
 
 static pt1Filter_t adciBatFilter;
 
-#ifndef CURRENT_METER_SCALE_DEFAULT
-#define CURRENT_METER_SCALE_DEFAULT 402 // for Allegro ACS758LCB-100U (40mV/A)
+#ifndef DEFAULT_CURRENT_METER_SCALE
+#define DEFAULT_CURRENT_METER_SCALE 402 // for Allegro ACS758LCB-100U (40mV/A)
 #endif
 
-#ifndef CURRENT_METER_OFFSET_DEFAULT
-#define CURRENT_METER_OFFSET_DEFAULT 0
+#ifndef DEFAULT_CURRENT_METER_OFFSET
+#define DEFAULT_CURRENT_METER_OFFSET 0
 #endif
 
 
@@ -94,8 +102,8 @@ currentSensorADCConfig_t currentSensorADCConfig;
 
 void currentSensorADCConfig_Init(void)
 {
-	currentSensorADCConfig.scale = 386;
-	currentSensorADCConfig.offset = CURRENT_METER_OFFSET_DEFAULT;
+	currentSensorADCConfig.scale = DEFAULT_CURRENT_METER_SCALE;
+	currentSensorADCConfig.offset = DEFAULT_CURRENT_METER_OFFSET;
 }
 
 static int32_t currentMeterADCToCentiamps(const uint16_t src)
@@ -240,7 +248,6 @@ void currentMeterESCReadMotor(uint8_t motorNumber, currentMeter_t *meter)
 }
 #endif
 
-
 #ifdef USE_MSP_CURRENT_METER
 #include "common/streambuf.h"
 
@@ -268,7 +275,7 @@ void currentMeterMSPRefresh(timeUs_t currentTimeUs)
     if (cmp32(currentTimeUs, streamRequestAt) > 0) {
         streamRequestAt = currentTimeUs + ((1000 * 1000) / 10); // 10hz
 
-        mspSerialPush(SERIAL_PORT_ALL, MSP_ANALOG, NULL, 0, MSP_DIRECTION_REQUEST);
+        mspSerialPush(SERIAL_PORT_ALL, MSP_ANALOG, NULL, 0, MSP_DIRECTION_REQUEST, MSP_V1);
     }
 }
 

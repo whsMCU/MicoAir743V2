@@ -104,13 +104,12 @@ void positionConfig_Init(void)
   positionConfig.altitude_prefer_baro = 100;
   positionConfig.altitude_lpf = 300;                // lowpass cutoff (value / 100) Hz for altitude smoothing
   positionConfig.altitude_d_lpf = 300;              // lowpass for (value / 100) Hz for altitude derivative smoothing
-  positionConfig.rangefinder_max_range_cm = 200;    // Maximum rangefinder range to trust (cm)
+  positionConfig.rangefinder_max_range_cm = 400;    // Maximum rangefinder range to trust (cm)
 }
 
 #if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
-void calculateEstimatedAltitude(timeUs_t currentTimeUs)
+void calculateEstimatedAltitude(void)
 {
-  UNUSED(currentTimeUs);
     const bool isArmed = ARMING_FLAG(ARMED);
 
 #if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
