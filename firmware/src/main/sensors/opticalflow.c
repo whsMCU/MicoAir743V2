@@ -201,10 +201,10 @@ void opticalflowProcess(void) {
         vector2_t delayedGyroRotated;
         applySensorRotation(&delayedGyroRotated, &delayedGyroRaw);
 
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 0, lrintf(processed.x * 1000));
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 1, lrintf(processed.y * 1000));
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 2, lrintf(DEGREES_TO_RADIANS(delayedGyroRotated.x) * 1000));
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 3, lrintf(DEGREES_TO_RADIANS(delayedGyroRotated.y) * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 0, lrintf(processed.x * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 1, lrintf(processed.y * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 2, lrintf(DEGREES_TO_RADIANS(delayedGyroRotated.x) * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 3, lrintf(DEGREES_TO_RADIANS(delayedGyroRotated.y) * 1000));
 
         // Subtract the rate of body rotation (converted from dps to rad/s) from the
         // optical flow
@@ -218,13 +218,13 @@ void opticalflowProcess(void) {
         if (fabsf(delayedGyroRotated.y) > ROTATION_GYRO_LIMIT) {
             processed.y = 0;
         }
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 4, lrintf(processed.x * 1000));
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 5, lrintf(processed.y * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 4, lrintf(processed.x * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 5, lrintf(processed.y * 1000));
 
 				applyLPF(&processed);
 
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 6, lrintf(processed.x * 1000));
-//        DEBUG_SET(DEBUG_OPTICALFLOW, 7, lrintf(processed.y * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 6, lrintf(processed.x * 1000));
+        DEBUG_SET(DEBUG_OPTICALFLOW, 7, lrintf(processed.y * 1000));
 
         opticalflow.rawFlowRates = raw;
         opticalflow.processedFlowRates = processed;

@@ -608,7 +608,7 @@ static void ubloxSendPollMessage(uint8_t msg_id)
 
 static void ubloxSendNAV5Message(uint8_t model)
 {
-    //DEBUG_SET(DEBUG_GPS_CONNECTION, 0, model);
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 0, model);
     ubxMessage_t tx_buffer;
     if (gpsData.ubloxM9orAbove) {
         uint8_t payload[4];
@@ -938,7 +938,7 @@ static void gpsConfigureNmea(void)
     // - send any NMEA custom commands to the GPS Module
     // the user must configure the power-up baud rate of the module to be fast enough for their data rate
     // Note: we always parse all incoming NMEA messages
-    //DEBUG_SET(DEBUG_GPS_CONNECTION, 4, (gpsData.state * 100 + gpsData.state_position));
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 4, (gpsData.state * 100 + gpsData.state_position));
 
     // wait 500ms between changes
     if (cmp32(gpsData.now, gpsData.state_ts) < 500) {
@@ -1018,7 +1018,7 @@ static void gpsConfigureUblox(void)
     switch (gpsData.state) {
     case GPS_STATE_DETECT_BAUD:
 
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 3, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex] / 100);
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 3, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex] / 100);
 
         // check to see if there has been a response to the version command
         // initially the FC will be at the user-configured baud rate.
@@ -1035,7 +1035,7 @@ static void gpsConfigureUblox(void)
         // Send MON-VER messages at GPS_CONFIG_BAUD_CHANGE_INTERVAL for GPS_BAUDRATE_TEST_COUNT times
         static bool messageSent = false;
         static uint8_t messageCounter = 0;
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 2, initBaudRateCycleCount * 100 + messageCounter);
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 2, initBaudRateCycleCount * 100 + messageCounter);
 
         if (messageCounter < GPS_BAUDRATE_TEST_COUNT) {
             if (!messageSent) {
@@ -1078,7 +1078,7 @@ static void gpsConfigureUblox(void)
         // set the FC's serial port to the configured rate
         //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
         uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex] / 100);
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex] / 100);
         // then start sending configuration settings
         gpsSetState(GPS_STATE_CONFIGURE);
         break;
@@ -1469,7 +1469,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
         }
         //rxBytesWaiting = serialRxBytesWaiting(gpsPort);
         rxBytesWaiting = uartAvailable(_DEF_UART3);
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         const uint32_t initialCycleCount = getCycleCounter();
         static uint8_t wait = 0;
         static bool isFast = false;
@@ -1498,7 +1498,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
             break;
         }
         rxBytesWaiting = uartAvailable(_DEF_UART3);;
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         static uint8_t wait = 0;
         static bool isFast = false;
         while (rxBytesWaiting-- > 0) {
@@ -1526,7 +1526,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
             }
 
             // Data is available
-            //DEBUG_SET(DEBUG_GPS_CONNECTION, 3, gpsData.now - gpsData.lastNavMessage); // interval since last Nav data was received
+            DEBUG_SET(DEBUG_GPS_CONNECTION, 3, gpsData.now - gpsData.lastNavMessage); // interval since last Nav data was received
             gpsData.lastNavMessage = gpsData.now;
             sensorsSet(SENSOR_GPS);
 
@@ -1536,7 +1536,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
 
             GPS_update &= ~GPS_MSP_UPDATE;
         } else {
-            //DEBUG_SET(DEBUG_GPS_CONNECTION, 2, gpsData.now - gpsData.lastNavMessage); // time since last Nav data, updated each GPS task interval
+            DEBUG_SET(DEBUG_GPS_CONNECTION, 2, gpsData.now - gpsData.lastNavMessage); // time since last Nav data, updated each GPS task interval
             // check for no data/gps timeout/cable disconnection etc
             if (cmp32(gpsData.now, gpsData.lastNavMessage) > GPS_TIMEOUT_MS) {
                 gpsSetState(GPS_STATE_LOST_COMMUNICATION);
@@ -1586,7 +1586,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
             }
         }
 #endif
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 2, gpsData.now - gpsData.lastNavMessage); // time since last Nav data, updated each GPS task interval
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 2, gpsData.now - gpsData.lastNavMessage); // time since last Nav data, updated each GPS task interval
         // check for no data/gps timeout/cable disconnection etc
         if (cmp32(gpsData.now, gpsData.lastNavMessage) > GPS_TIMEOUT_MS) {
             gpsSetState(GPS_STATE_LOST_COMMUNICATION);
@@ -1594,8 +1594,8 @@ void gpsUpdate(timeUs_t currentTimeUs)
         break;
     }
 
-    //DEBUG_SET(DEBUG_GPS_CONNECTION, 4, (gpsData.state * 100 + gpsData.state_position));
-    //DEBUG_SET(DEBUG_GPS_CONNECTION, 6, gpsData.ackState);
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 4, (gpsData.state * 100 + gpsData.state_position));
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 6, gpsData.ackState);
 
     if (sensors(SENSOR_GPS)) {
         updateGpsIndicator(currentTimeUs);
@@ -1615,10 +1615,10 @@ void gpsUpdate(timeUs_t currentTimeUs)
         }
     }
 
-    //DEBUG_SET(DEBUG_GPS_DOP, 0, gpsSol.numSat);
-    //DEBUG_SET(DEBUG_GPS_DOP, 1, gpsSol.dop.pdop);
-    //DEBUG_SET(DEBUG_GPS_DOP, 2, gpsSol.dop.hdop);
-    //DEBUG_SET(DEBUG_GPS_DOP, 3, gpsSol.dop.vdop);
+    DEBUG_SET(DEBUG_GPS_DOP, 0, gpsSol.numSat);
+    DEBUG_SET(DEBUG_GPS_DOP, 1, gpsSol.dop.pdop);
+    DEBUG_SET(DEBUG_GPS_DOP, 2, gpsSol.dop.hdop);
+    DEBUG_SET(DEBUG_GPS_DOP, 3, gpsSol.dop.vdop);
 
     timeDelta_t executeTimeUs = micros() - currentTimeUs;
     if (executeTimeUs > (gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT)) {
@@ -1629,16 +1629,16 @@ void gpsUpdate(timeUs_t currentTimeUs)
     }
     schedulerSetNextStateTime(gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT);
 
-    //DEBUG_SET(DEBUG_GPS_CONNECTION, 5, executeTimeUs);
-//    keeping temporarily, to be used when debugging the scheduler stuff
-//    DEBUG_SET(DEBUG_GPS_CONNECTION, 6, (gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT));
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 5, executeTimeUs);
+    //keeping temporarily, to be used when debugging the scheduler stuff
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 6, (gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT));
 }
 
 static void gpsHandleFrameComplete(void)
 {
-    //DEBUG_SET(DEBUG_GPS_CONNECTION, 1, gpsSol.navIntervalMs);
+    DEBUG_SET(DEBUG_GPS_CONNECTION, 1, gpsSol.navIntervalMs);
     if (gpsData.state == GPS_STATE_RECEIVING_DATA) {
-        //DEBUG_SET(DEBUG_GPS_CONNECTION, 3, gpsData.now - gpsData.lastNavMessage); // interval since last Nav data was received
+        DEBUG_SET(DEBUG_GPS_CONNECTION, 3, gpsData.now - gpsData.lastNavMessage); // interval since last Nav data was received
         gpsData.lastNavMessage = gpsData.now;
         sensorsSet(SENSOR_GPS);
     }

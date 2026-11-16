@@ -192,6 +192,7 @@ typedef enum {
 
 typedef struct rxRuntimeState_s {
     rxProvider_t        rxProvider;
+    SerialRXType        serialrxProvider;
     uint8_t             channelCount; // number of RC channels as reported by current input driver
     rcReadRawDataFnPtr  rcReadRawFn;
     rcFrameStatusFnPtr  rcFrameStatusFn;

@@ -104,5 +104,3 @@ bool imuIsHeadingValid(void);
 void imuTransformVectorBodyToEarth(fpVector3_t * v);
 void imuTransformVectorEarthToBody(fpVector3_t * v);
 
-void gyroGetMeasuredRotationRate(fpVector3_t *measuredRotationRate);
-void accGetMeasuredAcceleration(fpVector3_t *measuredAcc);

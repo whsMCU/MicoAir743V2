@@ -32,7 +32,7 @@
 #include "common/maths.h"
 #include "common/filter.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 
 #include "fc/runtime_config.h"
 
@@ -43,6 +43,7 @@
 //#include "drivers/accgyro/gyro_sync.h"
 
 #include "sensors/gyro.h"
+#include "sensors/gyro_init.h"
 #include "sensors/sensors.h"
 
 
@@ -51,8 +52,44 @@
 // gyro types are supported with SPI DMA.
 #define GYRO_BUF_SIZE 32
 
+#define SIMPLIFIED_TUNING_PIDS_MIN 0
+#define SIMPLIFIED_TUNING_FILTERS_MIN 10
+#define SIMPLIFIED_TUNING_MAX 200
+#define SIMPLIFIED_TUNING_DEFAULT 100
+#define SIMPLIFIED_TUNING_D_DEFAULT 100
+
+gyroConfig_t gyroConfig;
+
 void gyroConfig_init(void)
 {
+  gyroConfig.gyroCalibrationDuration = 125;        // 1.25 seconds
+  gyroConfig.gyroMovementCalibrationThreshold = 48;
+  gyroConfig.gyro_hardware_lpf = GYRO_HARDWARE_LPF_NORMAL;
+  gyroConfig.gyro_lpf1_type = FILTER_PT1;
+  gyroConfig.gyro_lpf1_static_hz = GYRO_LPF1_DYN_MIN_HZ_DEFAULT;
+      // NOTE: dynamic lpf is enabled by default so this setting is actually
+      // overridden and the static lowpass 1 is disabled. We can't set this
+      // value to 0 otherwise Configurator versions 10.4 and earlier will also
+      // reset the lowpass filter type to PT1 overriding the desired Butterworth setting.
+  gyroConfig.gyro_lpf2_type = FILTER_PT1;
+  gyroConfig.gyro_lpf2_static_hz = GYRO_LPF2_HZ_DEFAULT;
+  gyroConfig.gyro_high_fsr = false;
+  gyroConfig.gyro_soft_notch_hz_1 = 0;
+  gyroConfig.gyro_soft_notch_cutoff_1 = 0;
+  gyroConfig.gyro_soft_notch_hz_2 = 0;
+  gyroConfig.gyro_soft_notch_cutoff_2 = 0;
+  gyroConfig.checkOverflow = GYRO_OVERFLOW_CHECK_ALL_AXES;
+  gyroConfig.gyro_offset_yaw = 0;
+  gyroConfig.yaw_spin_recovery = YAW_SPIN_RECOVERY_AUTO;
+  gyroConfig.yaw_spin_threshold = 1950;
+  gyroConfig.gyro_lpf1_dyn_min_hz = GYRO_LPF1_DYN_MIN_HZ_DEFAULT;
+  gyroConfig.gyro_lpf1_dyn_max_hz = GYRO_LPF1_DYN_MAX_HZ_DEFAULT;
+  gyroConfig.gyro_filter_debug_axis = FD_ROLL;
+  gyroConfig.gyro_lpf1_dyn_expo = 5;
+  gyroConfig.simplified_gyro_filter = true;
+  gyroConfig.simplified_gyro_filter_multiplier = SIMPLIFIED_TUNING_DEFAULT;
+  //gyroConfig.gyro_enabled_bitmask = DEFAULT_GYRO_ENABLED;
+
   bmi270.gyro.gyro_high_fsr = false;
   bmi270.gyro.sampleRateHz = 3200;
   bmi270.gyro.gyroRateKHz = GYRO_RATE_3200_Hz;

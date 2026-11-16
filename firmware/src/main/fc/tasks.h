@@ -22,8 +22,6 @@
 
 #include "scheduler/scheduler.h"
 
-extern uint32_t debug1;
-
 void tasksInitData(void);
 void tasksInit(void);
 task_t *getTask(unsigned taskId);

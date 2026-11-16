@@ -42,3 +42,5 @@ typedef int serializeBoxFn(struct sbuf_s *dst, const box_t *box);
 void serializeBoxReply(struct sbuf_s *dst, int page, serializeBoxFn *serializeBox);
 void initActiveBoxIds(void);
 bool getBoxIdState(boxId_e boxid);
+
+void MSP_SET_MODE_RANGE(uint32_t i, uint8_t boxId, uint8_t auxChannelIndex, uint32_t start, uint32_t end);

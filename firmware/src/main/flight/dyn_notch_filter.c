@@ -234,9 +234,9 @@ FAST_CODE void dynNotchUpdate(void)
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
             sampleAvg[axis] = sampleAccumulator[axis] * sampleCountRcp;
             sampleAccumulator[axis] = 0;
-//            if (axis == gyro.gyroDebugAxis) {
-//                DEBUG_SET(DEBUG_FFT, 2, lrintf(sampleAvg[axis]));
-//            }
+            if (axis == bmi270.gyro.gyroDebugAxis) {
+                DEBUG_SET(DEBUG_FFT, 2, lrintf(sampleAvg[axis]));
+            }
         }
 
         // We need DYN_NOTCH_CALC_TICKS ticks to update all axes with newly sampled value
@@ -384,13 +384,13 @@ static FAST_CODE_NOINLINE void dynNotchProcess(void)
                 }
             }
 
-            // if (state.axis == gyro.gyroDebugAxis) {
-            //     for (int p = 0; p < dynNotch.count && p < DYN_NOTCH_COUNT_MAX; p++) {
-            //         // debug channel 0 is reserved for pre DN gyro
-            //         DEBUG_SET(DEBUG_FFT_FREQ, p + 1, lrintf(dynNotch.centerFreq[state.axis][p]));
-            //     }
-            //     DEBUG_SET(DEBUG_DYN_LPF, 1, lrintf(dynNotch.centerFreq[state.axis][0]));
-            // }
+             if (state.axis == bmi270.gyro.gyroDebugAxis) {
+                 for (int p = 0; p < dynNotch.count && p < DYN_NOTCH_COUNT_MAX; p++) {
+                     // debug channel 0 is reserved for pre DN gyro
+                     DEBUG_SET(DEBUG_FFT_FREQ, p + 1, lrintf(dynNotch.centerFreq[state.axis][p]));
+                 }
+                 DEBUG_SET(DEBUG_DYN_LPF, 1, lrintf(dynNotch.centerFreq[state.axis][0]));
+             }
 
             DEBUG_SET(DEBUG_FFT_TIME, 1, micros() - startTime);
 

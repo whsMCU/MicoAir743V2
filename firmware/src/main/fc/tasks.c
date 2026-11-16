@@ -22,12 +22,29 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "hw.h"
+
 #include "build/debug.h"
 
+//#include "cli/cli.h"
+
+//#include "cms/cms.h"
+
+#include "common/color.h"
 #include "common/utils.h"
 
-#include "config/sdcard.h"
 #include "config/feature.h"
+
+#include "drivers/accgyro/accgyro.h"
+//#include "drivers/camera_control.h"
+#include "drivers/compass/compass.h"
+#include "drivers/sensor.h"
+//#include "drivers/serial.h"
+//#include "drivers/serial_usb_vcp.h"
+//#include "drivers/stack_check.h"
+//#include "drivers/transponder_ir.h"
+//#include "drivers/usb_io.h"
+//#include "drivers/vtx_common.h"
 
 #include "config/config.h"
 #include "fc/core.h"
@@ -36,48 +53,67 @@
 #include "fc/rc_controls.h"
 #include "fc/runtime_config.h"
 
+#include "flight/alt_hold.h"
+#include "flight/gps_rescue.h"
 #include "flight/imu.h"
-#include "flight/failsafe.h"
-#include "flight/position.h"
-
-#include "drivers/accgyro/accgyro.h"
-#include "drivers/compass/compass.h"
-#include "drivers/sensor.h"
-#include "io/gps.h"
-#include "drivers/motor.h"
-#include "drivers/dshot.h"
-
+//#include "flight/mixer.h"
 #include "flight/pid.h"
-#include "flight/gps_rescue_multirotor.h"
+#include "flight/position.h"
+#include "flight/pos_hold.h"
 
+#include "io/asyncfatfs/asyncfatfs.h"
+//#include "io/beeper.h"
+//#include "io/dashboard.h"
+//#include "io/dronecan/dronecan.h"
+//#include "io/flashfs.h"
+//#include "io/gimbal_control.h"
+#include "io/gps.h"
 #include "io/ledstrip.h"
-
-#include "scheduler/scheduler.h"
-#include "scheduler/tasks.h"
-
-#include "sensors/adcinternal.h"
-#include "sensors/barometer.h"
-#include "sensors/battery.h"
-#include "sensors/compass.h"
-#include "sensors/gyro.h"
-#include "sensors/sensors.h"
-#include "sensors/opticalflow.h"
-#include "sensors/rangefinder.h"
-
-#include "rx/rx.h"
-#include "fc/rc_controls.h"
+//#include "io/piniobox.h"
+//#include "io/serial.h"
+//#include "io/transponder_ir.h"
+//#include "io/vtx_tramp.h" // Will be gone
+//#include "io/rcdevice_cam.h"
+//#include "io/usb_cdc_hid.h"
+//#include "io/vtx.h"
 
 #include "msp/msp.h"
 #include "msp/msp_serial.h"
 
 #include "osd/osd.h"
+#if ENABLE_OSD_CUSTOM_TEXT
+#include "osd/osd_custom_text.h"
+#endif
 
-#include "scheduler/tasks.h"
+//#include "pg/rx.h"
+//#include "pg/motor.h"
+
+#include "rx/rx.h"
+#include "rx/rc_stats.h"
+
+#include "scheduler/scheduler.h"
+
+//#include "sensors/acceleration.h"
+#include "sensors/adcinternal.h"
+#include "sensors/barometer.h"
+#include "sensors/battery.h"
+#include "sensors/compass.h"
+#include "sensors/esc_sensor.h"
+#include "sensors/gyro.h"
+#include "sensors/sensors.h"
+#include "sensors/rangefinder.h"
+#include "sensors/opticalflow.h"
 
 #include "telemetry/telemetry.h"
 #include "telemetry/crsf.h"
 
-#include "hw/adc_impl.h"
+#ifdef USE_BST
+#include "i2c_bst.h"
+#endif
+
+#ifdef USE_USB_CDC_HID
+#include "io/usb_cdc_hid.h"
+#endif
 
 #include "tasks.h"
 
@@ -116,23 +152,49 @@ static void ledUpdate(uint32_t currentTimeUs)
     }
 }
 
-uint32_t debug1;
-
 static void debugPrint(uint32_t currentTimeUs)
 {
   //uartPrintf_IT(_DEF_UART1, "adcValue =  %d, buff = %d\r\n", adcGetValue(0), adcInternalRead(4));
 }
 
-static void taskHandleSerial(uint32_t currentTimeUs)
+static void taskHandleSerial(timeUs_t currentTimeUs)
 {
+#if ENABLE_BF_OBL
+    // OBL armed IWDG before BXNS; refresh from TASK_SERIAL — the
+    // scheduler exempts TASK_SERIAL from the time-budget check so it
+    // always runs at its nominal rate. If scheduler itself wedges,
+    // refresh stops, IWDG fires and OBL routes the next boot to DFU.
+    BF_OBL_IWDG_REFRESH();
+#endif
+
     UNUSED(currentTimeUs);
 
-    cliMain();
+    #if defined(USE_VCP)
+    DEBUG_SET(DEBUG_USB, 0, usbCableIsInserted());
+    DEBUG_SET(DEBUG_USB, 1, usbVcpIsConnected());
+#endif
 
-    // Allow MSP processing even if in CLI mode
     bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
+    cliMain();
 }
+
+static void taskBatteryAlerts(timeUs_t currentTimeUs)
+{
+    if (!ARMING_FLAG(ARMED)) {
+        // the battery *might* fall out in flight, but if that happens the FC will likely be off too unless the user has battery backup.
+        batteryUpdatePresence();
+    }
+    batteryUpdateStates(currentTimeUs);
+    batteryUpdateAlarms();
+}
+
+#ifdef USE_ACC
+static void taskUpdateAccelerometer(timeUs_t currentTimeUs)
+{
+    accUpdate(currentTimeUs);
+}
+#endif
 
 typedef enum {
     RX_STATE_CHECK,
@@ -260,13 +322,14 @@ static void taskCalculateAltitude(timeUs_t currentTimeUs)
 }
 #endif // USE_BARO || USE_GPS
 
-#ifdef USE_RANGEFINDER
-void taskUpdateRangefinder(timeUs_t currentTimeUs)
+#if defined(USE_RANGEFINDER)
+static void taskUpdateRangefinder(timeUs_t currentTimeUs)
 {
     UNUSED(currentTimeUs);
 
-    if (!sensors(SENSOR_RANGEFINDER))
+    if (!sensors(SENSOR_RANGEFINDER)) {
         return;
+    }
 
     rangefinderUpdate();
 
@@ -275,10 +338,13 @@ void taskUpdateRangefinder(timeUs_t currentTimeUs)
 #endif
 
 #ifdef USE_OPTICALFLOW
-void taskUpdateOpticalflow(timeUs_t currentTimeUs)
+static void taskUpdateOpticalflow(timeUs_t currentTimeUs)
 {
-    if (!sensors(SENSOR_OPTICALFLOW))
+    UNUSED(currentTimeUs);
+
+    if (!sensors(SENSOR_OPTICALFLOW)) {
         return;
+    }
 
     opticalflowUpdate();
     opticalflowProcess();
@@ -286,38 +352,26 @@ void taskUpdateOpticalflow(timeUs_t currentTimeUs)
 #endif
 
 #ifdef USE_TELEMETRY
-
-#define GYRO_TEMP_READ_DELAY_US 3e6    // Only read the gyro temp every 3 seconds
-void subTaskTelemetryPollSensors(timeUs_t currentTimeUs)
-{
-    static timeUs_t lastGyroTempTimeUs = 0;
-
-    if (cmpTimeUs(currentTimeUs, lastGyroTempTimeUs) >= GYRO_TEMP_READ_DELAY_US) {
-        // Read out gyro temperature if used for telemmetry
-        //gyroReadTemperature();
-        lastGyroTempTimeUs = currentTimeUs;
-    }
-}
-
 static void taskTelemetry(timeUs_t currentTimeUs)
 {
-    //if (!cliMode && featureIsEnabled(FEATURE_TELEMETRY)) {
+    if (featureIsEnabled(FEATURE_TELEMETRY)) { //!cliMode &&
         subTaskTelemetryPollSensors(currentTimeUs);
 
         telemetryProcess(currentTimeUs);
-    //}
+    }
 }
 #endif
 
-static void taskBatteryAlerts(uint32_t currentTimeUs)
+#ifdef USE_CAMERA_CONTROL
+static void taskCameraControl(timeUs_t currentTimeUs)
 {
-    if (!ARMING_FLAG(ARMED)) {
-        // the battery *might* fall out in flight, but if that happens the FC will likely be off too unless the user has battery backup.
-        batteryUpdatePresence();
+    if (ARMING_FLAG(ARMED)) {
+        return;
     }
-    batteryUpdateStates(currentTimeUs);
-    batteryUpdateAlarms();
+
+    cameraControlProcess(currentTimeUs);
 }
+#endif
 
 #define DEFINE_TASK(taskNameParam, subTaskNameParam, checkFuncParam, taskFuncParam, desiredPeriodParam, staticPriorityParam) {  \
 	    .taskName = taskNameParam, \
@@ -333,12 +387,13 @@ task_t tasks[TASK_COUNT];
 
 // Task ID data in .data (initialised data)
 task_attribute_t task_attributes[TASK_COUNT] = {
+
     [TASK_SYSTEM] = DEFINE_TASK("SYSTEM", "LOAD", NULL, taskSystemLoad, TASK_PERIOD_HZ(10), TASK_PRIORITY_MEDIUM_HIGH),
     [TASK_MAIN] = DEFINE_TASK("SYSTEM", "UPDATE", NULL, taskMain, TASK_PERIOD_HZ(1000), TASK_PRIORITY_MEDIUM_HIGH),
-    [TASK_SERIAL] = DEFINE_TASK("SERIAL", NULL, NULL,taskHandleSerial, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW), // 100 Hz should be enough to flush up to 115 bytes @ 115200 baud
-    [TASK_BATTERY_ALERTS] = DEFINE_TASK("BATTERY_ALERTS", NULL, NULL,taskBatteryAlerts, TASK_PERIOD_HZ(5), TASK_PRIORITY_MEDIUM),
-    [TASK_BATTERY_VOLTAGE] = DEFINE_TASK("BATTERY_VOLTAGE", NULL, NULL,batteryUpdateVoltage, TASK_PERIOD_HZ(SLOW_VOLTAGE_TASK_FREQ_HZ), TASK_PRIORITY_MEDIUM), // Freq may be updated in tasksInit
-    [TASK_BATTERY_CURRENT] = DEFINE_TASK("BATTERY_CURRENT", NULL, NULL,batteryUpdateCurrentMeter, TASK_PERIOD_HZ(50), TASK_PRIORITY_MEDIUM),
+    [TASK_SERIAL] = DEFINE_TASK("SERIAL", NULL, NULL, taskHandleSerial, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW), // 100 Hz should be enough to flush up to 115 bytes @ 115200 baud
+    [TASK_BATTERY_ALERTS] = DEFINE_TASK("BATTERY_ALERTS", NULL, NULL, taskBatteryAlerts, TASK_PERIOD_HZ(5), TASK_PRIORITY_MEDIUM),
+    [TASK_BATTERY_VOLTAGE] = DEFINE_TASK("BATTERY_VOLTAGE", NULL, NULL, batteryUpdateVoltage, TASK_PERIOD_HZ(SLOW_VOLTAGE_TASK_FREQ_HZ), TASK_PRIORITY_MEDIUM), // Freq may be updated in tasksInit
+    [TASK_BATTERY_CURRENT] = DEFINE_TASK("BATTERY_CURRENT", NULL, NULL, batteryUpdateCurrentMeter, TASK_PERIOD_HZ(50), TASK_PRIORITY_MEDIUM),
 
 #ifdef USE_TRANSPONDER
     [TASK_TRANSPONDER] = DEFINE_TASK("TRANSPONDER", NULL, NULL, transponderUpdate, TASK_PERIOD_HZ(250), TASK_PRIORITY_LOW),
@@ -349,11 +404,11 @@ task_attribute_t task_attributes[TASK_COUNT] = {
 #endif
 
     [TASK_GYRO] = DEFINE_TASK("GYRO", NULL, NULL, taskGyroSample, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
-    [TASK_FILTER] = DEFINE_TASK("FILTER", NULL, NULL,taskFiltering, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
+    [TASK_FILTER] = DEFINE_TASK("FILTER", NULL, NULL, taskFiltering, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
     [TASK_PID] = DEFINE_TASK("PID", NULL, NULL, taskMainPidLoop, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
 
 #ifdef USE_ACC
-    [TASK_ACCEL] = DEFINE_TASK("ACC", NULL, NULL, taskAccUpdate, TASK_PERIOD_HZ(1000), TASK_PRIORITY_MEDIUM),
+    [TASK_ACCEL] = DEFINE_TASK("ACC", NULL, NULL, taskUpdateAccelerometer, TASK_PERIOD_HZ(1000), TASK_PRIORITY_MEDIUM),
     [TASK_ATTITUDE] = DEFINE_TASK("ATTITUDE", NULL, NULL, imuUpdateAttitude, TASK_PERIOD_HZ(400), TASK_PRIORITY_MEDIUM),
 #endif
 
@@ -375,6 +430,14 @@ task_attribute_t task_attributes[TASK_COUNT] = {
     [TASK_GPS_RESCUE] = DEFINE_TASK("GPS_RESCUE", NULL, NULL, taskGpsRescue, TASK_PERIOD_HZ(TASK_GPS_RESCUE_RATE_HZ), TASK_PRIORITY_MEDIUM),
 #endif
 
+#ifdef USE_ALTITUDE_HOLD
+    [TASK_ALTHOLD] = DEFINE_TASK("ALTHOLD", NULL, NULL, updateAltHold, TASK_PERIOD_HZ(ALTHOLD_TASK_RATE_HZ), TASK_PRIORITY_LOW),
+#endif
+
+#ifdef USE_POSITION_HOLD
+    [TASK_POSHOLD] = DEFINE_TASK("POSHOLD", NULL, NULL, updatePosHold, TASK_PERIOD_HZ(POSHOLD_TASK_RATE_HZ), TASK_PRIORITY_LOW),
+#endif
+
 #ifdef USE_MAG
     [TASK_COMPASS] = DEFINE_TASK("COMPASS", NULL, NULL, taskUpdateMag, TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ), TASK_PRIORITY_LOW),
 #endif
@@ -387,8 +450,12 @@ task_attribute_t task_attributes[TASK_COUNT] = {
     [TASK_ALTITUDE] = DEFINE_TASK("ALTITUDE", NULL, NULL, taskCalculateAltitude, TASK_PERIOD_HZ(TASK_ALTITUDE_RATE_HZ), TASK_PRIORITY_LOW),
 #endif
 
+#ifdef USE_DASHBOARD
+    [TASK_DASHBOARD] = DEFINE_TASK("DASHBOARD", NULL, NULL, dashboardUpdate, TASK_PERIOD_HZ(10), TASK_PRIORITY_LOW),
+#endif
+
 #ifdef USE_OSD
-    [TASK_OSD] = DEFINE_TASK("OSD", NULL, NULL, osdUpdate, TASK_PERIOD_HZ(OSD_FRAMERATE_DEFAULT_HZ), TASK_PRIORITY_LOW),
+    [TASK_OSD] = DEFINE_TASK("OSD", NULL, osdUpdateCheck, osdUpdate, TASK_PERIOD_HZ(OSD_FRAMERATE_DEFAULT_HZ), TASK_PRIORITY_LOW),
 #endif
 
 #ifdef USE_TELEMETRY
@@ -396,24 +463,67 @@ task_attribute_t task_attributes[TASK_COUNT] = {
 #endif
 
 #ifdef USE_LED_STRIP
-    [TASK_LEDSTRIP] = DEFINE_TASK("LEDSTRIP", NULL, NULL, ledStripUpdate, TASK_PERIOD_HZ(60), TASK_PRIORITY_LOW),
+    [TASK_LEDSTRIP] = DEFINE_TASK("LEDSTRIP", NULL, NULL, ledStripUpdate, TASK_PERIOD_HZ(TASK_LEDSTRIP_RATE_HZ), TASK_PRIORITY_LOW),
+#endif
+
+#ifdef USE_BST
+    [TASK_BST_MASTER_PROCESS] = DEFINE_TASK("BST_MASTER_PROCESS", NULL, NULL, taskBstMasterProcess, TASK_PERIOD_HZ(50), TASK_PRIORITY_LOWEST),
 #endif
 
 #ifdef USE_ESC_SENSOR
     [TASK_ESC_SENSOR] = DEFINE_TASK("ESC_SENSOR", NULL, NULL, escSensorProcess, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
 #endif
 
+#ifdef USE_CMS
+    [TASK_CMS] = DEFINE_TASK("CMS", NULL, NULL, cmsHandler, TASK_PERIOD_HZ(20), TASK_PRIORITY_LOW),
+#endif
+
+#ifdef USE_VTX_CONTROL
+    [TASK_VTXCTRL] = DEFINE_TASK("VTXCTRL", NULL, NULL, vtxUpdate, TASK_PERIOD_HZ(5), TASK_PRIORITY_LOWEST),
+#endif
+
+#ifdef USE_RCDEVICE
+    [TASK_RCDEVICE] = DEFINE_TASK("RCDEVICE", NULL, NULL, rcdeviceUpdate, TASK_PERIOD_HZ(20), TASK_PRIORITY_MEDIUM),
+#endif
+
+#ifdef USE_CAMERA_CONTROL
+    [TASK_CAMCTRL] = DEFINE_TASK("CAMCTRL", NULL, NULL, taskCameraControl, TASK_PERIOD_HZ(5), TASK_PRIORITY_LOW),
+#endif
+
 #ifdef USE_ADC_INTERNAL
     [TASK_ADC_INTERNAL] = DEFINE_TASK("ADCINTERNAL", NULL, NULL, adcInternalProcess, TASK_PERIOD_HZ(1), TASK_PRIORITY_LOWEST),
 #endif
 
-#ifdef USE_RANGEFINDER
-    [TASK_RANGEFINDER] = DEFINE_TASK("RANGEFINDER", NULL, NULL, taskUpdateRangefinder, TASK_PERIOD_MS(70), TASK_PRIORITY_LOWEST),
+#ifdef USE_PINIOBOX
+    [TASK_PINIOBOX] = DEFINE_TASK("PINIOBOX", NULL, NULL, pinioBoxUpdate, TASK_PERIOD_HZ(20), TASK_PRIORITY_LOWEST),
 #endif
 
-#ifdef USE_OPTICALFLOW
-    [TASK_OPTICALFLOW] = DEFINE_TASK("OPTICALFLOW", NULL, NULL, taskUpdateOpticalflow, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOWEST),
+#ifdef USE_RANGEFINDER
+    [TASK_RANGEFINDER] = DEFINE_TASK("RANGEFINDER", NULL, NULL, taskUpdateRangefinder, TASK_PERIOD_HZ(10), TASK_PRIORITY_LOWEST),
 #endif
+#ifdef USE_OPTICALFLOW
+    [TASK_OPTICALFLOW] = DEFINE_TASK("OPTICALFLOW", NULL, NULL, taskUpdateOpticalflow, TASK_PERIOD_HZ(10), TASK_PRIORITY_LOWEST),
+#endif
+#ifdef USE_CRSF_V3
+    [TASK_SPEED_NEGOTIATION] = DEFINE_TASK("SPEED_NEGOT'N", NULL, NULL, speedNegotiationProcess, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
+#endif
+
+#ifdef USE_RC_STATS
+    [TASK_RC_STATS] = DEFINE_TASK("RC_STATS", NULL, NULL, rcStatsUpdate, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
+#endif
+
+#ifdef USE_GIMBAL
+    [TASK_GIMBAL] = DEFINE_TASK("GIMBAL", NULL, NULL, gimbalUpdate, TASK_PERIOD_HZ(100), TASK_PRIORITY_MEDIUM),
+#endif
+
+#if ENABLE_OSD_CUSTOM_TEXT
+    [TASK_OSD_CUSTOM_TEXT] = DEFINE_TASK("OSD_CTEXT", NULL, NULL, osdCustomTextUpdate, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
+#endif
+
+#if ENABLE_DRONECAN
+    [TASK_DRONECAN] = DEFINE_TASK("DRONECAN", NULL, NULL, dronecanUpdate, TASK_PERIOD_HZ(50), TASK_PRIORITY_LOW),
+#endif
+
 };
 
 task_t *getTask(unsigned taskId)
@@ -453,8 +563,12 @@ void tasksInit(void)
 
     const bool useBatteryCurrent = batteryConfig.currentMeterSource != CURRENT_METER_NONE;
     setTaskEnabled(TASK_BATTERY_CURRENT, useBatteryCurrent);
-    const bool useBatteryAlerts = batteryConfig.useVBatAlerts || batteryConfig.useConsumptionAlerts;
+    const bool useBatteryAlerts = batteryConfig.useVBatAlerts || batteryConfig.useConsumptionAlerts || featureIsEnabled(FEATURE_OSD);
     setTaskEnabled(TASK_BATTERY_ALERTS, (useBatteryVoltage || useBatteryCurrent) && useBatteryAlerts);
+
+#ifdef USE_STACK_CHECK
+    setTaskEnabled(TASK_STACK_CHECK, true);
+#endif
 
     if (sensors(SENSOR_GYRO)) {
       rescheduleTask(TASK_GYRO, bmi270.gyro.sampleLooptime);
@@ -474,6 +588,18 @@ void tasksInit(void)
 	}
 #endif
 
+#ifdef USE_RANGEFINDER
+    if (sensors(SENSOR_RANGEFINDER)) {
+        setTaskEnabled(TASK_RANGEFINDER, featureIsEnabled(FEATURE_RANGEFINDER));
+    }
+#endif
+
+#ifdef USE_OPTICALFLOW
+    if (sensors(SENSOR_OPTICALFLOW)) {
+        setTaskEnabled(TASK_OPTICALFLOW, featureIsEnabled(FEATURE_OPTICALFLOW));
+    }
+#endif
+
   setTaskEnabled(TASK_RX, true);
 
   setTaskEnabled(TASK_DISPATCH, dispatchIsEnabled());
@@ -483,23 +609,33 @@ void tasksInit(void)
 #endif
 
 #ifdef USE_GPS
-    setTaskEnabled(TASK_GPS, true);
+    setTaskEnabled(TASK_GPS, featureIsEnabled(FEATURE_GPS));
 #endif
 
 #ifdef USE_GPS_RESCUE
-    setTaskEnabled(TASK_GPS_RESCUE, true);
+    setTaskEnabled(TASK_GPS_RESCUE, featureIsEnabled(FEATURE_GPS));
+#endif
+
+#ifdef USE_ALTITUDE_HOLD
+    setTaskEnabled(TASK_ALTHOLD, sensors(SENSOR_BARO) ||
+                                 sensors(SENSOR_RANGEFINDER) ||
+                                 featureIsEnabled(FEATURE_GPS));
+#endif
+
+#ifdef USE_POSITION_HOLD
+    setTaskEnabled(TASK_POSHOLD, featureIsEnabled(FEATURE_GPS) || sensors(SENSOR_OPTICALFLOW));
 #endif
 
 #ifdef USE_MAG
     setTaskEnabled(TASK_COMPASS, sensors(SENSOR_MAG));
 #endif
-//
+
 #ifdef USE_BARO
-    setTaskEnabled(TASK_BARO, true);
+    setTaskEnabled(TASK_BARO, sensors(SENSOR_BARO));
 #endif
 
-#if defined(USE_BARO) || defined(USE_GPS)
-    setTaskEnabled(TASK_ALTITUDE, true);
+#if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
+    setTaskEnabled(TASK_ALTITUDE, sensors(SENSOR_BARO) || featureIsEnabled(FEATURE_GPS) || sensors(SENSOR_RANGEFINDER));
 #endif
 
 #ifdef USE_DASHBOARD
@@ -507,9 +643,16 @@ void tasksInit(void)
 #endif
 
 #ifdef USE_TELEMETRY
-    setTaskEnabled(TASK_TELEMETRY, true);
-    // Reschedule telemetry to 500hz, 2ms for CRSF
-    rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
+    if (featureIsEnabled(FEATURE_TELEMETRY)) {
+    	setTaskEnabled(TASK_TELEMETRY, true);
+      if (rxRuntimeState.serialrxProvider == SERIALRX_JETIEXBUS) {
+          // Reschedule telemetry to 500hz for Jeti Exbus
+          rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
+      } else if (rxRuntimeState.serialrxProvider == SERIALRX_CRSF) {
+				// Reschedule telemetry to 500hz, 2ms for CRSF
+				rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
+      }
+    }
 #endif
 
 #ifdef USE_LED_STRIP
@@ -522,13 +665,13 @@ void tasksInit(void)
 
 #ifdef USE_OSD
     rescheduleTask(TASK_OSD, TASK_PERIOD_HZ(osdConfig.framerate_hz));
-    setTaskEnabled(TASK_OSD, true);
+    setTaskEnabled(TASK_OSD, featureIsEnabled(FEATURE_OSD) && osdGetDisplayPort(NULL));
 #endif
 
 #ifdef USE_BST
     setTaskEnabled(TASK_BST_MASTER_PROCESS, true);
 #endif
-//
+
 #ifdef USE_ESC_SENSOR
     setTaskEnabled(TASK_ESC_SENSOR, featureIsEnabled(FEATURE_ESC_SENSOR));
 #endif
@@ -537,43 +680,54 @@ void tasksInit(void)
     setTaskEnabled(TASK_ADC_INTERNAL, true);
 #endif
 
-#ifdef USE_RANGEFINDER
-    setTaskEnabled(TASK_RANGEFINDER, sensors(SENSOR_RANGEFINDER));
+#ifdef USE_PINIOBOX
+    pinioBoxTaskControl();
 #endif
 
-#ifdef USE_OPTICALFLOW
-    setTaskEnabled(TASK_OPTICALFLOW, sensors(SENSOR_OPTICALFLOW));
+#ifdef USE_CMS
+#ifdef USE_MSP_DISPLAYPORT
+    setTaskEnabled(TASK_CMS, true);
+#else
+    setTaskEnabled(TASK_CMS, featureIsEnabled(FEATURE_OSD) || featureIsEnabled(FEATURE_DASHBOARD));
+#endif
 #endif
 
-//#ifdef USE_PINIOBOX
-//    pinioBoxTaskControl();
-//#endif
-//
-//#ifdef USE_CMS
-//#ifdef USE_MSP_DISPLAYPORT
-//    setTaskEnabled(TASK_CMS, true);
-//#else
-//    setTaskEnabled(TASK_CMS, featureIsEnabled(FEATURE_OSD) || featureIsEnabled(FEATURE_DASHBOARD));
-//#endif
-//#endif
-//
-//#ifdef USE_VTX_CONTROL
-//#if defined(USE_VTX_RTC6705) || defined(USE_VTX_SMARTAUDIO) || defined(USE_VTX_TRAMP)
-//    setTaskEnabled(TASK_VTXCTRL, true);
-//#endif
-//#endif
-//
-//#ifdef USE_CAMERA_CONTROL
-//    setTaskEnabled(TASK_CAMCTRL, true);
-//#endif
-//
-//#ifdef USE_RCDEVICE
-//    setTaskEnabled(TASK_RCDEVICE, rcdeviceIsEnabled());
-//#endif
-//
-//#ifdef USE_CRSF_V3
-//    const bool useCRSF = rxRuntimeState.serialrxProvider == SERIALRX_CRSF;
-//    setTaskEnabled(TASK_SPEED_NEGOTIATION, useCRSF);
-//#endif
+#ifdef USE_VTX_CONTROL
+#if defined(USE_VTX_RTC6705) || defined(USE_VTX_SMARTAUDIO) || defined(USE_VTX_TRAMP) || defined(USE_VTX_MSP)
+    setTaskEnabled(TASK_VTXCTRL, true);
+#endif
+#endif
+
+#ifdef USE_CAMERA_CONTROL
+    setTaskEnabled(TASK_CAMCTRL, true);
+#endif
+
+#ifdef USE_RCDEVICE
+    setTaskEnabled(TASK_RCDEVICE, rcdeviceIsEnabled());
+#endif
+
+#ifdef USE_CRSF_V3
+    const bool useCRSF = rxRuntimeState.serialrxProvider == SERIALRX_CRSF;
+    setTaskEnabled(TASK_SPEED_NEGOTIATION, useCRSF);
+#endif
+
+#if ENABLE_SIMULATOR_MULTITHREAD
+    rescheduleTask(TASK_RX, 1);
+#endif
+
+#ifdef USE_RC_STATS
+    setTaskEnabled(TASK_RC_STATS, true);
+#endif
+
+#ifdef USE_GIMBAL
+    setTaskEnabled(TASK_GIMBAL, true);
+#endif
+
+#if ENABLE_OSD_CUSTOM_TEXT
+    setTaskEnabled(TASK_OSD_CUSTOM_TEXT, true);
+#endif
+
+#if ENABLE_DRONECAN
+    setTaskEnabled(TASK_DRONECAN, dronecanIsInitialised());
+#endif
 }
-

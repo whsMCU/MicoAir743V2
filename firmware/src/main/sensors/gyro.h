@@ -35,14 +35,21 @@
 
 //#include "flight/pid.h"
 
-#define GRAVITY_CMSS    980.665f
-#define GRAVITY_MSS     9.80665f
+#define LPF_MAX_HZ 1000 // so little filtering above 1000hz that if the user wants less delay, they must disable the filter
+#define DYN_LPF_MAX_HZ 1000
 
-#define ACC_CLIPPING_THRESHOLD_G        7.9f
-#define ACC_VIBE_FLOOR_FILT_HZ          5.0f
-#define ACC_VIBE_FILT_HZ                2.0f
+#define GYRO_LPF1_DYN_MIN_HZ_DEFAULT 250
+#define GYRO_LPF1_DYN_MAX_HZ_DEFAULT 500
+#define GYRO_LPF2_HZ_DEFAULT 500
+
+#ifdef USE_YAW_SPIN_RECOVERY
+#define YAW_SPIN_RECOVERY_THRESHOLD_MIN 500
+#define YAW_SPIN_RECOVERY_THRESHOLD_MAX 1950
+#endif
 
 #define GYRO_IMU_DOWNSAMPLE_CUTOFF_HZ 200
+
+#define GYRO_MASK(x) BIT(x)
 
 typedef union gyroLowpassFilter_u {
     pt1Filter_t pt1FilterState;
@@ -76,23 +83,21 @@ typedef struct gyro_s {
     uint16_t sampleRateHz;
     uint32_t targetLooptime;
     uint32_t sampleLooptime;
+    float scale;
+    vector3_t gyroADC;     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
+    float gyroADCf[XYZ_AXIS_COUNT];    // filtered gyro data
+    uint8_t sampleCount;               // gyro sensor sample counter
+    float sampleSum[XYZ_AXIS_COUNT];   // summed samples used for downsampling
+    bool downsampleFilterEnabled;      // if true then downsample using gyro lowpass 2, otherwise use averaging
 
     volatile bool dataReady;
 
-    float scale;
-
     int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
     int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
-    vector3_t gyroADC;     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
-    float gyroADCf[XYZ_AXIS_COUNT];    // filtered gyro data
 
     float gyro_accumulatedMeasurements[XYZ_AXIS_COUNT];
     float gyroPrevious[XYZ_AXIS_COUNT];
     int gyro_accumulatedMeasurementCount;
-
-    uint8_t sampleCount;               // gyro sensor sample counter
-    float sampleSum[XYZ_AXIS_COUNT];   // summed samples used for downsampling
-    bool downsampleFilterEnabled;      // if true then downsample using gyro lowpass 2, otherwise use averaging
 
     gyroCalibration_t calibration;
 
@@ -112,11 +117,29 @@ typedef struct gyro_s {
 
     dynNotchConfig_t dynNotchConfig;
 
+    // notch filters
     filterApplyFnPtr notchFilter1ApplyFn;
     biquadFilter_t notchFilter1[XYZ_AXIS_COUNT];
 
     filterApplyFnPtr notchFilter2ApplyFn;
     biquadFilter_t notchFilter2[XYZ_AXIS_COUNT];
+
+    uint8_t gyroEnabledBitmask;
+    uint8_t gyroDebugMode;
+    bool gyroHasOverflowProtection;
+    bool useMultiGyroDebugging;
+    int gyroDebugAxis;
+
+#ifdef USE_DYN_LPF
+    uint8_t dynLpfFilter;
+    uint16_t dynLpfMin;
+    uint16_t dynLpfMax;
+    uint8_t dynLpfCurveExpo;
+#endif
+
+#ifdef USE_GYRO_OVERFLOW_CHECK
+    uint8_t overflowAxisMask;
+#endif
 
     pt1Filter_t imuGyroFilter[XYZ_AXIS_COUNT];
 
@@ -206,6 +229,31 @@ extern imu_t bmi270;
 extern imu_t bmi088;
 extern uint8_t activePidLoopDenom;
 
+enum {
+    GYRO_OVERFLOW_CHECK_NONE = 0,
+    GYRO_OVERFLOW_CHECK_YAW,
+    GYRO_OVERFLOW_CHECK_ALL_AXES
+};
+
+enum {
+    DYN_LPF_NONE = 0,
+    DYN_LPF_PT1,
+    DYN_LPF_SVF,
+    DYN_LPF_PT2,
+    DYN_LPF_PT3,
+};
+
+typedef enum {
+    YAW_SPIN_RECOVERY_OFF,
+    YAW_SPIN_RECOVERY_ON,
+    YAW_SPIN_RECOVERY_AUTO
+} yawSpinRecoveryMode_e;
+
+enum {
+    FILTER_LPF1 = 0,
+    FILTER_LPF2
+};
+
 void gyroUpdate(timeUs_t currentTimeUs);
 void gyroFiltering(timeUs_t currentTimeUs);
 float gyroGetFilteredDownsampled(int axis);
@@ -219,7 +267,7 @@ bool accIsCalibrationComplete(void);
 bool accHasBeenCalibrated(void);
 void accStartCalibration(void);
 void resetRollAndPitchTrims(rollAndPitchTrims_t *rollAndPitchTrims);
-void taskAccUpdate(timeUs_t currentTimeUs);
+void accUpdate(timeUs_t currentTimeUs);
 bool accGetAccumulationAverage(float *accumulation);
 
 void resetFlightDynamicsTrims(flightDynamicsTrims_t *accZero);

@@ -89,7 +89,7 @@
 //#include "pg/pg_ids.h"
 //#include "pg/rx.h"
 
-//#include "rx/rc_stats.h"
+#include "rx/rc_stats.h"
 #include "rx/rx.h"
 
 #include "scheduler/scheduler.h"
@@ -1293,6 +1293,19 @@ void processRxModes(timeUs_t currentTimeUs)
 
     //pidSetAntiGravityState(IS_RC_MODE_ACTIVE(BOXANTIGRAVITY) || featureIsEnabled(FEATURE_ANTI_GRAVITY));
 }
+
+#define GYRO_TEMP_READ_DELAY_US 3e6    // Only read the gyro temp every 3 seconds
+void subTaskTelemetryPollSensors(timeUs_t currentTimeUs)
+{
+    static timeUs_t lastGyroTempTimeUs = 0;
+
+    if (cmpTimeUs(currentTimeUs, lastGyroTempTimeUs) >= GYRO_TEMP_READ_DELAY_US) {
+        // Read out gyro temperature if used for telemmetry
+        //gyroReadTemperature();
+        lastGyroTempTimeUs = currentTimeUs;
+    }
+}
+
 static FAST_CODE_NOINLINE void subTaskRcCommand(timeUs_t currentTimeUs)
 {
     UNUSED(currentTimeUs);
@@ -1359,15 +1372,15 @@ FAST_CODE void taskMainPidLoop(timeUs_t currentTimeUs)
 	// 1 - subTaskPidController()
 	// 2 - subTaskMotorUpdate()
 	// 3 - subTaskPidSubprocesses()
-	//DEBUG_SET(DEBUG_PIDLOOP, 0, micros() - currentTimeUs);
+	DEBUG_SET(DEBUG_PIDLOOP, 0, micros() - currentTimeUs);
 
     subTaskRcCommand(currentTimeUs);
 	subTaskPidController(currentTimeUs);
 	//subTaskMotorUpdate(currentTimeUs);
 	//subTaskPidSubprocesses(currentTimeUs);
 
-	//DEBUG_SET(DEBUG_CYCLETIME, 0, getTaskDeltaTimeUs(TASK_SELF));
-	//DEBUG_SET(DEBUG_CYCLETIME, 1, getAverageSystemLoadPercent());
+	DEBUG_SET(DEBUG_CYCLETIME, 0, getTaskDeltaTimeUs(TASK_SELF));
+	DEBUG_SET(DEBUG_CYCLETIME, 1, getAverageSystemLoadPercent());
 }
 
 bool isCrashFlipModeActive(void)

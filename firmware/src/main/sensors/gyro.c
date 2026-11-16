@@ -496,7 +496,7 @@ void performAcclerationCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 
 #define acc_lpf_factor 4
 
-void taskAccUpdate(timeUs_t currentTimeUs)
+void accUpdate(timeUs_t currentTimeUs)
 {
   static timeUs_t previousIMUUpdateTime;
   const timeDelta_t deltaT = currentTimeUs - previousIMUUpdateTime;
@@ -557,16 +557,6 @@ void taskAccUpdate(timeUs_t currentTimeUs)
   for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
     bmi270.acc.accADCf[axis] = (float)bmi270.acc.accADC.v[axis] / bmi270.acc.acc_1G;
   }
-
-  // Before filtering check for clipping and vibration levels
-  if (fabsf(bmi270.acc.accADCf[X]) > ACC_CLIPPING_THRESHOLD_G || fabsf(bmi270.acc.accADCf[Y]) > ACC_CLIPPING_THRESHOLD_G || fabsf(bmi270.acc.accADCf[Z]) > ACC_CLIPPING_THRESHOLD_G) {
-    bmi270.acc.isClipped = true;
-    bmi270.acc.accClipCount++;
-  }
-  else {
-    bmi270.acc.isClipped = false;
-  }
-
 
 //  for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
 //    bmi270.acc.accADCf[axis] = laggedMovingAverageUpdate(&accAvg[axis].filter, (float)bmi270.acc.accADC[axis]);

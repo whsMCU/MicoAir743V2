@@ -32,6 +32,7 @@
 
 #include "config/config.h"
 #include "fc/runtime_config.h"
+#include "fc/rc_controls.h"
 
 //#include "flight/mixer.h"
 #include "flight/pid.h"
@@ -423,4 +424,28 @@ int packFlightModeFlags(boxBitmask_t *mspFlightModeFlags)
     }
     // return count of used bits
     return mspBoxIdx;
+}
+
+void MSP_SET_MODE_RANGE(uint32_t i, uint8_t boxId, uint8_t auxChannelIndex, uint32_t start, uint32_t end){
+	uint32_t start_value = CHANNEL_VALUE_TO_STEP(start);
+	uint32_t end_value = CHANNEL_VALUE_TO_STEP(end);
+	  //i = sbufReadU8(src);
+	  if (i < MAX_MODE_ACTIVATION_CONDITION_COUNT) {
+	      modeActivationCondition_t *mac = &modeActivationConditions[i];
+	      //i = sbufReadU8(src);
+	      const box_t *box = findBoxByPermanentId(boxId);
+	      if (box) {
+	          mac->modeId = box->boxId;
+	          mac->auxChannelIndex = auxChannelIndex;
+	          mac->range.startStep = (uint8_t)start_value;
+	          mac->range.endStep = (uint8_t)end_value;
+//	          if (sbufBytesRemaining(src) != 0) {
+//	              mac->modeLogic = sbufReadU8(src);
+//
+//	              i = sbufReadU8(src);
+//	              mac->linkedTo = findBoxByPermanentId(i)->boxId;
+//	          }
+	          rcControlsInit();
+	      }
+	  }
 }

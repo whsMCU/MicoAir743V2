@@ -26,26 +26,30 @@
 #include <limits.h>
 #include <math.h>
 
-#include "build/debug.h"
+#include "hw.h"
 
 #include "drivers/accgyro/accgyro.h"
 
-#include "fc/core.h"
+#include "build/build_config.h"
+#include "build/debug.h"
 
 #include "common/maths.h"
+#include "common/time.h"
+#include "common/utils.h"
+
+#include "drivers/time.h"
+#include "drivers/accgyro/accgyro.h"
+//#include "drivers/system.h"
+
+#include "fc/core.h"
+#include "fc/tasks.h"
 
 #include "rx/rx.h"
-#include "rx/crsf.h"
-
 #include "flight/failsafe.h"
 
 #include "scheduler.h"
 
 #include "sensors/gyro_init.h"
-#include "sensors/gyro.h"
-
-#include "scheduler/scheduler.h"
-#include "scheduler/tasks.h"
 
 // DEBUG_SCHEDULER, timings for:
 // 0 - Average time spent executing check function
@@ -114,7 +118,7 @@ static uint8_t skippedOSDAttempts = 0;
 #endif
 
 #if defined(USE_LATE_TASK_STATISTICS)
-static int16_t lateTaskCount = 0;
+static uint32_t lateTaskCount = 0;
 static uint32_t lateTaskTotal = 0;
 static uint32_t taskCount = 0;
 static uint32_t lateTaskPercentage = 0;
@@ -471,18 +475,18 @@ FAST_CODE timeUs_t schedulerExecuteTask(task_t *selectedTask, timeUs_t currentTi
 	    #if defined(USE_LATE_TASK_STATISTICS)
 	      selectedTask->runCount++;
 
-//        if ((selectedTask - tasks) == schedulerConfig()->debugTask) {
-//            timeUs_t averageDeltaTime10thUs = selectedTask->movingSumDeltaTime10thUs / TASK_STATS_MOVING_SUM_COUNT;
-//            int16_t taskFrequency = averageDeltaTime10thUs == 0 ? 0 : lrintf(1e7f / averageDeltaTime10thUs);
-//            DEBUG_SET(DEBUG_TASK, 0, schedulerConfig()->debugTask);
-//            DEBUG_SET(DEBUG_TASK, 1, taskFrequency);
-//            DEBUG_SET(DEBUG_TASK, 2, selectedTask->maxExecutionTimeUs);
-//            DEBUG_SET(DEBUG_TASK, 3, selectedTask->movingSumExecutionTime10thUs / TASK_STATS_MOVING_SUM_COUNT / 10);
-//            DEBUG_SET(DEBUG_TASK, 4, estimatedExecutionUs);
-//            DEBUG_SET(DEBUG_TASK, 5, taskExecutionTimeUs);
-//            DEBUG_SET(DEBUG_TASK, 6, estimatedExecutionUs - taskExecutionTimeUs);
-//            DEBUG_SET(DEBUG_TASK, 7, selectedTask->lateCount);
-//        }
+        if ((selectedTask - tasks) == schedulerConfig.debugTask) {
+            timeUs_t averageDeltaTime10thUs = selectedTask->movingSumDeltaTime10thUs / TASK_STATS_MOVING_SUM_COUNT;
+            int16_t taskFrequency = averageDeltaTime10thUs == 0 ? 0 : lrintf(1e7f / averageDeltaTime10thUs);
+            DEBUG_SET(DEBUG_TASK, 0, schedulerConfig.debugTask);
+            DEBUG_SET(DEBUG_TASK, 1, taskFrequency);
+            DEBUG_SET(DEBUG_TASK, 2, selectedTask->maxExecutionTimeUs);
+            DEBUG_SET(DEBUG_TASK, 3, selectedTask->movingSumExecutionTime10thUs / TASK_STATS_MOVING_SUM_COUNT / 10);
+            DEBUG_SET(DEBUG_TASK, 4, estimatedExecutionUs);
+            DEBUG_SET(DEBUG_TASK, 5, taskExecutionTimeUs);
+            DEBUG_SET(DEBUG_TASK, 6, estimatedExecutionUs - taskExecutionTimeUs);
+            DEBUG_SET(DEBUG_TASK, 7, selectedTask->lateCount);
+        }
 	    #endif
 		  }
 
@@ -583,12 +587,12 @@ FAST_CODE void scheduler(void)
 						rxFrameCheck(currentTimeUs, cmpTimeUs(currentTimeUs, getTask(TASK_RX)->lastExecutedAtUs));
 
             // Check for failsafe conditions without reliance on the RX task being well behaved
-//            if (cmp32(millis(), lastFailsafeCheckMs) > PERIOD_RXDATA_FAILURE) {
-//                // This is very low cost taking less that 4us every 10ms
-//                failsafeCheckDataFailurePeriod();
-//                failsafeUpdateState();
-//                lastFailsafeCheckMs = millis();
-//            }
+            if (cmp32(millis(), lastFailsafeCheckMs) > PERIOD_RXDATA_FAILURE) {
+                // This is very low cost taking less that 4us every 10ms
+                failsafeCheckDataFailurePeriod();
+                failsafeUpdateState();
+                lastFailsafeCheckMs = millis();
+            }
 
             // This is the first scheduling opportunity after the realtime tasks have run
             firstSchedulingOpportunity = true;

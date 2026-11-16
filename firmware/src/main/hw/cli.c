@@ -9,7 +9,7 @@
 
 #include "hw/cli.h"
 #include "scheduler/scheduler.h"
-#include "scheduler/tasks.h"
+#include "fc/tasks.h"
 
 typedef enum {
     REBOOT_TARGET_FIRMWARE,

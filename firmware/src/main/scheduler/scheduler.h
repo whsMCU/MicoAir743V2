@@ -23,8 +23,34 @@
 #include "hw.h"
 
 #include "common/time.h"
+#include "config/config.h"
+//#include "pg/scheduler.h"
 
-//#include "config/config.h"
+
+#define TASK_GYROPID_DESIRED_PERIOD     125 // 125us = 8kHz
+#define SCHEDULER_DELAY_LIMIT           10
+
+#ifndef SCHEDULER_RELAX_RX
+#define SCHEDULER_RELAX_RX  25
+#endif
+
+#ifndef SCHEDULER_RELAX_OSD
+#define SCHEDULER_RELAX_OSD 25
+#endif
+
+// Tenths of a % of tasks late
+#ifndef CPU_LOAD_LATE_LIMIT
+#define CPU_LOAD_LATE_LIMIT 10
+#endif
+
+typedef struct schedulerConfig_s {
+    uint16_t rxRelaxDeterminism;
+    uint16_t osdRelaxDeterminism;
+    uint16_t cpuLatePercentageLimit;
+    uint8_t debugTask;
+} schedulerConfig_t;
+
+extern schedulerConfig_t schedulerConfig;
 
 #define TASK_PERIOD_HZ(hz) (1000000 / (hz))
 #define TASK_PERIOD_MS(ms) ((ms) * 1000)
@@ -60,18 +86,14 @@
 #define TASK_EXEC_TIME_CLAMP_US         0
 #endif
 
-#define TASK_AGE_EXPEDITE_RX            25  // Make RX tasks more schedulable if it's failed to be scheduled this many times
-#define TASK_AGE_EXPEDITE_OSD           25  // Make OSD tasks more schedulable if it's failed to be scheduled this many times
-#define TASK_AGE_EXPEDITE_COUNT         1   // Make aged tasks more schedulable
+#define TASK_AGE_EXPEDITE_RX            schedulerConfig.rxRelaxDeterminism  // Make RX tasks more schedulable if it's failed to be scheduled this many times
+#define TASK_AGE_EXPEDITE_OSD           schedulerConfig.osdRelaxDeterminism  // Make OSD tasks more schedulable if it's failed to be scheduled this many times
+#define TASK_AGE_EXPEDITE_COUNT         1    // Make aged tasks more schedulable
 #define TASK_AGE_EXPEDITE_SCALE         0.9f // By scaling their expected execution time
 
 // Gyro interrupt counts over which to measure loop time and skew
 #define GYRO_RATE_COUNT 25000
 #define GYRO_LOCK_COUNT 50
-
-#define TASK_GYROPID_DESIRED_PERIOD     125 // 125us = 8kHz
-#define SCHEDULER_DELAY_LIMIT           10
-
 
 typedef enum {
     TASK_PRIORITY_REALTIME = -1, // Task will be run outside the scheduler logic
@@ -261,28 +283,6 @@ typedef struct {
   timeUs_t execTime;
 #endif
 } task_t;
-
-#ifndef SCHEDULER_RELAX_RX
-#define SCHEDULER_RELAX_RX  25
-#endif
-
-#ifndef SCHEDULER_RELAX_OSD
-#define SCHEDULER_RELAX_OSD 25
-#endif
-
-// Tenths of a % of tasks late
-#ifndef CPU_LOAD_LATE_LIMIT
-#define CPU_LOAD_LATE_LIMIT 10
-#endif
-
-typedef struct schedulerConfig_s {
-    uint16_t rxRelaxDeterminism;
-    uint16_t osdRelaxDeterminism;
-    uint16_t cpuLatePercentageLimit;
-    uint8_t debugTask;
-} schedulerConfig_t;
-
-extern schedulerConfig_t schedulerConfig;
 
 void getCheckFuncInfo(cfCheckFuncInfo_t *checkFuncInfo);
 void getTaskInfo(taskId_e taskId, taskInfo_t *taskInfo);

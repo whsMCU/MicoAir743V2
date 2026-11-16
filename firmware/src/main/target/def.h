@@ -148,6 +148,7 @@
 #define USE_LATE_TASK_STATISTICS
 #define USE_DSHOT
 #define USE_DSHOT_TELEMETRY
+#define USE_RC_STATS
 
 #define USE_ITCM_RAM
 #define USE_FAST_DATA

@@ -44,7 +44,7 @@
 #include "fc/rc_controls.h"
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
-#include "scheduler/tasks.h"
+#include "fc/tasks.h"
 
 #include "flight/failsafe.h"
 
@@ -293,6 +293,7 @@ void rxInit(void)
 {
 
     rxRuntimeState.rxProvider = RX_PROVIDER_SERIAL;
+    rxRuntimeState.serialrxProvider = SERIALRX_CRSF;
     rxRuntimeState.rcReadRawFn = nullReadRawRC;
     rxRuntimeState.rcFrameStatusFn = nullFrameStatus;
     rxRuntimeState.rcProcessFrameFn = nullProcessFrame;
@@ -517,8 +518,8 @@ FAST_CODE_NOINLINE void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t current
     }
 #endif
 
-    // DEBUG_SET(DEBUG_FAILSAFE, 1, rxSignalReceived);
-    // DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 0, rxSignalReceived);
+    DEBUG_SET(DEBUG_FAILSAFE, 1, rxSignalReceived);
+    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 0, rxSignalReceived);
 }
 
 #if defined(USE_RX_PWM) || defined(USE_RX_PPM)

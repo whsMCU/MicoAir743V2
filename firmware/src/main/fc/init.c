@@ -67,8 +67,7 @@
 #include "fc/runtime_config.h"
 #include "fc/stats.h"
 #include "fc/controlrate_profile.h"
-
-#include "scheduler/tasks.h"
+#include "fc/tasks.h"
 
 #include "flight/failsafe.h"
 #include "flight/imu.h"
@@ -94,7 +93,6 @@
 #include "rx/rx.h"
 
 #include "scheduler/scheduler.h"
-#include "scheduler/tasks.h"
 
 #include "sensors/sensors.h"
 #include "sensors/barometer.h"
@@ -318,7 +316,6 @@ void Param_Config_Init(void)
 	boardAlignment_Init(0, 0, 0);
 	failsafeConfig_Init();
 	gyroConfig_init();
-
 	motorConfig_Init();
 
 #ifdef USE_RPM_FILTER

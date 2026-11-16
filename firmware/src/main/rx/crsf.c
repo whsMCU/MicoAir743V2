@@ -49,8 +49,7 @@
 #include "rx/rx.h"
 #include "rx/crsf.h"
 
-//#include "fc/tasks.h"
-#include "scheduler/tasks.h"
+#include "fc/tasks.h"
 
 #include "telemetry/crsf.h"
 

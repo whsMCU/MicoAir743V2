@@ -21,16 +21,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "scheduler/tasks.h"
+
 
 #include "drivers/nvic.h"
-//
-//#include "config/config.h"
-//
+
+#include "config/config.h"
+
 #include "fc/init.h"
-//#include "fc/rc_modes.h"
-//#include "fc/rc_controls.h"
-//#include "fc/core.h"
+#include "fc/rc_modes.h"
+#include "fc/rc_controls.h"
+#include "fc/core.h"
+#include "fc/tasks.h"
 //
 #include "flight/imu.h"
 //#include "flight/pid_init.h"
