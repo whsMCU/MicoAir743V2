@@ -22,25 +22,34 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <math.h>
+
+#include "hw.h"
 
 #include "build/build_config.h"
 #include "build/debug.h"
 
-#include "common/quaternion.h"
-#include "common/vector.h"
-#include "io/gps.h"
+//#include "pg/pg.h"
+//#include "pg/pg_ids.h"
+
+#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
-#include "fc/core.h"
 
-//#include "flight/gps_rescue.h"
+#include "flight/gps_rescue.h"
 #include "flight/imu.h"
 //#include "flight/mixer.h"
 #include "flight/pid.h"
 
+#include "fc/rc.h"
+#include "fc/core.h"
+
+#include "io/gps.h"
+
 #include "scheduler/scheduler.h"
 
+//#include "sensors/acceleration.h"
 #include "sensors/barometer.h"
 #include "sensors/compass.h"
 #include "sensors/gyro.h"
@@ -55,26 +64,26 @@
 
 #define ATTITUDE_RESET_QUIET_TIME 250000   // 250ms - gyro quiet period after disarm before attitude reset
 #define ATTITUDE_RESET_GYRO_LIMIT 15       // 15 deg/sec - gyro limit for quiet period
-#define ATTITUDE_RESET_KP_GAIN    25.0     // dcmKpGain value to use during attitude reset
 #define ATTITUDE_RESET_ACTIVE_TIME 500000  // 500ms - Time to wait for attitude to converge at high gain
-#define GPS_COG_MIN_GROUNDSPEED 500        // 500cm/s minimum groundspeed for a gps heading to be considered valid
+#define GPS_COG_MIN_GROUNDSPEED 100        // 1.0m/s - min groundspeed for GPS Heading reinitialisation etc
 
-float accAverage[XYZ_AXIS_COUNT];
-
-int16_t heading;
-
-bool canUseGPSHeading = true;
+bool canUseGPSHeading;
 
 static float throttleAngleScale;
 static int throttleAngleValue;
-static float fc_acc;
 static float smallAngleCosZ = 0;
 
 static imuRuntimeConfig_t imuRuntimeConfig;
 
 matrix33_t rMat;
+// Horizontal earth-frame heading vectors in imu.c (north_ef, cog_ef, heading_ef,
+// mag2d_ef) are vector2_t in the NWU ground plane: index NWU_N and NWU_W only.
+// NWU_U (==2) would read past a 2-element vector - do not use it on these.
+static vector2_t north_ef;
 
+#if defined(USE_ACC)
 bool attitudeIsEstablished = false;
+#endif // USE_ACC
 
 // quaternion of sensor frame relative to earth frame
 quaternion_t q = QUATERNION_INITIALIZE;
@@ -87,9 +96,6 @@ quaternion_t offset = QUATERNION_INITIALIZE;
 attitudeEulerAngles_t attitude = EULER_INITIALIZE;
 quaternion_t imuAttitudeQuaternion = QUATERNION_INITIALIZE;
 
-FAST_DATA_ZERO_INIT fpVector3_t imuMeasuredAccelBF;
-FAST_DATA_ZERO_INIT fpVector3_t imuMeasuredRotationBF;
-
 #ifdef USE_RACE_PRO
 #define DEFAULT_SMALL_ANGLE 180
 #else
@@ -100,8 +106,8 @@ imuConfig_t imuConfig;
 
 void imuConfig_Init(void)
 {
-	imuConfig.dcm_kp = 2500;                // 1.0 * 10000
-	imuConfig.dcm_ki = 0;                   // 0.003 * 10000
+	imuConfig.imu_dcm_kp = 2500;                // 1.0 * 10000
+	imuConfig.imu_dcm_ki = 0;                   // 0.003 * 10000
 	imuConfig.small_angle = DEFAULT_SMALL_ANGLE,
 	imuConfig.imu_process_denom = 2;
 	imuConfig.mag_declination = 0;
@@ -131,7 +137,6 @@ void imuComputeRotationMatrix(void){
     // NWU. The row selects the earth axis (NWU_N/NWU_W/NWU_U), the column selects
     // the body axis (X/Y/Z). NWU_N/W/U and X/Y/Z share index values 0/1/2, so the
     // named form denotes the same storage as the old m[0..2][0..2] literals.
-
     rMat.m[NWU_N][X] = 1.0f - 2.0f * qP.yy - 2.0f * qP.zz;
     rMat.m[NWU_N][Y] = 2.0f * (qP.xy + -qP.wz);
     rMat.m[NWU_N][Z] = 2.0f * (qP.xz - -qP.wy);
@@ -145,14 +150,6 @@ void imuComputeRotationMatrix(void){
     rMat.m[NWU_U][Z] = 1.0f - 2.0f * qP.xx - 2.0f * qP.yy;
 }
 
-/*
-* Calculate RC time constant used in the accZ lpf.
-*/
-static float calculateAccZLowPassFilterRCTimeConstant(float accz_lpf_cutoff)
-{
-    return 0.5f / (M_PIf * accz_lpf_cutoff);
-}
-
 static float calculateThrottleAngleScale(uint16_t throttle_correction_angle)
 {
     return (1800.0f / M_PIf) * (900.0f / throttle_correction_angle);
@@ -160,16 +157,18 @@ static float calculateThrottleAngleScale(uint16_t throttle_correction_angle)
 
 void imuConfigure(uint16_t throttle_correction_angle, uint8_t throttle_correction_value)
 {
-    imuRuntimeConfig.dcm_kp = imuConfig.dcm_kp / 10000.0f;
-    imuRuntimeConfig.dcm_ki = imuConfig.dcm_ki / 10000.0f;
+    // current default for imu_dcm_kp is 2500; our 'normal' or baseline value for imuDcmKp is 0.25
+    imuRuntimeConfig.imuDcmKp = imuConfig.imu_dcm_kp / 10000.0f;
+    imuRuntimeConfig.imuDcmKi = imuConfig.imu_dcm_ki / 10000.0f;
+    // magnetic declination has negative sign (positive clockwise when seen from top)
+    const float imuMagneticDeclinationRad = DEGREES_TO_RADIANS(imuConfig.mag_declination / 10.0f);
+    // north_ef: magnetic-north reference in the horizontal earth frame (NWU).
+    // v[NWU_N] = cos(declination), v[NWU_W] = -sin(declination).
+    sincosf_approx(imuMagneticDeclinationRad, &north_ef.v[NWU_W], &north_ef.v[NWU_N]);
+    north_ef.v[NWU_W] = -north_ef.v[NWU_W];
 
     smallAngleCosZ = cos_approx(degreesToRadians(imuConfig.small_angle));
 
-    for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-        imuMeasuredAccelBF.v[axis] = 0;
-    }
-
-    fc_acc = calculateAccZLowPassFilterRCTimeConstant(5.0f); // Set to fix value
     throttleAngleScale = calculateThrottleAngleScale(throttle_correction_angle);
 
     throttleAngleValue = throttle_correction_value;
@@ -177,12 +176,7 @@ void imuConfigure(uint16_t throttle_correction_angle, uint8_t throttle_correctio
 
 void imuInit(void)
 {
-#ifdef USE_GPS
-    canUseGPSHeading = true;
-#else
     canUseGPSHeading = false;
-#endif
-
     imuComputeRotationMatrix();
 }
 
@@ -215,8 +209,8 @@ static float invSqrt(float x)
 static void imuMahonyAHRSupdate(float dt,
                                 float gx, float gy, float gz,
                                 bool useAcc, float ax, float ay, float az,
-                                bool useMag,
-                                bool useCOG, float courseOverGround, const float dcmKpGain)
+                                float headingErrMag, float headingErrCog,
+                                const float dcmKpGain)
 {
     static float integralFBx = 0.0f,  integralFBy = 0.0f, integralFBz = 0.0f;    // integral error terms scaled by Ki
 
@@ -225,76 +219,36 @@ static void imuMahonyAHRSupdate(float dt,
 
     // Use raw heading error (from GPS or whatever else)
     float ex = 0, ey = 0, ez = 0;
-    if (useCOG) {
-        while (courseOverGround >  M_PIf) {
-            courseOverGround -= (2.0f * M_PIf);
-        }
 
-        while (courseOverGround < -M_PIf) {
-            courseOverGround += (2.0f * M_PIf);
-        }
-
-        const float ez_ef = (- sin_approx(courseOverGround) * rMat.m[NWU_N][X] - cos_approx(courseOverGround) * rMat.m[NWU_W][X]);
-
-        ex = rMat.m[NWU_U][X] * ez_ef;
-        ey = rMat.m[NWU_U][Y] * ez_ef;
-        ez = rMat.m[NWU_U][Z] * ez_ef;
-    }
-
-#ifdef USE_MAG
-    // Use measured magnetic field vector
-    float mx = mag.magADC.x;
-    float my = mag.magADC.y;
-    float mz = mag.magADC.z;
-    float recipMagNorm = sq(mx) + sq(my) + sq(mz);
-    if (useMag && recipMagNorm > 0.01f) {
-        // Normalise magnetometer measurement
-        recipMagNorm = invSqrt(recipMagNorm);
-        mx *= recipMagNorm;
-        my *= recipMagNorm;
-        mz *= recipMagNorm;
-
-        // For magnetometer correction we make an assumption that magnetic field is perpendicular to gravity (ignore Z-component in EF).
-        // This way magnetic field will only affect heading and wont mess roll/pitch angles
-
-        // (hx; hy; 0) - measured mag field vector in EF (assuming Z-component is zero)
-        // (bx; 0; 0) - reference mag field vector heading due North in EF (assuming Z-component is zero)
-        const float hx = rMat.m[NWU_N][X] * mx + rMat.m[NWU_N][Y] * my + rMat.m[NWU_N][Z] * mz;
-        const float hy = rMat.m[NWU_W][X] * mx + rMat.m[NWU_W][Y] * my + rMat.m[NWU_W][Z] * mz;
-        const float bx = sqrtf(hx * hx + hy * hy);
-
-        // magnetometer error is cross product between estimated magnetic north and measured magnetic north (calculated in EF)
-        const float ez_ef = -(hy * bx);
-
-        // Rotate mag error vector back to BF and accumulate
-        ex += rMat.m[NWU_U][X] * ez_ef;
-        ey += rMat.m[NWU_U][Y] * ez_ef;
-        ez += rMat.m[NWU_U][Z] * ez_ef;
-    }
-#else
-    UNUSED(useMag);
-#endif
+    // Add error from magnetometer and Cog
+    // The earth-Up row (NWU_U) of rMat is earth-up expressed in the body frame,
+    // so it rotates the earth-Z heading error onto the body axes.
+    ex += rMat.m[NWU_U][X] * (headingErrCog + headingErrMag);
+    ey += rMat.m[NWU_U][Y] * (headingErrCog + headingErrMag);
+    ez += rMat.m[NWU_U][Z] * (headingErrCog + headingErrMag);
 
     // Use measured acceleration vector
     float recipAccNorm = sq(ax) + sq(ay) + sq(az);
     if (useAcc && recipAccNorm > 0.01f) {
-        // Normalise accelerometer measurement
+        // Normalise accelerometer measurement; useAcc is true when all smoothed acc axes are within 20% of 1G
         recipAccNorm = invSqrt(recipAccNorm);
+
         ax *= recipAccNorm;
         ay *= recipAccNorm;
         az *= recipAccNorm;
 
-        // Error is sum of cross product between estimated direction and measured direction of gravity
+        // Error is sum of cross product between estimated direction and measured direction of gravity.
+        // The earth-Up row (NWU_U) is the estimated gravity/up direction in the body frame.
         ex += (ay * rMat.m[NWU_U][Z] - az * rMat.m[NWU_U][Y]);
         ey += (az * rMat.m[NWU_U][X] - ax * rMat.m[NWU_U][Z]);
         ez += (ax * rMat.m[NWU_U][Y] - ay * rMat.m[NWU_U][X]);
     }
 
     // Compute and apply integral feedback if enabled
-    if (imuRuntimeConfig.dcm_ki > 0.0f) {
+    if (imuRuntimeConfig.imuDcmKi > 0.0f) {
         // Stop integrating if spinning beyond the certain limit
         if (spin_rate < DEGREES_TO_RADIANS(SPIN_RATE_LIMIT)) {
-            const float dcmKiGain = imuRuntimeConfig.dcm_ki;
+            const float dcmKiGain = imuRuntimeConfig.imuDcmKi;
             integralFBx += dcmKiGain * ex * dt;    // integral error scaled by Ki
             integralFBy += dcmKiGain * ey * dt;
             integralFBz += dcmKiGain * ez * dt;
@@ -368,70 +322,241 @@ static bool imuIsAccelerometerHealthy(void)
     return (0.9f < bmi270.acc.accMagnitude) && (bmi270.acc.accMagnitude < 1.1f);
 }
 
-// Calculate the dcmKpGain to use. When armed, the gain is imuRuntimeConfig.dcm_kp * 1.0 scaling.
-// When disarmed after initial boot, the scaling is set to 10.0 for the first 20 seconds to speed up initial convergence.
+// Calculate the dcmKpGain to use. When armed, the gain is imuRuntimeConfig.imuDcmKp, i.e., the default value
+// When disarmed after initial boot, the scaling is 10 times higher  for the first 20 seconds to speed up initial convergence.
 // After disarming we want to quickly reestablish convergence to deal with the attitude estimation being incorrect due to a crash.
 //   - wait for a 250ms period of low gyro activity to ensure the craft is not moving
 //   - use a large dcmKpGain value for 500ms to allow the attitude estimate to quickly converge
 //   - reset the gain back to the standard setting
-static float imuCalcKpGain(uint32_t currentTimeUs, bool useAcc, float *gyroAverage)
+static float imuCalcKpGain(timeUs_t currentTimeUs, bool useAcc, float *gyroAverage)
 {
-    static bool lastArmState = false;
-    static uint32_t gyroQuietPeriodTimeEnd = 0;
-    static uint32_t attitudeResetTimeEnd = 0;
-    static bool attitudeResetCompleted = false;
-    float ret;
-    bool attitudeResetActive = false;
+    static enum {
+        stArmed,
+        stRestart,
+        stQuiet,
+        stReset,
+        stDisarmed
+    } arState = stDisarmed;
+
+    static timeUs_t stateTimeout;
 
     const bool armState = ARMING_FLAG(ARMED);
 
     if (!armState) {
-        if (lastArmState) {   // Just disarmed; start the gyro quiet period
-            gyroQuietPeriodTimeEnd = currentTimeUs + ATTITUDE_RESET_QUIET_TIME;
-            attitudeResetTimeEnd = 0;
-            attitudeResetCompleted = false;
-        }
-
         // If gyro activity exceeds the threshold then restart the quiet period.
         // Also, if the attitude reset has been complete and there is subsequent gyro activity then
-        // start the reset cycle again. This addresses the case where the pilot rights the craft after a crash.
-        if ((attitudeResetTimeEnd > 0) || (gyroQuietPeriodTimeEnd > 0) || attitudeResetCompleted) {
-            if ((fabsf(gyroAverage[X]) > ATTITUDE_RESET_GYRO_LIMIT)
+        //  start the reset cycle again. This addresses the case where the pilot rights the craft after a crash.
+        if (   (fabsf(gyroAverage[X]) > ATTITUDE_RESET_GYRO_LIMIT)  // gyro axis limit exceeded
                 || (fabsf(gyroAverage[Y]) > ATTITUDE_RESET_GYRO_LIMIT)
                 || (fabsf(gyroAverage[Z]) > ATTITUDE_RESET_GYRO_LIMIT)
-                || (!useAcc)) {
-
-                gyroQuietPeriodTimeEnd = currentTimeUs + ATTITUDE_RESET_QUIET_TIME;
-                attitudeResetTimeEnd = 0;
-            }
+            || !useAcc                                              // acc reading out of range
+            ) {
+            arState = stRestart;
         }
-        if (attitudeResetTimeEnd > 0) {        // Resetting the attitude estimation
-            if (currentTimeUs >= attitudeResetTimeEnd) {
-                gyroQuietPeriodTimeEnd = 0;
-                attitudeResetTimeEnd = 0;
-                attitudeResetCompleted = true;
-            } else {
-                attitudeResetActive = true;
+
+        switch (arState) {
+        default: // should not happen, safeguard only
+        case stArmed:
+        case stRestart:
+            stateTimeout = currentTimeUs + ATTITUDE_RESET_QUIET_TIME;
+            arState = stQuiet;
+            // fallthrough
+        case stQuiet:
+            if (cmpTimeUs(currentTimeUs, stateTimeout) >= 0) {
+                stateTimeout = currentTimeUs + ATTITUDE_RESET_ACTIVE_TIME;
+                arState = stReset;
             }
-        } else if ((gyroQuietPeriodTimeEnd > 0) && (currentTimeUs >= gyroQuietPeriodTimeEnd)) {
-            // Start the high gain period to bring the estimation into convergence
-            attitudeResetTimeEnd = currentTimeUs + ATTITUDE_RESET_ACTIVE_TIME;
-            gyroQuietPeriodTimeEnd = 0;
+            // low gain (default value of 0.25) during quiet phase
+            return imuRuntimeConfig.imuDcmKp;
+        case stReset:
+            if (cmpTimeUs(currentTimeUs, stateTimeout) >= 0) {
+                arState = stDisarmed;
+            }
+            // high gain, 100x greater than normal, or 25, after quiet period
+            return imuRuntimeConfig.imuDcmKp * 100.0f;
+        case stDisarmed:
+            // Scale the kP to converge 10x faster when disarmed, ie 2.5
+            return imuRuntimeConfig.imuDcmKp * 10.0f;
+        }
+            } else {
+        arState = stArmed;
+        return imuRuntimeConfig.imuDcmKp;
+    }
+}
+
+#ifdef USE_GPS
+
+// IMU groundspeed gain heuristic
+static float imuCalcGroundspeedGain(float dt)
+{
+    const bool isWing = false;//isFixedWing();  // different weighting for airplane aerodynamic
+
+    // 1. Groundspeed
+    const float speedRatio = 0.5f * gpsSol.groundSpeed / GPS_COG_MIN_GROUNDSPEED;
+    float speedBasedGain = speedRatio > 1.0f ? fminf(speedRatio, 10.0f) : sq(speedRatio);
+    // speedBasedGain is 0 at 0.0m/s, 1.0 at 2.0 m/s,rising towards 5.0 at 10m/s, to max 10.0 at 20m/s
+    // need a lot of speed since forward flight speed must exceed lateral wind drift by a significant margin
+
+    // 2. suppress heading correction during and after yaw movements, down to zero at more than 10 deg/s
+    float yawGyroRateFactor = fminf(fabsf(bmi270.gyro.gyroADCf[FD_YAW] * 0.1f), 1.0f);
+    yawGyroRateFactor = 1.0f - sq(yawGyroRateFactor);
+    // 1.0 at zero gyro rate, 0 at 10 deg/s
+    // significant persistent yaw while flying forwards will result in an IMU orientation error
+    // negative peak detector with decay over a 1s time constant, to sustain the suppression after a transient
+    static float yawGyroRateFactorPrev = 0.0f;
+    const float k = 1.0f * dt; // near enough to 1.0s time constant for any reasonable IMU update rate
+    const float yawSuppression = yawGyroRateFactorPrev + k * (yawGyroRateFactor - yawGyroRateFactorPrev);
+    yawGyroRateFactorPrev = fminf(yawSuppression, yawGyroRateFactor);
+
+    // 3. Roll angle
+    // from 1.0 with no Roll to zero more than 10 degrees from flat
+    // this is to prevent adaptation to GPS while flying sideways, or with a significant sideways element
+    const float absRollAngle = fabsf(attitude.values.roll * 0.1f);  // degrees
+    float rollMax = isWing ? 25.0f : 10.0f; // 25 degrees for wing, 10 degrees for quad
+    // note: these value are 'educated guesses' - for quads it must be very tight
+    // for wings, which can't fly sideways, it can be wider
+    const float rollSuppression = (absRollAngle < rollMax) ? (rollMax - absRollAngle) / rollMax : 0.0f;
+
+    // 4. attenuate heading correction by pitch angle, no correction if flat or negative (e.g. when pitched back to fly tail first)
+    // allow faster adaptation for quads at higher pitch angles; returns 1.0 at 45 degrees
+    // ignored for wings because they typically are flat when flying and may fly forwards at negative angles.
+    // In position hold the pilot may fly backwards.
+    float pitchSuppression = 1.0f;
+    if (!isWing) {
+        const float pitchFactor = attitude.values.pitch * 0.1f / 10.0f; // negative is backwards
+        pitchSuppression = fminf(pitchFactor , 5.0f); // 1.0 at 10 degrees, 5.0 at 50 degrees or more
+        pitchSuppression = (pitchSuppression >= 0) ? pitchSuppression : 0.0f; // zero if flat or pitched backwards
+    }
+    // 5. Suppress GPS correction generally when a mag is present (favour Mag)
+    float MagSuppression = 1.0f;
+#ifdef USE_MAG
+    if (compassEnabledAndCalibrated()) {
+        MagSuppression = 0.1f; // 10x slower than without mag, needs strong fast forward flight to adjust mag heading to gps cog
+    }
+#endif
+
+    return speedBasedGain * yawSuppression * rollSuppression * pitchSuppression * MagSuppression;
+    // NOTES : these heuristic suppressions make sense with normal pilot inputs and normal flight patterns
+    // Flying straight ahead at 5m/s at pitch of 10 degrees returns a final multiplier of 1.0
+    // At 10m/s and pitch of 20 degrees, 4.0, and at 15m/s and 30 degrees, 9.0
+    // The more pitch-only, and the faster the forward flight:
+    // - the more likely the GPS course over ground reflects the true heading of the craft
+    // - the ez_ef factor that promotes more rapid adaptation of IMU heading to GPS CoG will be faster
+    // Conversely, the IMU heading won't change, or only very slowly, if the craft is:
+    // - flown backwards, or sideways
+    // - flat on the pitch axis
+    // - moving very slowly
+    // - yawing, or has been recently yawed
+
+}
+
+// *** Calculate heading error derived from IMU heading vs GPS heading ***
+// assumes that quad/plane is flying forward (gain factors attenuate situations when this is not true)
+// courseOverGround - in rad, 0 = north, clockwise
+// return value rotation around earth Z axis, pointing in directipon of smaller error, [rad/s]
+STATIC_UNIT_TESTED float imuCalcCourseErr(float courseOverGround)
+{
+    // Compute COG heading unit vector in the horizontal earth frame (NWU) from
+    // scalar GPS CourseOverGround. North is v[NWU_N]; the sin/cos argument is
+    // anticlockwise so the orthogonal component lands on West (v[NWU_W]). (|cog_ef| == 1.0)
+    float sin, cos;
+    sincosf_approx(-courseOverGround, &sin, &cos);
+    const vector2_t cog_ef = {.v = {[NWU_N] = cos, [NWU_W] = sin}};
+
+    // Compute and normalise craft earth-frame heading vector from the body X axis
+    // (first column of rMat): row NWU_N is North, row NWU_W is West.
+    vector2_t heading_ef = {.v = {[NWU_N] = rMat.m[NWU_N][X], [NWU_W] = rMat.m[NWU_W][X]}};
+    vector2Normalize(&heading_ef, &heading_ef); // XY only, normalised to magnitude 1.0
+
+    // cross (vector product) = |heading| * |cog| * sin(angle) = 1 * 1 * sin(angle)
+    // cross value reflects error angle of quad X axis vs GPS groundspeed
+    // cross sign depends on the rotation change from input to output vectors by right hand rule
+    // operand order is arranged such that rotation is in direction of zero error
+    // abs value of cross is zero when parallel, max of 1.0 at 90 degree error
+    // cross value is used for ez_ef when error is less than 90 degrees
+    // decreasing cross value after 90 degrees, and zero cross value at 180 degree error,
+    //   would prevent error correction, so the maximum angular error value of 1.0 is used for this interval
+    const float cross = vector2Cross(&heading_ef, &cog_ef);
+
+    // dot product = |heading| * |cog| * cos(angle) = 1 * 1 * cos(angle)
+    // max when aligned, zero at 90 degrees of vector difference, negative for error > 90 degrees
+    const float dot = vector2Dot(&heading_ef, &cog_ef);
+
+    // error around Z axis in Earth frame
+    // for error angles less than 90 degrees (dot > 0), use cross value to compute ez_ef
+    //   over 90 deg, use sign(cross)
+    // when well aligned, return ~ 0 (sin(error)), for error >= 90 degrees, return +-1.0
+    return (dot > 0) ? cross : (cross < 0 ? -1.0f : 1.0f);
+}
+
+#endif
+
+#if defined(USE_MAG) && defined(USE_GPS_RESCUE)
+// refactored from old debug code, to be removed/optimized eventually
+static void imuDebug_GPS_RESCUE_HEADING(void)
+{
+    // Encapsulate additional operations in a block so that it is only executed when the according debug mode is used
+    // Only re-calculate magYaw when there is a new Mag data reading, to avoid spikes
+    if (debugMode == DEBUG_GPS_RESCUE_HEADING && mag.isNewMagADCFlag) {
+
+        vector3_t mag_bf = mag.magADC;
+        vector3_t mag_ef;
+        matrixVectorMul(&mag_ef, &rMat, &mag_bf); // BF->EF true north
+
+        matrix33_t rMatZTrans;
+        yawToRotationMatrixZ(&rMatZTrans, -atan2_approx(rMat.m[NWU_W][X], rMat.m[NWU_N][X]));
+
+        vector3_t mag_ef_yawed;
+        matrixVectorMul(&mag_ef_yawed, &rMatZTrans, &mag_ef); // EF->EF yawed
+
+        // Magnetic yaw is the angle between true north and the X axis of the body frame
+        int16_t magYaw = lrintf((atan2_approx(mag_ef_yawed.v[NWU_W], mag_ef_yawed.v[NWU_N]) * (1800.0f / M_PIf)));
+        if (magYaw < 0) {
+            magYaw += 3600;
+        }
+        DEBUG_SET(DEBUG_GPS_RESCUE_HEADING, 4, magYaw); // mag heading in degrees * 10
+        // reset new mag data flag to false to initiate monitoring for new Mag data.
+        // note that if the debug doesn't run, this reset will not occur, and we won't waste cycles on the comparison
+        mag.isNewMagADCFlag = false;
         }
     }
-    lastArmState = armState;
+#endif // defined(USE_MAG) && defined(USE_GPS_RESCUE)
 
-    if (attitudeResetActive) {
-        ret = ATTITUDE_RESET_KP_GAIN;
+#ifdef USE_MAG
+// Calculate heading error derived from magnetometer
+// return value rotation around earth Z axis, pointing in directipon of smaller error, [rad/s]
+STATIC_UNIT_TESTED float imuCalcMagErr(void)
+{
+    // Use measured magnetic field vector
+    vector3_t mag_bf = mag.magADC;
+    float magNormSquared = vector3NormSq(&mag_bf);
+
+    if (magNormSquared > 0.01f) {
+        // project magnetometer reading into Earth frame
+        vector3_t mag_ef;
+        matrixVectorMul(&mag_ef, &rMat, &mag_bf); // BF->EF true north
+        // Normalise magnetometer measurement
+        vector3Scale(&mag_ef, &mag_ef, 1.0f / sqrtf(magNormSquared));
+
+        // For magnetometer correction we make an assumption that magnetic field is perpendicular to gravity (ignore Z-component in EF).
+        // This way magnetic field will only affect heading and wont mess roll/pitch angles
+        vector2_t mag2d_ef = {.v = {[NWU_N] = mag_ef.v[NWU_N], [NWU_W] = mag_ef.v[NWU_W]}};
+        // mag2d_ef - measured mag field vector in EF (2D ground plane projection)
+        // north_ef - reference mag field vector heading due North in EF (2D ground plane projection).
+        //              Adjusted for magnetic declination (in imuConfigure)
+
+        // magnetometer error is cross product between estimated magnetic north and measured magnetic north (calculated in EF)
+        // increase gain on large misalignment
+        const float dot = vector2Dot(&mag2d_ef, &north_ef);
+        const float cross = vector2Cross(&mag2d_ef, &north_ef);
+        return (dot > 0) ? cross : (cross < 0 ? -1.0f : 1.0f) * vector2Norm(&mag2d_ef);
     } else {
-       ret = imuRuntimeConfig.dcm_kp;
-       if (!armState) {
-          ret = ret * 10.0f; // Scale the kP to generally converge faster when disarmed.
+        // invalid magnetometer data
+        return 0.0f;
        }
     }
 
-    return ret;
-}
+#endif
 
 #if defined(USE_GPS)
 static void imuComputeQuaternionFromRPY(quaternionProducts *quatProd, int16_t initialRoll, int16_t initialPitch, int16_t initialYaw)
@@ -448,14 +573,14 @@ static void imuComputeQuaternionFromRPY(quaternionProducts *quatProd, int16_t in
         initialYaw -= 3600;
     }
 
-    const float cosRoll = cos_approx(DECIDEGREES_TO_RADIANS(initialRoll) * 0.5f);
-    const float sinRoll = sin_approx(DECIDEGREES_TO_RADIANS(initialRoll) * 0.5f);
+    float cosRoll, sinRoll;
+    sincosf_approx(DECIDEGREES_TO_RADIANS(initialRoll) * 0.5f, &sinRoll, &cosRoll);
 
-    const float cosPitch = cos_approx(DECIDEGREES_TO_RADIANS(initialPitch) * 0.5f);
-    const float sinPitch = sin_approx(DECIDEGREES_TO_RADIANS(initialPitch) * 0.5f);
+    float cosPitch, sinPitch;
+    sincosf_approx(DECIDEGREES_TO_RADIANS(initialPitch) * 0.5f, &sinPitch, &cosPitch);
 
-    const float cosYaw = cos_approx(DECIDEGREES_TO_RADIANS(-initialYaw) * 0.5f);
-    const float sinYaw = sin_approx(DECIDEGREES_TO_RADIANS(-initialYaw) * 0.5f);
+    float cosYaw, sinYaw;
+    sincosf_approx(DECIDEGREES_TO_RADIANS(initialYaw) * 0.5f, &sinYaw, &cosYaw);
 
     const float q0 = cosRoll * cosPitch * cosYaw + sinRoll * sinPitch * sinYaw;
     const float q1 = sinRoll * cosPitch * cosYaw - cosRoll * sinPitch * sinYaw;
@@ -480,68 +605,119 @@ static void imuComputeQuaternionFromRPY(quaternionProducts *quatProd, int16_t in
 }
 #endif
 
-static void imuCalculateEstimatedAttitude(timeUs_t currentTimeUs)
-{
-    static timeUs_t previousIMUUpdateTime = 0;
-    bool useAcc = false;
-    bool useMag = false;
-    bool useCOG = false; // Whether or not correct yaw via imuMahonyAHRSupdate from our ground course
-    float courseOverGround = 0; // To be used when useCOG is true.  Stored in Radians
-
-    const timeDelta_t deltaT = currentTimeUs - previousIMUUpdateTime;
-    previousIMUUpdateTime = currentTimeUs;
-
-    const float dt = deltaT * 1e-6f;
-
-#ifdef USE_MAG
-    if (sensors(SENSOR_MAG) && compassEnabledAndCalibrated()) {
-        useMag = true;
-        useMag = false;
-    }
-#endif
 
 #if defined(USE_GPS)
-    if (!useMag && STATE(GPS_FIX) && gpsSol.numSat >= 5 && gpsSol.groundSpeed >= GPS_COG_MIN_GROUNDSPEED) {
-        // Use GPS course over ground to correct attitude.values.yaw
-        courseOverGround = DECIDEGREES_TO_RADIANS(gpsSol.groundCourse);
-        useCOG = true;
+static void updateGpsHeadingUsable(float groundspeedGain, float imuCourseError, float dt)
+{
+    static float gpsHeadingConfidence = 0.0f;
+    if (!canUseGPSHeading) {
+        const float alignment = fmaxf(1.0f - fabsf(imuCourseError) * 4.0f, 0.0f);
+        // fabsf(imuCourseError) = 0 when perfectly aligned, 0.25 at 15 degrees error, 1 for 90 degrees or greater error
+        // hence alignment is 1.0 when perfectly aligned, falling to zero when more than 15 degrees error.
+        // an alignment of zero can be false, eg when wind drift angle matches an incorrect 'heading' angle
+        const float confidence = groundspeedGain * alignment;
+        // groundspeedGain is high when groundspeed is more than 1m/s
+        // and when the movement is likely to be due to nose forward pitch alone
+        gpsHeadingConfidence += 0.5f * dt * (confidence - gpsHeadingConfidence);
+        // 2s time constant to require some time to reach the threshold
+        // time constant accurate enough for dt's from 0.1 to 0.001s
+        canUseGPSHeading = gpsHeadingConfidence > 1.5f;
+        // canUseGPSHeading, when true, allows position hold and GPS Rescue
+    } else {
+        gpsHeadingConfidence = 0.0f;
+        // re-evaluate from scratch on arming
+        // if the alignment is already good when arming, confidence is re-gained more quickly
+        // powering up the aircraft with its nose facing North helps a lot, since default heading is North
+    }
+    DEBUG_SET(DEBUG_ATTITUDE, 1, lrintf(gpsHeadingConfidence * 100.0f));
+    DEBUG_SET(DEBUG_ATTITUDE, 4, canUseGPSHeading ? 0 : 1);
+}
+#endif
 
-        if (useCOG && shouldInitializeGPSHeading()) {
-            // Reset our reference and reinitialize quaternion.  This will likely ideally happen more than once per flight, but for now,
-            // shouldInitializeGPSHeading() returns true only once.
-            imuComputeQuaternionFromRPY(&qP, attitude.values.roll, attitude.values.pitch, gpsSol.groundCourse);
+static void imuCalculateEstimatedAttitude(timeUs_t currentTimeUs)
+{
+#if ENABLE_SIMULATOR_IMU_SYNC
+    // Simulator-based timing
+    //  printf("[imu]deltaT = %u, imuDeltaT = %u, currentTimeUs = %u, micros64_real = %lu\n", deltaT, imuDeltaT, currentTimeUs, micros64_real());
+    const timeDelta_t deltaT = imuDeltaT;
+#else
+    static timeUs_t previousIMUUpdateTime = 0;
+    const timeDelta_t deltaT = currentTimeUs - previousIMUUpdateTime;
+    previousIMUUpdateTime = currentTimeUs;
+#endif
+    const float dt = deltaT * 1e-6f;
 
-            useCOG = false; // Don't use the COG when we first reinitialize.  Next time around though, yes.
-        }
+    // *** magnetometer based error estimate ***
+    bool useMag = false;   // mag will suppress GPS correction
+    float magErr = 0;
+
+#ifdef USE_MAG
+    if (compassEnabledAndCalibrated()) {
+        useMag = true;
+        magErr = imuCalcMagErr();
     }
 #endif
 
-  float gyroAverage[XYZ_AXIS_COUNT];
-  //gyroGetAccumulationAverage(gyroAverage);
-  for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
-      gyroAverage[axis] = gyroGetFilteredDownsampled(axis);
-  }
+#if defined(USE_MAG) && defined(USE_GPS_RESCUE)
+    // fill in GPS rescue debug value (leftover from code refactoring)
+    imuDebug_GPS_RESCUE_HEADING();
+#endif
 
-  if (accGetAccumulationAverage(accAverage)) {
-      useAcc = imuIsAccelerometerHealthy();
-  }
+    // *** GPS COG based heading error estimate ***
+    // When a mag is also healthy, its contribution will be corrected by GPS, but not strongly
+    // contribute simultaneously (their errors are summed in imuMahonyAHRSupdate).
+    // groundspeedGain naturally weights the COG contribution (near-zero when hovering,
+    // larger at speed), so the mag dominates at low speed and GPS COG supplements at
+    // higher speed.  GPS rescue overrides groundspeedGain with its own schedule.
+    float cogErr = 0;
+#if defined(USE_GPS)
+    if (sensors(SENSOR_GPS)
+        && STATE(GPS_FIX) && gpsSol.numSat > GPS_MIN_SAT_COUNT) {
+        static bool gpsHeadingInitialized = false;  // TODO - this really should relate to whether or not the imu is oriented
 
-//  DEBUG_SET(DEBUG_IMU, 0, (deltaT));
-//  DEBUG_SET(DEBUG_IMU, 1, (gyroAverage[X]));
-//  DEBUG_SET(DEBUG_IMU, 2, (gyroAverage[Y]));
-//  DEBUG_SET(DEBUG_IMU, 3, (gyroAverage[Z]));
-//  DEBUG_SET(DEBUG_IMU, 4, (accAverage[X]));
-//  DEBUG_SET(DEBUG_IMU, 5, (accAverage[Y]));
-//  DEBUG_SET(DEBUG_IMU, 6, (accAverage[Z]));
+        if (gpsHeadingInitialized) {
+            // IMU yaw gain to be applied in imuMahonyAHRSupdate is modified by likely association between heading of the aircraft and GPS ground course
+            const float groundspeedGain = imuCalcGroundspeedGain(dt); // 0.0 - 10.0, heuristic based on GPS speed, pitch angle, roll angle, and yaw inputs
+            const float courseOverGround = DECIDEGREES_TO_RADIANS(gpsSol.groundCourse);
+            const float imuCourseError = imuCalcCourseErr(courseOverGround);
 
-  imuMahonyAHRSupdate(dt,
-                      DEGREES_TO_RADIANS(gyroAverage[X]), DEGREES_TO_RADIANS(gyroAverage[Y]), DEGREES_TO_RADIANS(gyroAverage[Z]),
-                      useAcc, accAverage[X], accAverage[Y], accAverage[Z],
-                      useMag,
-                      useCOG, courseOverGround,  imuCalcKpGain(currentTimeUs, useAcc, gyroAverage));
+            DEBUG_SET(DEBUG_ATTITUDE, 3, lrintf(imuCourseError * 100.0f));
 
-  imuUpdateEulerAngles();
+            cogErr = imuCourseError * groundspeedGain;
+            // cogErr is greater with larger heading errors and greater speed in straight pitch forward flight
+
+            updateGpsHeadingUsable(groundspeedGain, imuCourseError, dt);
+
+        } else if (gpsSol.groundSpeed > GPS_COG_MIN_GROUNDSPEED) {
+            if (!useMag) {
+                // Only reinitialize the quaternion from GPS COG when no mag is providing
+                // yaw reference.  When a mag is healthy it has already established yaw;
+                // overwriting it with an initial COG value would degrade accuracy.
+                imuComputeQuaternionFromRPY(&qP, attitude.values.roll, attitude.values.pitch, gpsSol.groundCourse);
+            }
+            gpsHeadingInitialized = true;
+        }
+    }
+#else
+    UNUSED(useMag);
+#endif
+
+    float gyroAverage[XYZ_AXIS_COUNT];
+    for (int axis = 0; axis < XYZ_AXIS_COUNT; ++axis) {
+        gyroAverage[axis] = gyroGetFilteredDownsampled(axis);
+    }
+
+    const bool useAcc = imuIsAccelerometerHealthy(); // all smoothed accADC values are within 10% of 1G
+    imuMahonyAHRSupdate(dt,
+                        DEGREES_TO_RADIANS(gyroAverage[X]), DEGREES_TO_RADIANS(gyroAverage[Y]), DEGREES_TO_RADIANS(gyroAverage[Z]),
+                        useAcc, bmi270.acc.accADC.x, bmi270.acc.accADC.y, bmi270.acc.accADC.z,
+                        magErr, cogErr,
+                        imuCalcKpGain(currentTimeUs, useAcc, gyroAverage));
+
+    imuUpdateEulerAngles();
 }
+
+//#endif
 
 static int calculateThrottleAngleCorrection(void)
 {
@@ -554,8 +730,9 @@ static int calculateThrottleAngleCorrection(void)
         return 0;
     }
     int angle = lrintf(acos_approx(getCosTiltAngle()) * throttleAngleScale);
-    if (angle > 900)
+    if (angle > 900) {
         angle = 900;
+    }
     return lrintf(throttleAngleValue * sin_approx(angle / (900.0f * M_PIf / 2.0f)));
 }
 
@@ -567,7 +744,9 @@ void imuUpdateAttitude(timeUs_t currentTimeUs)
 
     // Update the throttle correction for angle and supply it to the mixer
     int throttleAngleCorrection = 0;
-    if (throttleAngleValue && (FLIGHT_MODE(ANGLE_MODE) || FLIGHT_MODE(HORIZON_MODE)) && ARMING_FLAG(ARMED)) {
+        if (throttleAngleValue
+            && (FLIGHT_MODE(ANGLE_MODE | HORIZON_MODE))
+            && ARMING_FLAG(ARMED)) {
         throttleAngleCorrection = calculateThrottleAngleCorrection();
     }
     mixerSetThrottleAngleCorrection(throttleAngleCorrection);
@@ -580,31 +759,7 @@ void imuUpdateAttitude(timeUs_t currentTimeUs)
     schedulerIgnoreTaskStateTime();
   }
 }
-
-bool isImuReady(void)
-{
-    return sensors(SENSOR_ACC) && accIsCalibrationComplete() && gyroIsCalibrationComplete();
-}
-
-bool isImuHeadingValid(void)
-{
-    return sensors(SENSOR_MAG);
-}
-
 #endif // USE_ACC
-
-bool shouldInitializeGPSHeading()
-{
-    static bool initialized = false;
-
-    if (!initialized) {
-        initialized = true;
-
-        return true;
-    }
-
-    return false;
-}
 
 // Angle in between the nose axis of the craft and the horizontal plane in ground reference.
 // Positive angle - nose down, negative angle - nose up.
@@ -628,13 +783,15 @@ void getQuaternion(quaternion_t *quat)
 
 bool imuQuaternionHeadfreeOffsetSet(void)
 {
-    if ((ABS(attitude.values.roll) < 450)  && (ABS(attitude.values.pitch) < 450)) {
+    if ((abs(attitude.values.roll) < 450)  && (abs(attitude.values.pitch) < 450)) {
         const float yaw = -atan2_approx((+2.0f * (qP.wz + qP.xy)), (+1.0f - 2.0f * (qP.yy + qP.zz)));
+        float sin, cos;
+        sincosf_approx(yaw/2, &sin, &cos);
 
-        offset.w = cos_approx(yaw/2);
+        offset.w = cos;
         offset.x = 0;
         offset.y = 0;
-        offset.z = sin_approx(yaw/2);
+        offset.z = sin;
 
         return true;
     } else {
@@ -642,7 +799,7 @@ bool imuQuaternionHeadfreeOffsetSet(void)
     }
 }
 
-void imuQuaternionMultiplication(quaternion_t *q1, quaternion_t *q2, quaternion_t *result)
+static void imuQuaternionMultiplication(quaternion_t *q1, quaternion_t *q2, quaternion_t *result)
 {
     const float A = (q1->w + q1->x) * (q2->w + q2->x);
     const float B = (q1->z - q1->y) * (q2->y - q2->z);
@@ -682,22 +839,4 @@ bool isUpright(void)
 #else
     return true;
 #endif
-}
-
-void imuTransformVectorBodyToEarth(fpVector3_t * v)
-{
-    // From body frame to earth frame
-    quaternionRotateVectorInv(v, v, &q);
-
-    // HACK: This is needed to correctly transform from NED (sensor frame) to NEU (navigation)
-    v->y = -v->y;
-}
-
-void imuTransformVectorEarthToBody(fpVector3_t * v)
-{
-    // HACK: This is needed to correctly transform from NED (sensor frame) to NEU (navigation)
-    v->y = -v->y;
-
-    // From earth frame to body frame
-    quaternionRotateVector(v, v, &q);
 }

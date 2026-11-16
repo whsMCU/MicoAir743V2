@@ -20,20 +20,14 @@
 
 #pragma once
 
-#include "hw.h"
 #include "common/axis.h"
-#include "common/maths.h"
 #include "common/time.h"
+#include "common/maths.h"
 #include "common/vector.h"
 //#include "pg/pg.h"
 
 // Exported symbols
 extern bool canUseGPSHeading;
-extern float accAverage[XYZ_AXIS_COUNT];
-extern int16_t heading;
-
-extern fpVector3_t imuMeasuredAccelBF;         // cm/s/s
-extern fpVector3_t imuMeasuredRotationBF;       // rad/s
 
 typedef union {
     float v[4];
@@ -51,7 +45,7 @@ typedef struct {
 typedef union {
     int16_t raw[XYZ_AXIS_COUNT];
     struct {
-        // absolute angle inclination in multiple of 0.1 degree    180 deg = 1800
+        // absolute angle inclination in multiple of 0.1 degree  eg attitude.values.yaw 180 deg = 1800
         int16_t roll;
         int16_t pitch;
         int16_t yaw;
@@ -64,8 +58,8 @@ extern matrix33_t rMat;
 extern quaternion_t imuAttitudeQuaternion; //attitude quaternion to use in blackbox
 
 typedef struct imuConfig_s {
-    uint16_t dcm_kp;                        // DCM filter proportional gain ( x 10000)
-    uint16_t dcm_ki;                        // DCM filter integral gain ( x 10000)
+    uint16_t imu_dcm_kp;          // DCM filter proportional gain ( x 10000)
+    uint16_t imu_dcm_ki;          // DCM filter integral gain ( x 10000)
     uint8_t small_angle;
     uint8_t imu_process_denom;
     int16_t mag_declination;      // Magnetic declination in degrees * 10
@@ -75,8 +69,8 @@ typedef struct imuConfig_s {
 extern imuConfig_t imuConfig;
 
 typedef struct imuRuntimeConfig_s {
-    float dcm_ki;
-    float dcm_kp;
+    float imuDcmKi;
+    float imuDcmKp;
 } imuRuntimeConfig_t;
 
 void imuConfigure(uint16_t throttle_correction_angle, uint8_t throttle_correction_value);
@@ -88,19 +82,9 @@ float getCosTiltAngle(void);
 void getQuaternion(quaternion_t * q);
 void imuUpdateAttitude(timeUs_t currentTimeUs);
 
-bool isImuReady(void);
-bool isImuHeadingValid(void);
-
 void imuInit(void);
 
 bool imuQuaternionHeadfreeOffsetSet(void);
-void imuQuaternionHeadfreeTransformVectorEarthToBody(vector3_t * v);
-bool shouldInitializeGPSHeading(void);
-
+void imuQuaternionHeadfreeTransformVectorEarthToBody(vector3_t *v);
 bool isUpright(void);
-
 bool imuIsHeadingValid(void);
-
-void imuTransformVectorBodyToEarth(fpVector3_t * v);
-void imuTransformVectorEarthToBody(fpVector3_t * v);
-

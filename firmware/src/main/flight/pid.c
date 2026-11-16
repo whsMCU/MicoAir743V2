@@ -216,7 +216,7 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 	imu_roll = (float)DECIDEGREES_TO_DEGREES(attitude.values.roll);
 	imu_pitch = (float)DECIDEGREES_TO_DEGREES(attitude.values.pitch);
 	imu_yaw = (float)DECIDEGREES_TO_DEGREES(attitude.values.yaw);
-	heading = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
+	//heading = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
 
   static timeUs_t previousUpdateTimeUs;
   float dT = (float)((currentTimeUs - previousUpdateTimeUs) * 1e-6);
