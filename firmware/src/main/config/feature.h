@@ -85,6 +85,8 @@ extern featureConfig_t featureConfig;
 //  Other restrictions on available features may apply.
 extern uint32_t featuresSupportedByBuild;
 
+void featureConfig_Init(void);
+
 void featureInit(void);
 bool featureIsEnabled(const uint32_t mask);
 bool featureIsConfigured(const uint32_t mask);

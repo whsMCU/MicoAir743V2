@@ -284,6 +284,7 @@ typedef struct {
 #endif
 } task_t;
 
+void schedulerConfig_Init(void);
 void getCheckFuncInfo(cfCheckFuncInfo_t *checkFuncInfo);
 void getTaskInfo(taskId_e taskId, taskInfo_t *taskInfo);
 void rescheduleTask(taskId_e taskId, timeDelta_t newPeriodUs);

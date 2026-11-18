@@ -1294,6 +1294,30 @@ void processRxModes(timeUs_t currentTimeUs)
     //pidSetAntiGravityState(IS_RC_MODE_ACTIVE(BOXANTIGRAVITY) || featureIsEnabled(FEATURE_ANTI_GRAVITY));
 }
 
+static FAST_CODE_NOINLINE void subTaskPidSubprocesses(timeUs_t currentTimeUs)
+{
+    uint32_t startTime = 0;
+    if (debugMode == DEBUG_PIDLOOP) {
+        startTime = micros();
+    }
+
+#if defined(USE_GPS) || defined(USE_MAG)
+    if (sensors(SENSOR_GPS) || sensors(SENSOR_MAG)) {
+        updateMagHold();
+    }
+#endif
+
+#ifdef USE_BLACKBOX
+    if (!cliMode && blackboxConfig()->device) {
+        blackboxUpdate(currentTimeUs);
+    }
+#else
+    UNUSED(currentTimeUs);
+#endif
+
+    DEBUG_SET(DEBUG_PIDLOOP, 3, micros() - startTime);
+}
+
 #define GYRO_TEMP_READ_DELAY_US 3e6    // Only read the gyro temp every 3 seconds
 void subTaskTelemetryPollSensors(timeUs_t currentTimeUs)
 {
@@ -1374,7 +1398,7 @@ FAST_CODE void taskMainPidLoop(timeUs_t currentTimeUs)
 	// 3 - subTaskPidSubprocesses()
 	DEBUG_SET(DEBUG_PIDLOOP, 0, micros() - currentTimeUs);
 
-    subTaskRcCommand(currentTimeUs);
+  subTaskRcCommand(currentTimeUs);
 	subTaskPidController(currentTimeUs);
 	//subTaskMotorUpdate(currentTimeUs);
 	//subTaskPidSubprocesses(currentTimeUs);

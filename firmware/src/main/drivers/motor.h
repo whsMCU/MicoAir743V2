@@ -85,9 +85,11 @@ void motorDevInit(void);
 unsigned motorDeviceCount(void);
 const motorVTable_t *motorGetVTable(void);
 
+
 void motorWriteAll(void);
 void motorDisable(void);
 void motorEnable(void);
 bool motorIsEnabled(void);
+bool motorIsMotorIdle(unsigned index);
 void motorShutdown(void); // Replaces stopPwmAllMotors
 uint8_t getMotorCount(void);

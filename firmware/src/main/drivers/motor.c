@@ -76,6 +76,7 @@ void motorConfig_Init(void)
   motorConfig.motorCount = 4;
   motorConfig.useDshotTelemetry = true;
   motorConfig.useDshotEdt = DSHOT_EDT_FORCE;
+  motorProtocolEnabled = true;
 }
 
 

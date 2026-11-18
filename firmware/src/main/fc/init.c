@@ -148,10 +148,21 @@ void init(void)
   	}
   }
 
+
+  featureInit();
+
+  initRcProcessing();
+
   activeAdjustmentRangeReset();
 
-  	// Initialize MSP
-  	mspInit();
+  failsafeReset();
+
+#if defined(USE_LED_STRIP_STATUS_MODE)
+  reevaluateLedConfig();
+#endif
+
+  // Initialize MSP
+  mspInit();
 	tasksInitData();
 	cliOpen(_DEF_USB, 57600);
 
@@ -226,9 +237,9 @@ void init(void)
 
 #ifdef USE_GPS
     if (featureIsEnabled(FEATURE_GPS)) {
-    gpsInit();
+    	gpsInit();
 #ifdef USE_GPS_LAP_TIMER
-        gpsLapTimerInit();
+       gpsLapTimerInit();
 #endif // USE_GPS_LAP_TIMER
     }
 #endif
@@ -315,6 +326,7 @@ void init(void)
 void Param_Config_Init(void)
 {
 	systemConfig_Init();
+	schedulerConfig_Init();
 //	pilotConfig_Init();
 	boardConfig_Init();
 //	sdcardConfig_Init();
@@ -355,7 +367,7 @@ void Param_Config_Init(void)
 	controlRateProfiles_Init();
 //	mixerConfig_Init();
 	throttleCorrectionConfig_Init();
-//	featureConfig_Init();
+	featureConfig_Init();
 	positionConfig_Init();
 	rcControlsConfig_Init();
 	telemetryConfig_Init();

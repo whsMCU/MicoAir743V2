@@ -215,8 +215,8 @@ static FAST_CODE void gyroUpdateSensor(void)
 //      bmi088.gyro.gyroADC.z = (float)bmi088.gyro.gyroADCRaw[Z] * bmi088.gyro.scale;
 //      //return;
 //    }
-
-    bmi088.gyro.dataReady = false;
+//
+//    bmi088.gyro.dataReady = false;
 //////////////////////////////////////////////////////////////////////////////////////////////////////
     if (isGyroSensorCalibrationComplete(&bmi270)) {
     // move 16-bit gyro data into 32-bit variables to avoid overflows in calculations
@@ -511,8 +511,8 @@ void accUpdate(timeUs_t currentTimeUs)
 //		bmi088AccRead(&bmi088);
 //		//return;
 //	}
-
-	bmi088.acc.dataReady = false;
+//
+//	bmi088.acc.dataReady = false;
 
 	bmi270.acc.isAccelUpdatedAtLeastOnce = true;
 

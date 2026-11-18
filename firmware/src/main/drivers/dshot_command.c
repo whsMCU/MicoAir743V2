@@ -29,7 +29,7 @@
 
 //#include "drivers/io.h"
 #include "drivers/motor.h"
-//#include "drivers/time.h"
+#include "drivers/time.h"
 
 #include "drivers/dshot.h"
 #include "drivers/dshot_command.h"
@@ -138,11 +138,11 @@ static dshotCommandControl_t* addCommand(void)
 
 static bool allMotorsAreIdle(void)
 {
-//    for (unsigned i = 0; i < motorDeviceCount(); i++) {
-//        if (!motorIsMotorIdle(i)) {
-//            return false;
-//        }
-//    }
+    for (unsigned i = 0; i < motorDeviceCount(); i++) {
+        if (!motorIsMotorIdle(i)) {
+            return false;
+        }
+    }
 
     return true;
 }

@@ -1,4 +1,26 @@
+/*
+ * This file is part of Cleanflight and Betaflight.
+ *
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #pragma once
+
+#include "hw.h"
 
 #include "common/axis.h"
 #include "common/maths.h"
@@ -12,12 +34,11 @@
 #define GYRO_SCALE_2000DPS (2000.0f / (1 << 15))   // 16.384 dps/lsb scalefactor for 2000dps sensors
 #define GYRO_SCALE_4000DPS (4000.0f / (1 << 15))   //  8.192 dps/lsb scalefactor for 4000dps sensors
 
+// Gyro hardware types were updated in PR #14087 (removed GYRO_L3G4200D, GYRO_MPU3050)
 typedef enum {
     GYRO_NONE = 0,
     GYRO_DEFAULT,
     GYRO_MPU6050,
-    GYRO_L3G4200D,
-    GYRO_MPU3050,
     GYRO_L3GD20,
     GYRO_MPU6000,
     GYRO_MPU6500,
@@ -32,7 +53,18 @@ typedef enum {
     GYRO_BMI160,
     GYRO_BMI270,
     GYRO_LSM6DSO,
-    GYRO_FAKE
+    GYRO_LSM6DSV16X,
+    GYRO_IIM42653,
+    GYRO_ICM45605,
+    GYRO_ICM45686,
+    GYRO_ICM40609D,
+    GYRO_IIM42652,
+    GYRO_LSM6DSK320X,
+    GYRO_ICM42622P,
+    GYRO_ICM42686P,
+    GYRO_ICM56686,
+    GYRO_VIRTUAL,
+    GYRO_HARDWARE_COUNT
 } gyroHardware_e;
 
 typedef enum {
@@ -48,7 +80,6 @@ typedef enum {
 typedef enum {
     GYRO_RATE_1_kHz,
     GYRO_RATE_1100_Hz,
-    GYRO_RATE_1600_Hz,
     GYRO_RATE_3200_Hz,
     GYRO_RATE_6400_Hz,
     GYRO_RATE_6664_Hz,

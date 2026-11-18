@@ -39,23 +39,20 @@
 #include "common/filter.h"
 #include "common/maths.h"
 
-#include "flight/rpm_filter.h"
-
 #include "config/feature.h"
 
 #include "drivers/motor_types.h"
 //#include "drivers/timer.h"
 
-//#include "drivers/dshot_command.h"
+#include "drivers/dshot_command.h"
 #include "drivers/nvic.h"
 
 
-//#include "pg/rpm_filter.h"
+#include "flight/rpm_filter.h"
 
 #include "rx/rx.h"
 
 #define ERPM_PER_LSB            100.0f
-#define SECONDS_PER_MINUTE          60.0f
 
 FAST_DATA_ZERO_INIT uint8_t dshotMotorCount = 0;
 

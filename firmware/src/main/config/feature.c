@@ -32,7 +32,8 @@ featureConfig_t featureConfig;
 
 void featureConfig_Init(void)
 {
-	featureConfig.enabledFeatures = DEFAULT_FEATURES | DEFAULT_RX_FEATURE | FEATURE_ANTI_GRAVITY | FEATURE_AIRMODE;
+	featureConfig.enabledFeatures = DEFAULT_FEATURES | DEFAULT_RX_FEATURE | FEATURE_ANTI_GRAVITY | FEATURE_AIRMODE | FEATURE_GPS
+																| FEATURE_TELEMETRY | FEATURE_LED_STRIP | FEATURE_RANGEFINDER | FEATURE_OPTICALFLOW;
 }
 
 // bitmask of features that are supported in current build configuration
