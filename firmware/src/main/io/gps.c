@@ -57,7 +57,7 @@
 
 //#include "config/config.h"
 
-//#include "fc/gps_lap_timer.h"
+#include "fc/gps_lap_timer.h"
 #include "fc/runtime_config.h"
 
 //#include "flight/gps_rescue.h"

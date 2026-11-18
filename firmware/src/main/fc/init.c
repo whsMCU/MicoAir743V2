@@ -68,6 +68,7 @@
 #include "fc/stats.h"
 #include "fc/controlrate_profile.h"
 #include "fc/tasks.h"
+#include "fc/gps_lap_timer.h"
 
 #include "flight/failsafe.h"
 #include "flight/imu.h"
@@ -224,7 +225,12 @@ void init(void)
     initRcProcessing();
 
 #ifdef USE_GPS
+    if (featureIsEnabled(FEATURE_GPS)) {
     gpsInit();
+#ifdef USE_GPS_LAP_TIMER
+        gpsLapTimerInit();
+#endif // USE_GPS_LAP_TIMER
+    }
 #endif
 
 #ifdef USE_LED_STRIP
@@ -328,6 +334,7 @@ void Param_Config_Init(void)
 #ifdef USE_GPS
 	gpsConfig_Init();
 	gpsRescueConfig_Init();
+	gpsLapTimerConfig_Init();
 #endif
 #ifdef USE_OPTICALFLOW
 	opticalflowConfig_Init();
