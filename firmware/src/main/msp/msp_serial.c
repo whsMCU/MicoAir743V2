@@ -22,8 +22,6 @@
 #include <stdint.h>
 #include <string.h>
 
-//#include "platform.h"
-
 #include "hw.h"
 
 #include "build/debug.h"

@@ -39,7 +39,7 @@
 
 //#include "io/serial.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
 
@@ -53,7 +53,7 @@
 //#include "telemetry/smartport.h"
 //#include "telemetry/ltm.h"
 //#include "telemetry/jetiexbus.h"
-//#include "telemetry/mavlink.h"
+#include "telemetry/mavlink.h"
 #include "telemetry/crsf.h"
 //#include "telemetry/ghst.h"
 //#include "telemetry/srxl.h"
@@ -129,22 +129,22 @@ void telemetryInit(void)
     telemetryCheckState();
 }
 
-//bool telemetryDetermineEnabledState(portSharing_e portSharing)
-//{
-//    bool enabled = portSharing == PORTSHARING_NOT_SHARED;
-//
+bool telemetryDetermineEnabledState(void)
+{
+    bool enabled = true;
+
 //    if (portSharing == PORTSHARING_SHARED) {
 //        if (isModeActivationConditionPresent(BOXTELEMETRY))
 //            enabled = IS_RC_MODE_ACTIVE(BOXTELEMETRY);
 //        else
 //            enabled = ARMING_FLAG(ARMED);
 //    }
-//
-//    return enabled;
-//}
 
-//bool telemetryCheckRxPortShared(const serialPortConfig_t *portConfig, const SerialRXType serialrxProvider)
-//{
+    return enabled;
+}
+
+bool telemetryCheckRxPortShared(void)
+{
 //    if (portConfig->functionMask & FUNCTION_RX_SERIAL && portConfig->functionMask & TELEMETRY_SHAREABLE_PORT_FUNCTIONS_MASK &&
 //        (serialrxProvider == SERIALRX_SPEKTRUM1024 ||
 //        serialrxProvider == SERIALRX_SPEKTRUM2048 ||
@@ -158,21 +158,21 @@ void telemetryInit(void)
 //
 //        return true;
 //    }
-//#ifdef USE_TELEMETRY_IBUS
-//    if (portConfig->functionMask & FUNCTION_TELEMETRY_IBUS
-//        && portConfig->functionMask & FUNCTION_RX_SERIAL
-//        && serialrxProvider == SERIALRX_IBUS) {
-//        // IBUS serial RX & telemetry
-//        return true;
-//    }
-//#endif
-//#if defined(USE_MSP_OVER_TELEMETRY) && defined(USE_VTX_MSP)
-//    if (portConfig->functionMask & FUNCTION_RX_SERIAL && portConfig->functionMask & FUNCTION_VTX_MSP) {
-//        return true;
-//    }
-//#endif
-//    return false;
-//}
+#ifdef USE_TELEMETRY_IBUS
+    if (portConfig->functionMask & FUNCTION_TELEMETRY_IBUS
+        && portConfig->functionMask & FUNCTION_RX_SERIAL
+        && serialrxProvider == SERIALRX_IBUS) {
+        // IBUS serial RX & telemetry
+        return true;
+    }
+#endif
+#if defined(USE_MSP_OVER_TELEMETRY) && defined(USE_VTX_MSP)
+    if (portConfig->functionMask & FUNCTION_RX_SERIAL && portConfig->functionMask & FUNCTION_VTX_MSP) {
+        return true;
+    }
+#endif
+    return false;
+}
 
 //serialPort_t *telemetrySharedPort = NULL;
 

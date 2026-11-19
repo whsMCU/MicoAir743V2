@@ -166,7 +166,7 @@ void init(void)
 	tasksInitData();
 	cliOpen(_DEF_USB, 57600);
 
-	mspSerialInit();
+	//mspSerialInit();
 	//mixerInit(mixerConfig.mixerMode);
 
 	motorDevInit();

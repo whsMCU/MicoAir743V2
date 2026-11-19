@@ -114,6 +114,10 @@
 #define USBD_PRODUCT_STRING     "Betaflight - STM32H743"
 #endif
 
+#define U_ID_0 (*(uint32_t*)UID_BASE)
+#define U_ID_1 (*(uint32_t*)(UID_BASE + 4))
+#define U_ID_2 (*(uint32_t*)(UID_BASE + 8))
+
 #define USE_ACC
 #define USE_BARO
 #define USE_VARIO
@@ -162,7 +166,10 @@
 
 #define USE_TELEMETRY
 #define USE_TELEMETRY_CRSF
-#define USE_MSP_OVER_TELEMETRY
+//#define USE_MSP_OVER_TELEMETRY
+//#define USE_SERIALRX_MAVLINK
+#define USE_TELEMETRY_MAVLINK
+#define ENABLE_TELEMETRY_MAVLINK_MISSION 0
 
 #define USE_ESC_SENSOR
 

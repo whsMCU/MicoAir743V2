@@ -101,11 +101,11 @@ extern telemetryConfig_t telemetryConfig;
 void telemetryConfig_Init(void);
 
 void telemetryInit(void);
-//bool telemetryCheckRxPortShared(const serialPortConfig_t *portConfig, const SerialRXType serialrxProvider);
+bool telemetryCheckRxPortShared(void);
 
 void telemetryCheckState(void);
 void telemetryProcess(uint32_t currentTime);
 
-//bool telemetryDetermineEnabledState(portSharing_e portSharing);
+bool telemetryDetermineEnabledState(void);
 
 bool telemetryIsSensorEnabled(sensor_e sensor);
