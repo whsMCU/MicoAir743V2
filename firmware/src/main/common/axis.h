@@ -45,7 +45,6 @@ typedef enum {
 } angle_index_t;
 
 #define RP_AXIS_COUNT 2
-#define ANGLE_INDEX_COUNT 2
 #define EF_AXIS_COUNT 2
 
 // Earth-frame axis indices.

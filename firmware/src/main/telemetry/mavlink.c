@@ -600,7 +600,7 @@ void initMAVLinkTelemetry(void)
 {
     //portConfig = findSerialPortConfig(FUNCTION_TELEMETRY_MAVLINK);
     //mavlinkPortSharing = determinePortSharing(portConfig, FUNCTION_TELEMETRY_MAVLINK);
-		uartOpen(_DEF_UART1, 115200);
+	uartOpen(_DEF_UART1, 115200);
 }
 
 void configureMAVLinkTelemetryPort(void)
