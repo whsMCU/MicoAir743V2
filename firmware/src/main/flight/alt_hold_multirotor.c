@@ -171,7 +171,7 @@ static void altHoldUpdate(void)
             targetAltitudeCm = navCmd->targetPosEfM.z * 100.0f;
             if (positionNavTargetReached()) {
                 altHold.targetAltitudeCm = targetAltitudeCm; // store target altitude so Alt Hold does not revert to pre-nav target altitude on the next cycle.
-            targetAltitudeVelocity = 0.0f;
+                targetAltitudeVelocity = 0.0f;
             } else {
                  targetAltitudeVelocity = positionNavGetTargetVelocityCmS().z; 
             }

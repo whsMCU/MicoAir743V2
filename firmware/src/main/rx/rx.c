@@ -163,7 +163,7 @@ void rxConfig_Init(void)
 	rxConfig.rssi_src_frame_lpf_period = 30;
 	rxConfig.rssi_smoothing = 125,
 	rxConfig.fpvCamAngleDegrees = 0;
-	rxConfig.airModeActivateThreshold = 25;
+	rxConfig.airModeActivateThreshold = 0;
 	rxConfig.max_aux_channel = DEFAULT_AUX_CHANNEL_COUNT;
 	rxConfig.rc_smoothing = 1;
 	rxConfig.rc_smoothing_setpoint_cutoff = 0;

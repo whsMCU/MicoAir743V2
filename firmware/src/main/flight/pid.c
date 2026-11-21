@@ -253,6 +253,13 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 //      updateHeadingHoldTarget(DECIDEGREES_TO_DEGREES(attitude.values.yaw));
 //  }
 
+#ifdef USE_ALTITUDE_HOLD
+    // Throttle value to be used during altitude hold mode (and failsafe landing mode)
+    if (FLIGHT_MODE(ALT_HOLD_MODE)) {
+        //throttle = getAutopilotThrottle();
+    }
+#endif
+
 
   applyCommand[ROLL]      = scaleRangef(rcCommand[ROLL],  -500.0f, 500.0f, -30.0f,  30.f);
   applyCommand[PITCH]     = scaleRangef(rcCommand[PITCH], -500.0f, 500.0f, -30.0f,  30.f);
