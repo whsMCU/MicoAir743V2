@@ -37,6 +37,7 @@
 #include "flight/position.h"
 #include "flight/pid.h"
 #include "flight/rpm_filter.h"
+#include "flight/autopilot_multirotor.h"
 
 #include "fc/rc_controls.h"
 #include "fc/core.h"
@@ -256,7 +257,7 @@ FAST_CODE void subTaskPidController(timeUs_t currentTimeUs)
 #ifdef USE_ALTITUDE_HOLD
     // Throttle value to be used during altitude hold mode (and failsafe landing mode)
     if (FLIGHT_MODE(ALT_HOLD_MODE)) {
-        //throttle = getAutopilotThrottle();
+        rcCommand[THROTTLE] = getAutopilotThrottle();
     }
 #endif
 

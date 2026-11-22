@@ -178,7 +178,7 @@ FAST_CODE void motorWriteAll(void)
 
     // Update the motor data
     for (int i = 0; i < motorDevice.count; i++) {
-    	motor[i] = (motor[i] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[i], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
+    	motor[i] = 0;//(motor[i] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[i], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
       motorDevice.vTable->write(i, motor[i]);
     }
 
