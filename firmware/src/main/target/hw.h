@@ -12,6 +12,8 @@
 #include "def.h"
 #include "bsp.h"
 
+#include"platform.h"
+
 #include "led.h"
 #include "uart.h"
 #include "usb.h"

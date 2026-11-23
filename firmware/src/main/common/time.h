@@ -57,7 +57,7 @@ typedef struct timeConfig_s {
     int16_t tz_offsetMinutes; // Offset from UTC in minutes, might be positive or negative
 } timeConfig_t;
 
-PG_DECLARE(timeConfig_t, timeConfig);
+extern timeConfig_t timeConfig;
 
 // Milliseconds since Jan 1 1970
 typedef int64_t rtcTime_t;
@@ -82,6 +82,8 @@ typedef struct _dateTime_s {
     // 0-999
     uint16_t millis;
 } dateTime_t;
+
+void timeConfig_Init(void);
 
 // buf must be at least FORMATTED_DATE_TIME_BUFSIZE
 bool dateTimeFormatUTC(char *buf, dateTime_t *dt);

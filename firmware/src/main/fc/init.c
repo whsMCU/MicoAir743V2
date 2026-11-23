@@ -327,6 +327,8 @@ void Param_Config_Init(void)
 {
 	systemConfig_Init();
 	schedulerConfig_Init();
+	usbDevConfig_Init();
+	timeConfig_Init();
 //	pilotConfig_Init();
 	boardConfig_Init();
 //	sdcardConfig_Init();

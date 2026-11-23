@@ -114,10 +114,6 @@
 #define USBD_PRODUCT_STRING     "Betaflight - STM32H743"
 #endif
 
-#define U_ID_0 (*(uint32_t*)UID_BASE)
-#define U_ID_1 (*(uint32_t*)(UID_BASE + 4))
-#define U_ID_2 (*(uint32_t*)(UID_BASE + 8))
-
 #define USE_ACC
 #define USE_BARO
 #define USE_VARIO
@@ -155,11 +151,6 @@
 #define USE_DSHOT_TELEMETRY
 #define USE_RC_STATS
 
-#define USE_ITCM_RAM
-#define USE_FAST_DATA
-#define USE_DYN_NOTCH_FILTER
-//#define USE_DYN_LPF
-#define USE_RPM_FILTER
 
 #define USE_LED_STRIP
 #define USE_LED_STRIP_STATUS_MODE
@@ -173,7 +164,6 @@
 
 #define USE_ESC_SENSOR
 
-#define USE_ADC_INTERNAL
 //#define USE_RC_SMOOTHING_FILTER
 #define USE_PERSISTENT_STATS
 
@@ -214,30 +204,6 @@
 #define DMA_DATA_ZERO_INIT          __attribute__ ((section(".dmaram_bss"), aligned(32)))
 #define DMA_DATA                    __attribute__ ((section(".dmaram_data"), aligned(32)))
 #define STATIC_DMA_DATA_AUTO        static DMA_DATA
-
-#define PERSISTENT                  __attribute__ ((section(".persistent_data"), aligned(4)))
-
-#ifdef USE_DMA_RAM
-#if defined(STM32H7)
-#define DMA_RAM 										__attribute__((section(".DMA_RAM"), aligned(32)))
-#define DMA_RW_AXI 									__attribute__((section(".DMA_RW_AXI"), aligned(32)))
-extern uint8_t _dmaram_start__;
-extern uint8_t _dmaram_end__;
-#elif defined(STM32G4)
-#define DMA_RAM_R __attribute__((section(".DMA_RAM_R")))
-#define DMA_RAM_W __attribute__((section(".DMA_RAM_W")))
-#define DMA_RAM_RW __attribute__((section(".DMA_RAM_RW")))
-#endif
-#else
-#define DMA_RAM
-#define DMA_RW_AXI
-#define DMA_RAM_R
-#define DMA_RAM_W
-#define DMA_RAM_RW
-#endif
-
-#define CACHE_LINE_SIZE 32
-#define CACHE_LINE_MASK (CACHE_LINE_SIZE - 1)
 
 
 #endif /* SRC_COMMON_DEF_H_ */
