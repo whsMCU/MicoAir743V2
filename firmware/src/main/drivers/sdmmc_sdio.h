@@ -211,7 +211,7 @@ typedef struct
 extern           SD_CardInfo_t               SD_CardInfo;
 extern           SD_CardType_t               SD_CardType;
 
-bool             SD_InitialiseHardware            (dmaResource_t *dma);
+bool             SD_InitialiseHardware            (void);
 SD_Error_t       SD_Init                     (void);
 bool             SD_IsDetected             (void);
 bool             SD_GetState                 (void);

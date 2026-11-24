@@ -22,7 +22,7 @@
  * Author: jflyper@github.com
  */
 
-#include "platform.h"
+#include "hw.h"
 #include "emfat.h"
 #include "emfat_file.h"
 
@@ -31,14 +31,14 @@
 #include "common/time.h"
 #include "common/utils.h"
 
-#include "drivers/flash/flash.h"
-#include "drivers/light_led.h"
+//#include "drivers/flash/flash.h"
+//#include "drivers/light_led.h"
 #include "drivers/time.h"
 #include "drivers/usb_msc.h"
 
 #include "io/flashfs.h"
 
-#include "pg/flash.h"
+//#include "pg/flash.h"
 
 #include "msc/usbd_storage.h"
 

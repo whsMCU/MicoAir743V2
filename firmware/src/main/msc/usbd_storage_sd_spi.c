@@ -34,14 +34,14 @@
 
 #include "usbd_storage.h"
 
-#include "drivers/bus_spi.h"
-#include "drivers/io.h"
-#include "drivers/light_led.h"
+//#include "drivers/bus_spi.h"
+//#include "drivers/io.h"
+//#include "drivers/light_led.h"
 #include "drivers/sdcard.h"
 #include "drivers/usb_msc.h"
 
 #include "pg/sdcard.h"
-#include "pg/bus_spi.h"
+//#include "pg/bus_spi.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -122,7 +122,7 @@ static int8_t STORAGE_Init (uint8_t lun)
 {
     UNUSED(lun);
     LED0_OFF;
-    sdcard_init(sdcardConfig());
+    sdcard_init(&sdcardConfig);
     while (sdcard_poll() == 0);
     mscSetActive();
     return 0;

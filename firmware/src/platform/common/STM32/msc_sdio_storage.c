@@ -18,9 +18,9 @@ bool mscSdioInitDma(void)
         return false;
     }
 #else
-    dmaResource_t *dmaRef = NULL;
+    //dmaResource_t *dmaRef = NULL;
 #endif
-    return SD_InitialiseHardware(dmaRef);
+    return SD_InitialiseHardware();
 }
 
 #endif

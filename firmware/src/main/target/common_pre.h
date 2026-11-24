@@ -86,19 +86,19 @@
 #endif
 
 #ifdef USE_DSHOT
-#define USE_DSHOT_BITBANG
+//#define USE_DSHOT_BITBANG
 #define USE_DSHOT_TELEMETRY
 #define USE_DSHOT_TELEMETRY_STATS
 #endif
 
 #define USE_MOTOR
 #define USE_DMA
-#define USE_TIMER
+//#define USE_TIMER
 
-#define USE_CLI
-#define USE_SERIAL_PASSTHROUGH
-#define USE_GYRO_REGISTER_DUMP  // Adds gyroregisters command to cli to dump configured register values
-#define USE_IMU_CALC
+//#define USE_CLI
+//#define USE_SERIAL_PASSTHROUGH
+//#define USE_GYRO_REGISTER_DUMP  // Adds gyroregisters command to cli to dump configured register values
+//#define USE_IMU_CALC
 
 // all the settings for classic build
 #if !defined(CLOUD_BUILD) && !defined(SITL)
@@ -111,52 +111,52 @@
 #if !defined(USE_BARO) && !defined(USE_VIRTUAL_BARO)
 #define USE_BARO
 
-#define USE_BARO_MS5611
-#define USE_BARO_SPI_MS5611
-#define USE_BARO_BMP280
-#define USE_BARO_SPI_BMP280
-#define USE_BARO_BMP388
-#define USE_BARO_SPI_BMP388
-#define USE_BARO_SPI_LPS
-#define USE_BARO_QMP6988
-#define USE_BARO_SPI_QMP6988
+//#define USE_BARO_MS5611
+//#define USE_BARO_SPI_MS5611
+//#define USE_BARO_BMP280
+//#define USE_BARO_SPI_BMP280
+//#define USE_BARO_BMP388
+//#define USE_BARO_SPI_BMP388
+//#define USE_BARO_SPI_LPS
+//#define USE_BARO_QMP6988
+//#define USE_BARO_SPI_QMP6988
 #define USE_BARO_DPS310
-#define USE_BARO_SPI_DPS310
-#define USE_BARO_BMP085
-#define USE_BARO_2SMBP_02B
-#define USE_BARO_SPI_2SMBP_02B
-#define USE_BARO_LPS22DF
-#define USE_BARO_SPI_LPS22DF
+//#define USE_BARO_SPI_DPS310
+//#define USE_BARO_BMP085
+//#define USE_BARO_2SMBP_02B
+//#define USE_BARO_SPI_2SMBP_02B
+//#define USE_BARO_LPS22DF
+//#define USE_BARO_SPI_LPS22DF
 #endif
 
 #if !defined(USE_GYRO) && !defined(USE_ACC)
 #define USE_ACC
 #define USE_GYRO
 
-#define USE_ACC_MPU6500
-#define USE_GYRO_MPU6500
-#define USE_ACC_SPI_MPU6000
-#define USE_GYRO_SPI_MPU6000
-#define USE_ACC_SPI_MPU6500
-#define USE_GYRO_SPI_MPU6500
-#define USE_ACC_SPI_ICM20689
-#define USE_GYRO_SPI_ICM20689
-#define USE_ACCGYRO_LSM6DSO
-#define USE_ACCGYRO_LSM6DSV16X
-#define USE_ACCGYRO_LSM6DSK320X
+//#define USE_ACC_MPU6500
+//#define USE_GYRO_MPU6500
+//#define USE_ACC_SPI_MPU6000
+//#define USE_GYRO_SPI_MPU6000
+//#define USE_ACC_SPI_MPU6500
+//#define USE_GYRO_SPI_MPU6500
+//#define USE_ACC_SPI_ICM20689
+//#define USE_GYRO_SPI_ICM20689
+//#define USE_ACCGYRO_LSM6DSO
+//#define USE_ACCGYRO_LSM6DSV16X
+//#define USE_ACCGYRO_LSM6DSK320X
 #define USE_ACCGYRO_BMI270
-#define USE_GYRO_SPI_ICM42605
-#define USE_ACCGYRO_ICM42622P
-#define USE_ACCGYRO_ICM42686P
-#define USE_GYRO_SPI_ICM42688P
-#define USE_ACCGYRO_ICM45686
-#define USE_ACCGYRO_ICM45605
-#define USE_ACCGYRO_ICM56686
-#define USE_ACCGYRO_IIM42652
-#define USE_ACCGYRO_IIM42653
-#define USE_ACC_SPI_ICM42605
-#define USE_ACC_SPI_ICM42688P
-#define USE_ACCGYRO_ICM40609D
+//#define USE_GYRO_SPI_ICM42605
+//#define USE_ACCGYRO_ICM42622P
+//#define USE_ACCGYRO_ICM42686P
+//#define USE_GYRO_SPI_ICM42688P
+//#define USE_ACCGYRO_ICM45686
+//#define USE_ACCGYRO_ICM45605
+//#define USE_ACCGYRO_ICM56686
+//#define USE_ACCGYRO_IIM42652
+//#define USE_ACCGYRO_IIM42653
+//#define USE_ACC_SPI_ICM42605
+//#define USE_ACC_SPI_ICM42688P
+//#define USE_ACCGYRO_ICM40609D
 
 #if TARGET_FLASH_SIZE > 512
 #define USE_ACC_MPU6050
@@ -174,16 +174,16 @@
 #if defined(USE_FLASH)
 
 #if !defined(USE_EXST)
-#define USE_FLASHFS
-#define USE_FLASH_TOOLS
-#define USE_FLASH_M25P16
-#define USE_FLASH_W25N01G    // 1Gb NAND flash support
-#define USE_FLASH_W25N02K    // 2Gb NAND flash support
-#define USE_FLASH_W25M       // Stacked die support
-#define USE_FLASH_W25M512    // 512Kb (256Kb x 2 stacked) NOR flash support
-#define USE_FLASH_W25M02G    // 2Gb (1Gb x 2 stacked) NAND flash support
-#define USE_FLASH_W25Q128FV  // 16MB Winbond 25Q128
-#define USE_FLASH_PY25Q128HA // 16MB PUYA SEMI 25Q128
+//#define USE_FLASHFS
+//#define USE_FLASH_TOOLS
+//#define USE_FLASH_M25P16
+//#define USE_FLASH_W25N01G    // 1Gb NAND flash support
+//#define USE_FLASH_W25N02K    // 2Gb NAND flash support
+//#define USE_FLASH_W25M       // Stacked die support
+//#define USE_FLASH_W25M512    // 512Kb (256Kb x 2 stacked) NOR flash support
+//#define USE_FLASH_W25M02G    // 2Gb (1Gb x 2 stacked) NAND flash support
+//#define USE_FLASH_W25Q128FV  // 16MB Winbond 25Q128
+//#define USE_FLASH_PY25Q128HA // 16MB PUYA SEMI 25Q128
 #endif // USE_EXST
 
 #endif // USE_FLASH
@@ -194,12 +194,12 @@
 #endif
 
 #if !defined(USE_RX_SPI)
-#define USE_RX_SPI
-
-#define USE_RX_CC2500
-#define USE_RX_EXPRESSLRS
-#define USE_RX_SX1280
-#define USE_RX_SX127X
+//#define USE_RX_SPI
+//
+//#define USE_RX_CC2500
+//#define USE_RX_EXPRESSLRS
+//#define USE_RX_SX1280
+//#define USE_RX_SX127X
 #endif // !USE_RX_SPI
 
 #if !defined(USE_EXST) && !defined(USE_SDCARD)
@@ -208,10 +208,10 @@
 
 #endif // !defined(USE_CONFIG)
 
-#define USE_RX_PPM
-#define USE_RX_PWM
+//#define USE_RX_PPM
+//#define USE_RX_PWM
 
-#define USE_PINIO
+//#define USE_PINIO
 
 #if !defined(USE_SERIAL_RX)
 
@@ -230,23 +230,23 @@
 #if !defined(USE_TELEMETRY)
 #define USE_TELEMETRY
 
-#define USE_TELEMETRY_FRSKY_HUB
-#define USE_TELEMETRY_SMARTPORT
+//#define USE_TELEMETRY_FRSKY_HUB
+//#define USE_TELEMETRY_SMARTPORT
 #define USE_TELEMETRY_CRSF
-#define USE_TELEMETRY_GHST
-#define USE_TELEMETRY_SRXL
+//#define USE_TELEMETRY_GHST
+//#define USE_TELEMETRY_SRXL
 
 #endif // !defined(USE_TELEMETRY)
 
-#define USE_SERVOS
+//#define USE_SERVOS
 
-#define USE_VTX
-#define USE_OSD
+//#define USE_VTX
+//#define USE_OSD
 #if !defined(USE_OSD_SD) && !defined(USE_OSD_HD)
 #define USE_OSD_SD
 #define USE_OSD_HD
 #endif
-#define USE_BLACKBOX
+//#define USE_BLACKBOX
 
 #if TARGET_FLASH_SIZE >= 1024
 
@@ -354,24 +354,24 @@
 #define USE_CLI_BATCH
 #define USE_RESOURCE_MGMT
 
-#define USE_RUNAWAY_TAKEOFF     // Runaway Takeoff Prevention (anti-taz)
+//#define USE_RUNAWAY_TAKEOFF     // Runaway Takeoff Prevention (anti-taz)
 
-#define USE_GYRO_OVERFLOW_CHECK
-#define USE_YAW_SPIN_RECOVERY
+//#define USE_GYRO_OVERFLOW_CHECK
+//#define USE_YAW_SPIN_RECOVERY
 
 #ifdef USE_DSHOT
-#define USE_DSHOT_DMAR
+//#define USE_DSHOT_DMAR
 #endif
 
-#define USE_MSP_OVER_TELEMETRY
+//#define USE_MSP_OVER_TELEMETRY
 
-#define USE_VIRTUAL_CURRENT_METER
+//#define USE_VIRTUAL_CURRENT_METER
 #define USE_ESC_SENSOR
-#define USE_SERIAL_4WAY_BLHELI_BOOTLOADER
-#define USE_RCDEVICE
+//#define USE_SERIAL_4WAY_BLHELI_BOOTLOADER
+//#define USE_RCDEVICE
 
 #define USE_GYRO_LPF2
-#define USE_DYN_LPF
+//#define USE_DYN_LPF
 #define USE_D_MAX
 
 #define USE_THROTTLE_BOOST
@@ -381,16 +381,16 @@
 #define USE_RC_SMOOTHING_FILTER
 #define USE_THRUST_LINEARIZATION
 
-#ifdef USE_SERIALRX_SPEKTRUM
-#define USE_SPEKTRUM_BIND
-#define USE_SPEKTRUM_BIND_PLUG
-#define USE_SPEKTRUM_REAL_RSSI
-#define USE_SPEKTRUM_VIRTUAL_RSSI
-#define USE_SPEKTRUM_RSSI_PERCENT_CONVERSION
-#define USE_SPEKTRUM_VTX_CONTROL
-#define USE_SPEKTRUM_VTX_TELEMETRY
-#define USE_SPEKTRUM_CMS_TELEMETRY
-#endif // USE_SERIALRX_SPEKTRUM
+//#ifdef USE_SERIALRX_SPEKTRUM
+//#define USE_SPEKTRUM_BIND
+//#define USE_SPEKTRUM_BIND_PLUG
+//#define USE_SPEKTRUM_REAL_RSSI
+//#define USE_SPEKTRUM_VIRTUAL_RSSI
+//#define USE_SPEKTRUM_RSSI_PERCENT_CONVERSION
+//#define USE_SPEKTRUM_VTX_CONTROL
+//#define USE_SPEKTRUM_VTX_TELEMETRY
+//#define USE_SPEKTRUM_CMS_TELEMETRY
+//#endif // USE_SERIALRX_SPEKTRUM
 
 #ifdef USE_TELEMETRY_SRXL
 #ifndef USE_SERIALRX_SPEKTRUM
@@ -409,7 +409,7 @@
 #define USE_RX_RSSI_DBM
 #define USE_RX_RSNR
 #define USE_RX_LINK_QUALITY_INFO
-#define USE_RX_MSP_OVERRIDE
+//#define USE_RX_MSP_OVERRIDE
 #define USE_RX_LINK_UPLINK_POWER
 
 #define USE_GYRO_DLPF_EXPERIMENTAL
@@ -422,10 +422,10 @@
 #define USE_PERSISTENT_STATS
 #define USE_PROFILE_NAMES
 #define USE_FEEDFORWARD
-#define USE_CUSTOM_BOX_NAMES
-#define USE_BATTERY_VOLTAGE_SAG_COMPENSATION
-#define USE_SIMPLIFIED_TUNING
-#define USE_CRAFTNAME_MSGS
+//#define USE_CUSTOM_BOX_NAMES
+//#define USE_BATTERY_VOLTAGE_SAG_COMPENSATION
+//#define USE_SIMPLIFIED_TUNING
+//#define USE_CRAFTNAME_MSGS
 
 #if !defined(CORE_BUILD)
 // CORE_BUILD is only hardware drivers, and the bare minimum
@@ -433,7 +433,7 @@
 // builds or included in CLOUD_BUILD by default.
 
 #if !defined(USE_LAUNCH_CONTROL)
-#define USE_LAUNCH_CONTROL
+//#define USE_LAUNCH_CONTROL
 #endif
 
 #endif // !defined(CORE_BUILD)
@@ -443,7 +443,7 @@
 
 #if (defined(USE_OSD_HD) || defined(USE_OSD_SD) || defined(USE_FRSKYOSD)) && !defined(USE_OSD)
 // If either USE_OSD_SD for USE_OSD_HD are defined, ensure that USE_OSD is also defined
-#define USE_OSD
+//#define USE_OSD
 #endif
 
 #if defined(USE_OSD)

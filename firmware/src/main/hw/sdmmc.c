@@ -70,6 +70,10 @@ void HAL_SD_MspInit(SD_HandleTypeDef* sdHandle)
     }
 
     /* SDMMC1 clock enable */
+    __HAL_RCC_SDMMC1_CLK_DISABLE();
+    __HAL_RCC_SDMMC1_FORCE_RESET();
+    __HAL_RCC_SDMMC1_RELEASE_RESET();
+
     __HAL_RCC_SDMMC1_CLK_ENABLE();
 
     __HAL_RCC_GPIOC_CLK_ENABLE();

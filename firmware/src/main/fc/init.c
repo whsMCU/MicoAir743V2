@@ -91,6 +91,8 @@
 
 #include "osd/osd.h"
 
+#include "pg/sdcard.h"
+
 #include "rx/rx.h"
 
 #include "scheduler/scheduler.h"
@@ -129,6 +131,66 @@
 
 static void Param_Config_Init(void);
 
+uint8_t systemState = SYSTEM_STATE_INITIALISING;
+
+static enum {
+    FLASH_INIT_ATTEMPTED                = (1 << 0),
+    SD_INIT_ATTEMPTED                   = (1 << 1),
+    SPI_BUSSES_INIT_ATTEMPTED           = (1 << 2),
+    QUAD_OCTO_SPI_BUSSES_INIT_ATTEMPTED = (1 << 3),
+} initFlags = 0;
+
+#ifdef USE_USB_MSC
+bool checkMsc(void)
+{
+    return (mscCheckBootAndReset() || mscCheckButton());
+}
+
+void initMsc(void)
+{
+/* MSC mode will start after init, but will not allow scheduler to run,
+ *  so there is no bottleneck in reading and writing data */
+    ledInit(statusLedConfig());
+
+#ifdef USE_SDCARD
+    if (blackboxConfig()->device == BLACKBOX_DEVICE_SDCARD) {
+        if (sdcardConfig()->mode) {
+            if (!(initFlags & SD_INIT_ATTEMPTED)) {
+                sdCardAndFSInit();
+                initFlags |= SD_INIT_ATTEMPTED;
+            }
+        }
+    }
+#endif
+
+#if defined(USE_FLASHFS)
+    // If the blackbox device is onboard flash, then initialize and scan
+    // it to identify the log files *before* starting the USB device to
+    // prevent timeouts of the mass storage device.
+    if (blackboxConfig()->device == BLACKBOX_DEVICE_FLASH) {
+        emfat_init_files();
+    }
+#endif
+    // There's no more initialisation to be done, so enable DMA where possible for SPI
+#ifdef USE_SPI
+    spiInitBusDMA();
+#endif
+    if (mscStart() == 0) {
+        mscWaitForButton();
+    } else {
+        systemResetFromMsc();
+    }
+}
+#endif
+
+#ifdef USE_SDCARD
+static void sdCardAndFSInit(void)
+{
+    sdcard_init(sdcardConfig());
+    afatfs_init();
+}
+#endif
+
 void init(void)
 {
   debugMode = DEBUG_NONE;//DEBUG_FLOW;//DEBUG_POS_EST;// DEBUG_NONE; //DEBUG_PIDLOOP
@@ -164,6 +226,9 @@ void init(void)
   // Initialize MSP
   mspInit();
 	tasksInitData();
+
+	sdCardAndFSInit();
+
 	cliOpen(_DEF_USB, 57600);
 
 	mspSerialInit();
@@ -257,6 +322,32 @@ void init(void)
     }
 #endif
 
+#ifdef USE_USB_DETECT
+    usbCableDetectInit();
+#endif
+
+#ifdef USE_FLASH_CHIP
+    if (!(initFlags & FLASH_INIT_ATTEMPTED)) {
+        flashInit(flashConfig());
+        initFlags |= FLASH_INIT_ATTEMPTED;
+    }
+#endif
+#ifdef USE_FLASHFS
+    flashfsInit();
+#endif
+
+#ifdef USE_SDCARD
+    if (sdcardConfig()->mode) {
+        if (!(initFlags & SD_INIT_ATTEMPTED)) {
+            sdCardAndFSInit();
+            initFlags |= SD_INIT_ATTEMPTED;
+        }
+    }
+#endif
+#ifdef USE_BLACKBOX
+    blackboxInit();
+#endif
+
 //#ifdef USE_ACC
 //    if (mixerConfig.mixerMode == MIXER_GIMBAL) {
 //        accStartCalibration();
@@ -331,7 +422,7 @@ void Param_Config_Init(void)
 	timeConfig_Init();
 //	pilotConfig_Init();
 	boardConfig_Init();
-//	sdcardConfig_Init();
+	sdcardConfig_Init();
 
 	boardAlignment_Init(0, 0, 0);
 	failsafeConfig_Init();

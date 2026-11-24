@@ -128,11 +128,11 @@ static void taskMain(timeUs_t currentTimeUs)
     UNUSED(currentTimeUs);
 
 #ifdef USE_SDCARD
-    //afatfs_poll();
+    afatfs_poll();
 #endif
 
 #ifdef USE_FLASHFS
-    //flashfsEraseAsync();
+    flashfsEraseAsync();
 #endif
 }
 static void ledUpdate(uint32_t currentTimeUs)

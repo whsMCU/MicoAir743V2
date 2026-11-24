@@ -237,19 +237,19 @@
 #if defined(USE_RANGEFINDER)
 
 #ifndef USE_RANGEFINDER_HCSR04
-#define USE_RANGEFINDER_HCSR04
+//#define USE_RANGEFINDER_HCSR04
 #endif
 #ifndef USE_RANGEFINDER_TF
-#define USE_RANGEFINDER_TF
+//#define USE_RANGEFINDER_TF
 #endif
 #ifndef USE_RANGEFINDER_MT
-#define USE_RANGEFINDER_MT
+//#define USE_RANGEFINDER_MT
 #endif
 #ifndef USE_RANGEFINDER_NOOPLOOP
-#define USE_RANGEFINDER_NOOPLOOP
+//#define USE_RANGEFINDER_NOOPLOOP
 #endif
 #ifndef USE_RANGEFINDER_UPT1
-#define USE_RANGEFINDER_UPT1
+//#define USE_RANGEFINDER_UPT1
 #endif
 
 #endif // USE_RANGEFINDER
@@ -257,10 +257,10 @@
 #if defined(USE_OPTICALFLOW)
 
 #ifndef USE_OPTICALFLOW_MT
-#define USE_OPTICALFLOW_MT
+//#define USE_OPTICALFLOW_MT
 #endif
 #ifndef USE_OPTICALFLOW_UPT1
-#define USE_OPTICALFLOW_UPT1
+//#define USE_OPTICALFLOW_UPT1
 #endif
 
 #endif // USE_OPTICALFLOW
@@ -370,7 +370,7 @@
 #define USE_TELEMETRY
 #endif
 #ifndef USE_TELEMETRY_SMARTPORT
-#define USE_TELEMETRY_SMARTPORT
+//#define USE_TELEMETRY_SMARTPORT
 #endif
 #endif
 
@@ -472,7 +472,7 @@
 #endif
 
 #if (defined(USE_SDCARD) || defined(USE_FLASH)) && !defined(USE_BLACKBOX)
-#define USE_BLACKBOX
+//#define USE_BLACKBOX
 #endif
 
 #ifdef USE_FLASH
@@ -787,7 +787,7 @@ extern struct linker_symbol __fontdata_end;
 #endif
 
 #if defined(USE_RX_SPI) || defined(USE_SERIALRX_SRXL2) || defined(USE_SERIALRX_CRSF)
-#define USE_RX_BIND
+//#define USE_RX_BIND
 #endif
 
 #ifndef USE_GPS
@@ -931,7 +931,7 @@ extern struct linker_symbol __fontdata_end;
 // compile CAN in also compile DroneCAN in by default, with the runtime PG
 // flag (dronecan_enabled) deciding whether the task is actually started.
 #if !defined(ENABLE_DRONECAN)
-#define ENABLE_DRONECAN ENABLE_CAN
+//#define ENABLE_DRONECAN ENABLE_CAN
 #endif
 
 // DroneCAN ESC: command ESCs over CAN (uavcan.equipment.esc.RawCommand) and

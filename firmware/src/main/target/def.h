@@ -62,6 +62,9 @@
 #define DEFAULT_CPU_OVERCLOCK 0
 #endif
 
+#define CACHE_LINE_SIZE 32
+#define CACHE_LINE_MASK (CACHE_LINE_SIZE - 1)
+
 
 
 #if !defined(ALT_HOLD_THROTTLE_NEUTRAL_ZONE)
