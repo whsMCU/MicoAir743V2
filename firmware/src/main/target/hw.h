@@ -21,8 +21,6 @@
 #include "i2c.h"
 #include "flash.h"
 #include "sd.h"
-#include "fatfs.h"
-#include "files.h"
 #include "timer.h"
 #include "spi.h"
 #include "gpio.h"

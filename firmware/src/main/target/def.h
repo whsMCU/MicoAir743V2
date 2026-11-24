@@ -124,6 +124,8 @@
 //#define USE_OSD
 //#define USE_MAX7456
 
+#define USE_VCP
+
 #define USE_MOTOR
 #define USE_DMA_RAM
 

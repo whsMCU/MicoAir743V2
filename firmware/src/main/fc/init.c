@@ -36,13 +36,14 @@
 
 #include "config/config.h"
 #include "config/feature.h"
-#include "config/sdcard.h"
+//#include "config/sdcard.h"
 
 #include "drivers/accgyro/accgyro.h"
 #include "drivers/accgyro/accgyro_spi_bmi270.h"
 #include "drivers/accgyro/accgyro_bmi088.h"
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
+#include "drivers/sdcard.h"
 #ifdef USE_USB_MSC
 #include "drivers/usb_msc.h"
 #endif
@@ -92,6 +93,7 @@
 #include "osd/osd.h"
 
 #include "pg/sdcard.h"
+#include "pg/usb.h"
 
 #include "rx/rx.h"
 
@@ -186,7 +188,7 @@ void initMsc(void)
 #ifdef USE_SDCARD
 static void sdCardAndFSInit(void)
 {
-    sdcard_init(sdcardConfig());
+    sdcard_init(&sdcardConfig);
     afatfs_init();
 }
 #endif
@@ -197,18 +199,18 @@ void init(void)
   Param_Config_Init();
 
 
-  bool existing = loadFromSDCard();
-  if(existing)
-  {
-  	for(int i = 0; i < 5; i++)
-  	{
-			if(readSDCard())
-			{
-				break;
-			}
-			delay(100);
-  	}
-  }
+//  bool existing = loadFromSDCard();
+//  if(existing)
+//  {
+//  	for(int i = 0; i < 5; i++)
+//  	{
+//			if(readSDCard())
+//			{
+//				break;
+//			}
+//			delay(100);
+//  	}
+//  }
 
 
   featureInit();
@@ -337,7 +339,7 @@ void init(void)
 #endif
 
 #ifdef USE_SDCARD
-    if (sdcardConfig()->mode) {
+    if (sdcardConfig.mode) {
         if (!(initFlags & SD_INIT_ATTEMPTED)) {
             sdCardAndFSInit();
             initFlags |= SD_INIT_ATTEMPTED;

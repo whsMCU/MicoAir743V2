@@ -47,7 +47,6 @@
 #include "io/gps.h"
 
 #include "hw/timer.h"
-#include "hw/sdmmc.h"
 
 #include "rx/rx.h"
 #include "rx/crsf.h"
@@ -130,10 +129,10 @@ void hwInit(void)
   adcInit();
   timerInit();
 
-  if (MX_SDMMC1_SD_Init() == true)
-  {
-  	fatfsInit();
-  }
+//  if (MX_SDMMC1_SD_Init() == true)
+//  {
+//  	//fatfsInit();
+//  }
 
 }
 

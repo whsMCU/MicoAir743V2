@@ -26,6 +26,7 @@
 #ifdef USE_SDCARD
 
 #include "drivers/nvic.h"
+#include "drivers/io_types.h"
 //#include "drivers/io.h"
 //#include "dma.h"
 //#include "dma_reqmap.h"
@@ -70,17 +71,17 @@ sdcard_t sdcard;
 static void sdcardInsertionDetectInit(const sdcardConfig_t *config)
 {
     if (config->cardDetectTag) {
-        sdcard.cardDetectPin = IOGetByTag(config->cardDetectTag);
+        //sdcard.cardDetectPin = IOGetByTag(config->cardDetectTag);
         sdcard.detectionInverted = config->cardDetectInverted;
     } else {
         sdcard.cardDetectPin = IO_NONE;
         sdcard.detectionInverted = false;
     }
 
-    if (sdcard.cardDetectPin) {
-        IOInit(sdcard.cardDetectPin, OWNER_SDCARD_DETECT, 0);
-        IOConfigGPIO(sdcard.cardDetectPin, IOCFG_IPU);
-    }
+//    if (sdcard.cardDetectPin) {
+//        IOInit(sdcard.cardDetectPin, OWNER_SDCARD_DETECT, 0);
+//        IOConfigGPIO(sdcard.cardDetectPin, IOCFG_IPU);
+//    }
 }
 
 /**
@@ -90,7 +91,7 @@ bool sdcard_isInserted(void)
 {
     bool result = true;
     if (sdcard.cardDetectPin) {
-        result = IORead(sdcard.cardDetectPin) != 0;
+        //result = IORead(sdcard.cardDetectPin) != 0;
         if (sdcard.detectionInverted) {
             result = !result;
         }
@@ -132,7 +133,7 @@ void sdcard_init(const sdcardConfig_t *config)
     }
 
     if (sdcardVTable) {
-        sdcardVTable->sdcard_init(config, spiPinConfig(0));
+        sdcardVTable->sdcard_init(config);
     }
 }
 

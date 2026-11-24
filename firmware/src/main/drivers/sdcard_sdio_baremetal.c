@@ -190,10 +190,8 @@ static bool sdcard_checkInitDone(void)
 /**
  * Begin the initialization process for the SD card. This must be called first before any other sdcard_ routine.
  */
-static void sdcardSdio_init(const sdcardConfig_t *config, const spiPinConfig_t *spiConfig)
+static void sdcardSdio_init(const sdcardConfig_t *config)
 {
-    UNUSED(spiConfig);
-
     sdcard.enabled = config->mode;
     if (!sdcard.enabled) {
         sdcard.state = SDCARD_STATE_NOT_PRESENT;
@@ -216,18 +214,18 @@ static void sdcardSdio_init(const sdcardConfig_t *config, const spiPinConfig_t *
         return;
     }
 #else
-    dmaResource_t *dmaRef = NULL;
+    //dmaResource_t *dmaRef = NULL;
 #endif
-    if (sdioConfig()->useCache) {
+    if (sdioConfig.useCache) {
         sdcard.useCache = 1;
     } else {
         sdcard.useCache = 0;
     }
 
-    if (!SD_InitialiseHardware(dmaRef)) {
+//    if (!SD_InitialiseHardware(dmaRef)) {
         sdcard.state = SDCARD_STATE_NOT_PRESENT;
-        return;
-    }
+//        return;
+//    }
 
     if (sdcard_isInserted()) {
         if (SD_Init() != 0) {

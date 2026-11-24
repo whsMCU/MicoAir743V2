@@ -1,23 +1,7 @@
-/*
- * This file is part of Betaflight.
- *
- * Betaflight is free software. You can redistribute this software
- * and/or modify this software under the terms of the GNU General
- * Public License as published by the Free Software Foundation,
- * either version 3 of the License, or (at your option) any later
- * version.
- *
- * Betaflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- *
- * See the GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public
- * License along with this software.
- *
- * If not, see <http://www.gnu.org/licenses/>.
- */
+/**
+ * usbd_conf.c adopted from
+ * STM32Cube_FW_H7_V1.3.0/Projects/STM32H743I_EVAL/Applications/USB_Device/CDC_Standalone
+ **/
 
 /**
  ******************************************************************************
@@ -65,15 +49,15 @@
  */
 
 /* Includes ------------------------------------------------------------------ */
-#include "stm32n6xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "usbd_conf.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
 #include "usbd_cdc.h"
 #include "usbd_cdc_interface.h"
 
-#include "platform.h"
-#include "pg/pg.h"
+#include "hw.h"
+//#include "pg/pg.h"
 #include "pg/usb.h"
 
 #ifdef USE_USB_MSC
@@ -92,11 +76,11 @@ PCD_HandleTypeDef hpcd;
                        PCD BSP Routines
  *******************************************************************************/
 
-// CubeN6 startup vector slot is named USB1_OTG_HS_IRQHandler — the older
-// OTG_HS_IRQHandler name (used by F4/F7/H7) doesn't match here, so the
-// weak Default_Handler stays installed and USB interrupts are silently
-// dropped. Use the N6 vector name explicitly.
-void USB1_OTG_HS_IRQHandler(void)
+#if defined(USE_USB_FS) && !(defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H730xx) || defined(STM32H735xx))
+void OTG_FS_IRQHandler(void)
+#else
+void OTG_HS_IRQHandler(void)
+#endif
 {
     HAL_PCD_IRQHandler(&hpcd);
 }
@@ -108,86 +92,199 @@ void USB1_OTG_HS_IRQHandler(void)
  */
 void HAL_PCD_MspInit(PCD_HandleTypeDef * hpcd)
 {
-    if (hpcd->Instance != USB1_OTG_HS) {
-        return;
-    }
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    /* PWR peripheral clock — required before any PWR register access.
-     * BF's NS handoff loses any clock state the boot ROM left, so enable
-     * explicitly. */
-    SET_BIT(RCC->AHB4ENSR, RCC_AHB4ENSR_PWRENS);
-    (void)RCC->AHB4ENR;
+#if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
 
-    /* VDD33USB independent USB voltage monitor — arm and wait until READY.
-     * (CubeMX reference inverts the poll condition and exits immediately;
-     * OBL's working sequence waits until ready, matching the bit semantics
-     * documented in RM0486.) Bound the poll so a missing flag can't hang
-     * boot — VDD33USB asserts within microseconds in practice. */
-    HAL_PWREx_EnableVddUSBVMEN();
-    {
-        const uint32_t start = HAL_GetTick();
-        while (__HAL_PWR_GET_FLAG(PWR_FLAG_USB33RDY) == 0U) {
-            if ((HAL_GetTick() - start) > 10U) {
-                return; // VDD33USB not ready — abort MSP init, USB will fail to enumerate
-            }
-        }
-    }
-    HAL_PWREx_EnableVddUSB();
+    // H7A3 uses USB1_OTG_HS in FS mode
 
-    /* USB1 OTG HS controller + PHY1 ref clocks from HSE direct (HSE/2 OSC
-     * tap = 24 MHz). Matches the bf_n6_ref/OBL working DFU clock setup. */
-    {
-        RCC_PeriphCLKInitTypeDef pclk = {0};
-        pclk.PeriphClockSelection    = RCC_PERIPHCLK_USBOTGHS1;
-        pclk.UsbOtgHs1ClockSelection = RCC_USBOTGHS1CLKSOURCE_HSE_DIRECT;
-        if (HAL_RCCEx_PeriphCLKConfig(&pclk) != HAL_OK) {
-            return;
-        }
+    UNUSED(hpcd);
 
-        pclk.PeriphClockSelection  = RCC_PERIPHCLK_USBPHY1;
-        pclk.UsbPhy1ClockSelection = RCC_USBPHY1CLKSOURCE_HSE_DIRECT;
-        if (HAL_RCCEx_PeriphCLKConfig(&pclk) != HAL_OK) {
-            return;
-        }
-    }
-
-    /* GPIOA clock — PA11/PA12 are dedicated DP/DM pins. CubeMX reference
-     * enables this even though the integrated PHY internally routes them. */
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    /* Force-reset OTG_HS, the embedded HS PHY, and the PHY control block.
-     * Magic 0x00800000 = RCC_AHB5RSTR_OTG1PHYCTLRST per the CubeMX-generated
-     * reference. */
-    LL_AHB5_GRP1_ForceReset(0x00800000UL);
-    __HAL_RCC_USB1_OTG_HS_FORCE_RESET();
-    __HAL_RCC_USB1_OTG_HS_PHY_FORCE_RESET();
+    /**USB GPIO Configuration
+    PA11     ------> USB_DM
+    PA12     ------> USB_DP
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate  = GPIO_AF10_OTG1_HS;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    LL_RCC_HSE_SelectHSEDiv2AsDiv2Clock();
-    LL_AHB5_GRP1_ReleaseReset(0x00800000UL);
-
-    /* Peripheral clock enable + settling delay before PHYC_CR access. */
+    /* Peripheral clock enable */
     __HAL_RCC_USB1_OTG_HS_CLK_ENABLE();
-    HAL_Delay(1);
 
-    /* USBPHYC_CR — full PHY bring-up word per the CubeMX-generated reference
-     * for this part. The clearing mask wipes the existing FSEL field; the OR
-     * sets:
-     *   bit 16 = PHY POWERDOWN release (active-high control of PHY's LDOs)
-     *   bits 4..6 (FSEL) = 0b010 → 24 MHz reference clock select
-     *   bit 2 = PHY common-block enable
-     *   bit 0 = PHY enable
-     * Without bits 16/2/0 set, the HAL_PCD_Init's USB_CoreReset poll on
-     * GRSTCTL.AHBIDL never completes — the PHY hands no clock to the core. */
-    USB1_HS_PHYC->USBPHYC_CR &= ~(0x7U << 0x4U);
-    USB1_HS_PHYC->USBPHYC_CR |= (0x1U << 16) | (0x2U << 4) | (0x1U << 2) | 0x1U;
+    /* Set USB HS Interrupt priority */
+    HAL_NVIC_SetPriority(OTG_HS_IRQn, 6, 0);
 
-    __HAL_RCC_USB1_OTG_HS_PHY_RELEASE_RESET();
-    HAL_Delay(1);
-    __HAL_RCC_USB1_OTG_HS_RELEASE_RESET();
-    __HAL_RCC_USB1_OTG_HS_PHY_CLK_ENABLE();
+    /* Enable USB HS Interrupt */
+    HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
 
-    HAL_NVIC_SetPriority(USB1_OTG_HS_IRQn, 7, 0);
-    HAL_NVIC_EnableIRQ(USB1_OTG_HS_IRQn);
+#elif defined(STM32H743xx) || defined(STM32H750xx) || defined(STM32H757xx)
+
+    if (hpcd->Instance == USB_OTG_FS)
+    {
+        __HAL_RCC_GPIOA_CLK_ENABLE();
+
+        /* Configure DM DP Pins */
+        GPIO_InitStruct.Pin = (GPIO_PIN_11 | GPIO_PIN_12);
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG1_FS;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+        if (hpcd->Init.vbus_sensing_enable == 1) {
+            /* Configure VBUS Pin */
+            GPIO_InitStruct.Pin = GPIO_PIN_9;
+            GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+            GPIO_InitStruct.Pull = GPIO_NOPULL;
+            HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+        }
+#ifdef USE_USB_ID
+
+        /* Configure ID pin */
+        GPIO_InitStruct.Pin = GPIO_PIN_10;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+        GPIO_InitStruct.Pull = GPIO_PULLUP;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG1_FS;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+#endif
+
+        /* Enable USB FS Clocks */
+        __HAL_RCC_USB2_OTG_FS_CLK_ENABLE();
+
+        /* XXX Todo: Configure and enable CRS for HSI48 */
+
+        /* Set USBFS Interrupt to the lowest priority */
+        HAL_NVIC_SetPriority(OTG_FS_IRQn, 6, 0);
+
+        /* Enable USBFS Interrupt */
+        HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+
+    }
+    else if (hpcd->Instance == USB1_OTG_HS)
+    {
+        /* Configure USB FS GPIOs */
+        __GPIOA_CLK_ENABLE();
+        __GPIOB_CLK_ENABLE();
+        __GPIOC_CLK_ENABLE();
+        __GPIOH_CLK_ENABLE();
+        __GPIOI_CLK_ENABLE();
+
+        /* CLK */
+        GPIO_InitStruct.Pin = GPIO_PIN_5;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG2_HS;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+        /* D0 */
+        GPIO_InitStruct.Pin = GPIO_PIN_3;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG2_HS;
+        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+        /* D1 D2 D3 D4 D5 D6 D7 */
+        GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_5 |
+                GPIO_PIN_10 | GPIO_PIN_11 | GPIO_PIN_12 | GPIO_PIN_13;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG2_HS;
+        HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+        /* STP */
+        GPIO_InitStruct.Pin = GPIO_PIN_0;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG2_HS;
+        HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+        /* NXT */
+        GPIO_InitStruct.Pin = GPIO_PIN_4;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG2_HS;
+        HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
+
+        /* DIR */
+        GPIO_InitStruct.Pin = GPIO_PIN_11;
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Alternate = GPIO_AF10_OTG2_HS;
+        HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
+        __HAL_RCC_USB1_OTG_HS_ULPI_CLK_ENABLE();
+
+        /* Enable USB HS Clocks */
+        __HAL_RCC_USB1_OTG_HS_CLK_ENABLE();
+
+        /* Set USBHS Interrupt to the lowest priority */
+        HAL_NVIC_SetPriority(OTG_HS_IRQn, 1, 0);
+
+        /* Enable USBHS Interrupt */
+        HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
+    }
+
+#elif defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H735xx)
+    UNUSED(hpcd);
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    /**USB GPIO Configuration
+    PA11     ------> USB_DM
+    PA12     ------> USB_DP
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate  = GPIO_AF10_OTG1_FS;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* Peripheral clock enable */
+    __HAL_RCC_USB1_OTG_HS_CLK_ENABLE();
+
+    /* Set USB FS Interrupt priority */
+    HAL_NVIC_SetPriority(OTG_HS_IRQn, 6, 0);
+
+    /* Enable USB FS Interrupt */
+    HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
+#elif defined(STM32H730xx)
+    UNUSED(hpcd);
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    /**USB GPIO Configuration
+    PA11     ------> USB_DM
+    PA12     ------> USB_DP
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_11|GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF10_OTG1_HS;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /* Enable USB HS Clocks */
+    __HAL_RCC_USB1_OTG_HS_CLK_ENABLE();
+
+    HAL_NVIC_SetPriority(OTG_HS_EP1_OUT_IRQn, 6, 0);
+    HAL_NVIC_EnableIRQ(OTG_HS_EP1_OUT_IRQn);
+
+    HAL_NVIC_SetPriority(OTG_HS_EP1_IN_IRQn, 6, 0);
+    HAL_NVIC_EnableIRQ(OTG_HS_EP1_IN_IRQn);
+
+    HAL_NVIC_SetPriority(OTG_HS_IRQn, 7, 0);
+    HAL_NVIC_EnableIRQ(OTG_HS_IRQn);
+
+#else
+#error Unknown MCU type
+#endif
 }
 
 /**
@@ -197,12 +294,47 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef * hpcd)
  */
 void HAL_PCD_MspDeInit(PCD_HandleTypeDef * hpcd)
 {
-    if (hpcd->Instance == USB1_OTG_HS) {
+#if defined(STM32H7A3xx) || defined(STM32H7A3xxQ)
+    if(hpcd->Instance==USB1_OTG_HS) {
+
+        __HAL_RCC_USB1_OTG_HS_CLK_DISABLE();
+
+        HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11|GPIO_PIN_12);
+
+        HAL_NVIC_DisableIRQ(OTG_HS_IRQn);
+
+        __HAL_RCC_GPIOA_CLK_DISABLE();
+    }
+#elif defined(STM32H743xx) || defined(STM32H750xx) || defined(STM32H757xx)
+    if (hpcd->Instance == USB2_OTG_FS)
+    {
+        /* Disable USB FS Clocks */
+        __HAL_RCC_USB2_OTG_FS_CLK_DISABLE();
+    }
+    else if (hpcd->Instance == USB1_OTG_HS)
+    {
+        /* Disable USB HS Clocks */
+        __HAL_RCC_USB1_OTG_HS_CLK_DISABLE();
+        __HAL_RCC_USB1_OTG_HS_ULPI_CLK_DISABLE();
+    }
+#elif defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H730xx) || defined(STM32H735xx)
+    if(hpcd->Instance==USB1_OTG_HS)
+    {
         /* Peripheral clock disable */
         __HAL_RCC_USB1_OTG_HS_CLK_DISABLE();
 
-        HAL_NVIC_DisableIRQ(USB1_OTG_HS_IRQn);
+        /**USB GPIO Configuration
+         PA11     ------> USB_DM
+         PA12     ------> USB_DP
+        */
+        HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11|GPIO_PIN_12);
+
+        /* Peripheral interrupt Deinit*/
+        HAL_NVIC_DisableIRQ(OTG_HS_IRQn);
     }
+#else
+#error Unknown MCU
+#endif
 }
 
 /*******************************************************************************
@@ -357,16 +489,18 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
 {
 #ifdef USE_USB_FS
     /* Set LL Driver parameters */
+#if defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H730xx) || defined(STM32H735xx)
     hpcd.Instance = USB1_OTG_HS;
+#elif defined(STM32H743xx) || defined(STM32H750xx) || defined(STM32H757xx)
+    hpcd.Instance = USB2_OTG_FS;
+#else
+#error Unknown MCU type
+#endif
     hpcd.Init.dev_endpoints = 9;
     hpcd.Init.use_dedicated_ep1 = DISABLE;
     hpcd.Init.ep0_mps = EP_MPS_64;
     hpcd.Init.low_power_enable = DISABLE;
-    // CubeN6 v1.3.0 misaligns the PHY id between modules: PCD_PHY_EMBEDDED == 2
-    // but USB_CoreInit's only accepted value is USB_OTG_HS_EMBEDDED_PHY == 3.
-    // Pass the LL value so USB_CoreInit doesn't bail at HAL_ERROR before
-    // USB_DevInit gets to program GINTMSK / FIFO sizes / endpoint masks.
-    hpcd.Init.phy_itface = USB_OTG_HS_EMBEDDED_PHY;
+    hpcd.Init.phy_itface = PCD_PHY_EMBEDDED;
     hpcd.Init.Sof_enable = DISABLE;
     hpcd.Init.battery_charging_enable = DISABLE;
     hpcd.Init.speed = PCD_SPEED_FULL;
@@ -385,9 +519,9 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
 
 #ifdef USE_USB_CDC_HID
 #ifdef USE_USB_MSC
-  if (usbDevConfig()->type == COMPOSITE && !mscCheckBootAndReset()) {
+  if (usbDevConfig.type == COMPOSITE && !mscCheckBootAndReset()) {
 #else
-  if (usbDevConfig()->type == COMPOSITE) {
+  if (usbDevConfig.type == COMPOSITE) {
 #endif
     HAL_PCDEx_SetRxFiFo(&hpcd, 0x80);
     HAL_PCDEx_SetTxFiFo(&hpcd, 0, 0x20);
@@ -419,11 +553,7 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
     hpcd.Init.dma_enable = 0;
     hpcd.Init.low_power_enable = 0;
     hpcd.Init.lpm_enable = 0;
-    // CubeN6 v1.3.0 misaligns the PHY id between modules: PCD_PHY_EMBEDDED == 2
-    // but USB_CoreInit's only accepted value is USB_OTG_HS_EMBEDDED_PHY == 3.
-    // Pass the LL value so USB_CoreInit doesn't bail at HAL_ERROR before
-    // USB_DevInit gets to program GINTMSK / FIFO sizes / endpoint masks.
-    hpcd.Init.phy_itface = USB_OTG_HS_EMBEDDED_PHY;
+    hpcd.Init.phy_itface = PCD_PHY_ULPI;
     hpcd.Init.Sof_enable = 0;
     hpcd.Init.speed = PCD_SPEED_HIGH;
     hpcd.Init.vbus_sensing_enable = 0;

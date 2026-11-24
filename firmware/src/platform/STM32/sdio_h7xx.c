@@ -155,48 +155,73 @@ static const sdioPin_t *sdioFindPinDef(const sdioPin_t *pindefs, ioTag_t pin)
 #define IOCFG_SDMMC       IO_CONFIG(GPIO_MODE_AF_PP, GPIO_SPEED_FREQ_VERY_HIGH, GPIO_NOPULL)
 #endif
 
-//void HAL_SD_MspInit(SD_HandleTypeDef* hsd)
-//{
-//    UNUSED(hsd);
-//
-//    if (!sdioHardware) {
-//        return;
-//    }
-//
-//    if (sdioHardware->instance == SDMMC1) {
-//        __HAL_RCC_SDMMC1_CLK_DISABLE();
-//        __HAL_RCC_SDMMC1_FORCE_RESET();
-//        __HAL_RCC_SDMMC1_RELEASE_RESET();
-//        __HAL_RCC_SDMMC1_CLK_ENABLE();
-//    } else if (sdioHardware->instance == SDMMC2) {
-//        __HAL_RCC_SDMMC2_CLK_DISABLE();
-//        __HAL_RCC_SDMMC2_FORCE_RESET();
-//        __HAL_RCC_SDMMC2_RELEASE_RESET();
-//        __HAL_RCC_SDMMC2_CLK_ENABLE();
-//    }
-//
-//    uint8_t is4BitWidth = sdioConfig.use4BitWidth;
-//
-//    const IO_t clk = IOGetByTag(sdioPin[SDIO_PIN_CK].pin);
-//    const IO_t cmd = IOGetByTag(sdioPin[SDIO_PIN_CMD].pin);
-//    const IO_t d0 = IOGetByTag(sdioPin[SDIO_PIN_D0].pin);
-//    const IO_t d1 = IOGetByTag(sdioPin[SDIO_PIN_D1].pin);
-//    const IO_t d2 = IOGetByTag(sdioPin[SDIO_PIN_D2].pin);
-//    const IO_t d3 = IOGetByTag(sdioPin[SDIO_PIN_D3].pin);
-//
-//    IOConfigGPIOAF(clk, IOCFG_SDMMC, sdioPin[SDIO_PIN_CK].af);
-//    IOConfigGPIOAF(cmd, IOCFG_SDMMC, sdioPin[SDIO_PIN_CMD].af);
-//    IOConfigGPIOAF(d0, IOCFG_SDMMC, sdioPin[SDIO_PIN_D0].af);
-//
-//    if(is4BitWidth) {
-//        IOConfigGPIOAF(d1, IOCFG_SDMMC, sdioPin[SDIO_PIN_D1].af);
-//        IOConfigGPIOAF(d2, IOCFG_SDMMC, sdioPin[SDIO_PIN_D2].af);
-//        IOConfigGPIOAF(d3, IOCFG_SDMMC, sdioPin[SDIO_PIN_D3].af);
-//    }
-//
-//    HAL_NVIC_SetPriority(sdioHardware->irqn, NVIC_PRIORITY_BASE(NVIC_PRIO_SDIO_DMA), NVIC_PRIORITY_SUB(NVIC_PRIO_SDIO_DMA));
-//    HAL_NVIC_EnableIRQ(sdioHardware->irqn);
-//}
+void HAL_SD_MspInit(SD_HandleTypeDef* hsd)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+  if(hsd->Instance==SDMMC1)
+  {
+  /* USER CODE BEGIN SDMMC1_MspInit 0 */
+
+  /* USER CODE END SDMMC1_MspInit 0 */
+
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SDMMC;
+    PeriphClkInitStruct.PLL2.PLL2M = 5;
+    PeriphClkInitStruct.PLL2.PLL2N = 500;
+    PeriphClkInitStruct.PLL2.PLL2P = 2;
+    PeriphClkInitStruct.PLL2.PLL2Q = 3;
+    PeriphClkInitStruct.PLL2.PLL2R = 4;
+    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_0;
+    PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+    PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
+    PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL2;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* SDMMC1 clock enable */
+    __HAL_RCC_SDMMC1_CLK_DISABLE();
+    __HAL_RCC_SDMMC1_FORCE_RESET();
+    __HAL_RCC_SDMMC1_RELEASE_RESET();
+
+    __HAL_RCC_SDMMC1_CLK_ENABLE();
+
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    /**SDMMC1 GPIO Configuration
+    PC8     ------> SDMMC1_D0
+    PC9     ------> SDMMC1_D1
+    PC10     ------> SDMMC1_D2
+    PC11     ------> SDMMC1_D3
+    PC12     ------> SDMMC1_CK
+    PD2     ------> SDMMC1_CMD
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11
+                          |GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO1;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO1;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /* SDMMC1 interrupt Init */
+    HAL_NVIC_SetPriority(SDMMC1_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(SDMMC1_IRQn);
+  /* USER CODE BEGIN SDMMC1_MspInit 1 */
+
+  /* USER CODE END SDMMC1_MspInit 1 */
+  }
+}
 
 //void sdioInitialize(void)
 //{
@@ -264,7 +289,7 @@ static SD_Error_t SD_DoInit(void)
 
     memset(&hsd1, 0, sizeof(hsd1));
 
-    hsd1.Instance = sdioHardware->instance;
+    hsd1.Instance = sdioPinHardware.instance;
 
     hsd1.Init.ClockEdge = SDMMC_CLOCK_EDGE_RISING;
     hsd1.Init.ClockPowerSave = SDMMC_CLOCK_POWER_SAVE_ENABLE;
@@ -660,11 +685,6 @@ void HAL_SD_AbortCallback(SD_HandleTypeDef *hsd)
 }
 
 void SDMMC1_IRQHandler(void)
-{
-    HAL_SD_IRQHandler(&hsd1);
-}
-
-void SDMMC2_IRQHandler(void)
 {
     HAL_SD_IRQHandler(&hsd1);
 }

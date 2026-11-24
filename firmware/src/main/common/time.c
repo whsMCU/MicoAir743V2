@@ -33,7 +33,7 @@
 #include "common/printf.h"
 #include "common/time.h"
 
-//#include "drivers/persistent.h"
+#include "drivers/persistent.h"
 
 //#include "pg/pg_ids.h"
 
@@ -202,18 +202,18 @@ bool dateTimeFormatUTC(char *buf, dateTime_t *dt)
 
 bool dateTimeFormatLocal(char *buf, dateTime_t *dt)
 {
-    const int16_t timezoneOffset = rtcIsDateTimeValid(dt) ? timeConfig()->tz_offsetMinutes : 0;
+    const int16_t timezoneOffset = rtcIsDateTimeValid(dt) ? timeConfig.tz_offsetMinutes : 0;
     return dateTimeFormat(buf, dt, timezoneOffset, false);
 }
 
 bool dateTimeFormatLocalShort(char *buf, dateTime_t *dt)
 {
-    return dateTimeFormat(buf, dt, timeConfig()->tz_offsetMinutes, true);
+    return dateTimeFormat(buf, dt, timeConfig.tz_offsetMinutes, true);
 }
 
 void dateTimeUTCToLocal(dateTime_t *utcDateTime, dateTime_t *localDateTime)
 {
-    dateTimeWithOffset(localDateTime, utcDateTime, timeConfig()->tz_offsetMinutes);
+    dateTimeWithOffset(localDateTime, utcDateTime, timeConfig.tz_offsetMinutes);
 }
 
 bool dateTimeSplitFormatted(char *formatted, char **date, char **time)

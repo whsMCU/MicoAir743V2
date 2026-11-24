@@ -29,7 +29,7 @@
 
 #include "common/utils.h"
 
-#include "drivers/io.h"
+//#include "drivers/io.h"
 
 #include "pg/usb.h"
 
@@ -57,7 +57,7 @@ USBD_HandleTypeDef USBD_Device;
 
 #include "drivers/time.h"
 
-#include "drivers/serial.h"
+//#include "drivers/serial.h"
 #include "drivers/serial_usb_vcp.h"
 
 #include "scheduler/scheduler.h"
@@ -229,8 +229,8 @@ static const struct serialPortVTable usbVTable[] = {
 
 void usbVcpInit(void)
 {
-    IOInit(IOGetByTag(IO_TAG(PA11)), OWNER_USB, 0);
-    IOInit(IOGetByTag(IO_TAG(PA12)), OWNER_USB, 0);
+//    IOInit(IOGetByTag(IO_TAG(PA11)), OWNER_USB, 0);
+//    IOInit(IOGetByTag(IO_TAG(PA12)), OWNER_USB, 0);
 
 #if defined(STM32F4)
     usbGenerateDisconnectPulse();
