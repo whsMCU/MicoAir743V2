@@ -23,12 +23,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/printf.h"
 
-//#include "drivers/serial.h"
-//#include "io/serial.h"
+#include "drivers/serial.h"
+#include "io/serial.h"
 
 #include "printf_serial.h"
 

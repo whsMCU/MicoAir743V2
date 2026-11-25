@@ -20,8 +20,6 @@
 
 #pragma once
 
-#include "def.h"
-#include "hw_def.h"
 #include "rx/crsf_protocol.h"
 
 #define CRSF_PORT_OPTIONS       (SERIAL_STOPBITS_1 | SERIAL_PARITY_NO)
@@ -85,8 +83,7 @@ bool crsfRxIsTelemetryBufEmpty(void); // check this function before using crsfRx
 
 struct rxConfig_s;
 struct rxRuntimeState_s;
-bool crsfRxInit(struct rxRuntimeState_s *rxRuntimeState);
-void crsfDataReceive(uint16_t c, void *data);
+bool crsfRxInit(const struct rxConfig_s *initialRxConfig, struct rxRuntimeState_s *rxRuntimeState);
 void crsfRxUpdateBaudrate(uint32_t baudrate);
 bool crsfRxUseNegotiatedBaud(void);
 #if defined(USE_CRSF_V3)

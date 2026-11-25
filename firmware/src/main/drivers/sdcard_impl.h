@@ -21,10 +21,10 @@
 #pragma once
 
 #include "drivers/nvic.h"
-//#include "drivers/io.h"
+#include "drivers/io.h"
 #include "dma.h"
 
-//#include "drivers/bus_spi.h"
+#include "drivers/bus_spi.h"
 #include "drivers/time.h"
 
 #include "sdcard.h"
@@ -95,7 +95,7 @@ typedef struct sdcard_t {
 #endif
 
 #ifdef USE_SDCARD_SDIO
-    //dmaIdentifier_e dmaIdentifier;
+    dmaIdentifier_e dmaIdentifier;
     uint8_t useCache;
 #endif
 
@@ -104,13 +104,13 @@ typedef struct sdcard_t {
 
 extern sdcard_t sdcard;
 
-//STATIC_ASSERT(sizeof(sdcardCSD_t) == 16, sdcard_csd_bitfields_didnt_pack_properly);
+STATIC_ASSERT(sizeof(sdcardCSD_t) == 16, sdcard_csd_bitfields_didnt_pack_properly);
 
 bool sdcard_isInserted(void);
 
 typedef struct sdcardVTable_s {
     void (*sdcard_preinit)(const sdcardConfig_t *config);
-    void (*sdcard_init)(const sdcardConfig_t *config);
+    void (*sdcard_init)(const sdcardConfig_t *config, const spiPinConfig_t *spiConfig);
     bool (*sdcard_readBlock)(uint32_t blockIndex, uint8_t *buffer, sdcard_operationCompleteCallback_c callback, uint32_t callbackData);
     sdcardOperationStatus_e (*sdcard_beginWriteBlocks)(uint32_t blockIndex, uint32_t blockCount);
     sdcardOperationStatus_e (*sdcard_writeBlock)(uint32_t blockIndex, uint8_t *buffer, sdcard_operationCompleteCallback_c callback, uint32_t callbackData);

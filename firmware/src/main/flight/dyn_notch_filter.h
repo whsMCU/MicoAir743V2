@@ -24,22 +24,9 @@
 
 #include "common/time.h"
 
-//#include "pg/dyn_notch.h"
+#include "pg/dyn_notch.h"
 
 #define DYN_NOTCH_COUNT_MAX 7
-
-typedef struct dynNotchConfig_s
-{
-    uint16_t dyn_notch_min_hz;
-    uint16_t dyn_notch_max_hz;
-    uint16_t dyn_notch_q;
-    uint8_t  dyn_notch_count;
-
-} dynNotchConfig_t;
-
-extern dynNotchConfig_t dynNotchConfig;
-
-void dynNotchConfig_Init(void);
 
 void dynNotchInit(const dynNotchConfig_t *config, const float dt);
 void dynNotchPush(const int axis, const float sample);

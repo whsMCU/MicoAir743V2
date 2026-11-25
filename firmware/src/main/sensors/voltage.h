@@ -21,7 +21,6 @@
 #pragma once
 
 #include "voltage_ids.h"
-#include "hw.h"
 
 #define SLOW_VOLTAGE_TASK_FREQ_HZ 50
 #define FAST_VOLTAGE_TASK_FREQ_HZ 200
@@ -31,7 +30,7 @@
 #define VOLTAGE_STABLE_BITS_THRESHOLD 10    // number of samples tham must be within delta (~1s)
 #define VOLTAGE_STABLE_MAX_DELTA      10    // 100mV
 
-//STATIC_ASSERT(VOLTAGE_STABLE_BITS_TOTAL < sizeof(uint16_t) * 8, "not enough voltageStableBits");
+STATIC_ASSERT(VOLTAGE_STABLE_BITS_TOTAL < sizeof(uint16_t) * 8, "not enough voltageStableBits");
 
 //
 // meters
@@ -101,11 +100,11 @@ typedef struct voltageSensorADCConfig_s {
     uint8_t vbatresdivmultiplier;           // multiplier for scale (e.g. 2.5:1 ratio with multiplier of 4 can use '100' instead of '25' in ratio) to get better precision
 } voltageSensorADCConfig_t;
 
+PG_DECLARE_ARRAY(voltageSensorADCConfig_t, MAX_VOLTAGE_SENSOR_ADC, voltageSensorADCConfig);
 
 //
 // Main API
 //
-void voltageSensorADCConfig_Init(void);
 void voltageMeterReset(voltageMeter_t *voltageMeter);
 
 void voltageMeterGenericInit(void);

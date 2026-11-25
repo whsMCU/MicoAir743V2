@@ -24,18 +24,18 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_SDCARD_SDIO
 
 #include "drivers/nvic.h"
-//#include "drivers/io.h"
-//#include "drivers/dma.h"
-//#include "drivers/dma_reqmap.h"
+#include "drivers/io.h"
+#include "drivers/dma.h"
+#include "drivers/dma_reqmap.h"
 
 #include "drivers/time.h"
 
-//#include "pg/bus_spi.h" // For spiPinConfig_t, which is unused but should be defined
+#include "pg/bus_spi.h" // For spiPinConfig_t, which is unused but should be defined
 #include "pg/sdio.h"
 
 #include "drivers/sdcard.h"
@@ -190,8 +190,10 @@ static bool sdcard_checkInitDone(void)
 /**
  * Begin the initialization process for the SD card. This must be called first before any other sdcard_ routine.
  */
-static void sdcardSdio_init(const sdcardConfig_t *config)
+static void sdcardSdio_init(const sdcardConfig_t *config, const spiPinConfig_t *spiConfig)
 {
+    UNUSED(spiConfig);
+
     sdcard.enabled = config->mode;
     if (!sdcard.enabled) {
         sdcard.state = SDCARD_STATE_NOT_PRESENT;
@@ -214,18 +216,18 @@ static void sdcardSdio_init(const sdcardConfig_t *config)
         return;
     }
 #else
-    //dmaResource_t *dmaRef = NULL;
+    dmaResource_t *dmaRef = NULL;
 #endif
-    if (sdioConfig.useCache) {
+    if (sdioConfig()->useCache) {
         sdcard.useCache = 1;
     } else {
         sdcard.useCache = 0;
     }
 
-//    if (!SD_InitialiseHardware(dmaRef)) {
+    if (!SD_InitialiseHardware(dmaRef)) {
         sdcard.state = SDCARD_STATE_NOT_PRESENT;
-//        return;
-//    }
+        return;
+    }
 
     if (sdcard_isInserted()) {
         if (SD_Init() != 0) {

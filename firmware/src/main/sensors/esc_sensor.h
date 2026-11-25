@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/time.h"
 
@@ -30,8 +30,7 @@ typedef struct escSensorConfig_s {
 
 } escSensorConfig_t;
 
-//PG_DECLARE(escSensorConfig_t, escSensorConfig);
-extern escSensorConfig_t escSensorConfig;
+PG_DECLARE(escSensorConfig_t, escSensorConfig);
 
 typedef struct {
     uint8_t dataAge;
@@ -52,6 +51,14 @@ void escSensorProcess(timeUs_t currentTime);
 #define ESC_SENSOR_COMBINED 255
 
 escSensorData_t *getEscSensorData(uint8_t motorNumber);
+
+#if ENABLE_DRONECAN_ESC
+// Publish telemetry from an out-of-band source (DroneCAN esc.Status) into the
+// shared escSensorData[] store. Fields use escSensorData_t units.
+void escSensorSetExternal(uint8_t motorIndex, const escSensorData_t *data);
+void escSensorExternalInit(void);
+void escSensorExternalAge(uint8_t motorIndex);
+#endif
 
 void startEscDataRead(uint8_t *frameBuffer, uint8_t frameLength);
 uint8_t getNumberEscBytesRead(void);

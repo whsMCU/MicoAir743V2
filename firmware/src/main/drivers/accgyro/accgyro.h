@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/axis.h"
 #include "common/maths.h"
@@ -28,7 +28,15 @@
 #include "common/time.h"
 #include "common/vector.h"
 
+#include "drivers/accgyro/accgyro_mpu.h"
+#include "drivers/bus.h"
+#include "drivers/exti.h"
 #include "drivers/sensor.h"
+
+#pragma GCC diagnostic push
+#if ENABLE_SIMULATOR_MULTITHREAD
+#include <pthread.h>
+#endif
 
 #define GYRO_SCALE_2000DPS (2000.0f / (1 << 15))   // 16.384 dps/lsb scalefactor for 2000dps sensors
 #define GYRO_SCALE_4000DPS (4000.0f / (1 << 15))   //  8.192 dps/lsb scalefactor for 4000dps sensors
@@ -94,61 +102,102 @@ typedef enum {
     GYRO_EXTI_NO_INT
 } gyroModeSPI_e;
 
-//typedef struct gyroDev_s {
-//    uint8_t  gyro_bus_ch;
-//    sensorGyroInitFuncPtr initFn;                             // initialize function
-//    sensorGyroReadFuncPtr readFn;                             // read 3 axis data function
-//    sensorGyroReadDataFuncPtr temperatureFn;                  // read temperature if available
-//    //extiCallbackRec_t exti;
-//    //extDevice_t dev;
-//    uint8_t *txBuf, *rxBuf;
-//    float scale;                                             // scalefactor
-//    float gyroZero[XYZ_AXIS_COUNT];
-//    float gyroADC[XYZ_AXIS_COUNT];                           // gyro data after calibration and alignment
-//    int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
-//    int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
-//    int16_t temperature;
-//    //mpuDetectionResult_t mpuDetectionResult;
-//    sensor_align_e gyroAlign;
-//    gyroRateKHz_e gyroRateKHz;
-//    gyroModeSPI_e gyroModeSPI;
-//
-//    uint32_t detectedEXTI;
-//    uint32_t gyroLastEXTI;
-//    uint32_t gyroSyncEXTI;
-//    int32_t gyroShortPeriod;
-//    int32_t gyroDmaMaxDuration;
-//    uint32_t exit_callback_dt;
-//    uint32_t rx_callback_dt;
-//    //busSegment_t segments[2];
-//
-//    volatile bool dataReady;
-//    bool gyro_high_fsr;
-//    uint8_t hardware_lpf;
-//    uint8_t hardware_32khz_lpf;
-//    //uint8_t mpuDividerDrops;
-//    //ioTag_t mpuIntExtiTag;
-//    uint8_t gyroHasOverflowProtection;
-//    gyroHardware_e gyroHardware;
-//    fp_rotationMatrix_t rotationMatrix;
-//    uint16_t gyroSampleRateHz;
-//    uint16_t accSampleRateHz;
-//    uint8_t accDataReg;
-//    uint8_t gyroDataReg;
-//} gyroDev_t;
-//
-//typedef struct accDev_s {
-//    float acc_1G_rec;
-//    sensorAccInitFuncPtr initFn;                              // initialize function
-//    sensorAccReadFuncPtr readFn;                              // read 3 axis data function
-//    uint16_t acc_1G;
-//    int16_t ADCRaw[XYZ_AXIS_COUNT];
-//    //mpuDetectionResult_t mpuDetectionResult;
-//    sensor_align_e accAlign;
-//    bool dataReady;
-//    gyroDev_t *gyro;
-//    bool acc_high_fsr;
-//    char revisionCode;                                      // a revision code for the sensor, if known
-//    uint8_t filler[2];
-//    fp_rotationMatrix_t rotationMatrix;
-//} accDev_t;
+typedef struct gyroDev_s {
+#if ENABLE_SIMULATOR_MULTITHREAD
+    pthread_mutex_t lock;
+#endif
+    sensorGyroInitFuncPtr initFn;                             // initialize function
+    sensorGyroReadFuncPtr readFn;                             // read 3 axis data function
+    sensorGyroReadDataFuncPtr temperatureFn;                  // read temperature if available
+    extiCallbackRec_t exti;
+    extDevice_t dev;
+    float scale;                                             // scalefactor
+    float gyroZero[XYZ_AXIS_COUNT];
+    vector3_t gyroADC;                                       // gyro data after calibration and alignment
+    int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
+    int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
+    int16_t temperature;
+    float tempScale;
+    float tempZero;
+    mpuDetectionResult_t mpuDetectionResult;
+    sensor_align_e gyroAlign;
+    gyroRateKHz_e gyroRateKHz;
+    gyroModeSPI_e gyroModeSPI;
+    uint32_t detectedEXTI;
+    uint32_t gyroLastEXTI;
+    uint32_t gyroSyncEXTI;
+    int32_t gyroShortPeriod;
+    int32_t gyroDmaMaxDuration;
+    busSegment_t segments[2];
+    volatile bool dataReady;
+    bool gyro_high_fsr;
+    uint8_t hardware_lpf;
+    uint8_t hardware_32khz_lpf;
+    uint8_t mpuDividerDrops;
+    ioTag_t mpuIntExtiTag;
+    uint8_t gyroHasOverflowProtection;
+    gyroHardware_e gyroHardware;
+    matrix33_t rotationMatrix;
+    uint16_t gyroSampleRateHz;
+    uint16_t accSampleRateHz;
+    uint8_t accDataReg;
+    uint8_t gyroDataReg;
+    uint8_t tempDataReg;
+    uint8_t dmaReadRegStart;
+} gyroDev_t;
+
+typedef struct accDev_s {
+#if ENABLE_SIMULATOR_MULTITHREAD
+    pthread_mutex_t lock;
+#endif
+    float acc_1G_rec;
+    sensorAccInitFuncPtr initFn;                              // initialize function
+    sensorAccReadFuncPtr readFn;                              // read 3 axis data function
+    uint16_t acc_1G;
+    int16_t ADCRaw[XYZ_AXIS_COUNT];
+    mpuDetectionResult_t mpuDetectionResult;
+    sensor_align_e accAlign;
+    bool dataReady;
+    gyroDev_t *gyro;
+    bool acc_high_fsr;
+    char revisionCode;                                      // a revision code for the sensor, if known
+    uint8_t filler[2];
+    matrix33_t rotationMatrix;
+} accDev_t;
+
+static inline void accDevLock(accDev_t *acc)
+{
+#if ENABLE_SIMULATOR_MULTITHREAD
+    pthread_mutex_lock(&acc->lock);
+#else
+    (void)acc;
+#endif
+}
+
+static inline void accDevUnLock(accDev_t *acc)
+{
+#if ENABLE_SIMULATOR_MULTITHREAD
+    pthread_mutex_unlock(&acc->lock);
+#else
+    (void)acc;
+#endif
+}
+
+static inline void gyroDevLock(gyroDev_t *gyro)
+{
+#if ENABLE_SIMULATOR_MULTITHREAD
+    pthread_mutex_lock(&gyro->lock);
+#else
+    (void)gyro;
+#endif
+}
+
+static inline void gyroDevUnLock(gyroDev_t *gyro)
+{
+#if ENABLE_SIMULATOR_MULTITHREAD
+    pthread_mutex_unlock(&gyro->lock);
+#else
+    (void)gyro;
+#endif
+}
+#pragma GCC diagnostic pop

@@ -19,7 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "hw.h"
+#include "platform.h"
 
 #include "pwl.h"
 

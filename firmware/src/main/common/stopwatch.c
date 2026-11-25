@@ -19,11 +19,11 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/time.h"
 
-//#include "drivers/system.h"
+#include "drivers/system.h"
 
 #include "stopwatch.h"
 

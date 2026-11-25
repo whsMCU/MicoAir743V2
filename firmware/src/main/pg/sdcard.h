@@ -20,8 +20,8 @@
 
 #pragma once
 
-//#include "pg/pg.h"
-//#include "drivers/io.h"
+#include "pg/pg.h"
+#include "drivers/io.h"
 
 typedef enum {
     SDCARD_MODE_NONE = 0,
@@ -31,12 +31,10 @@ typedef enum {
 
 typedef struct sdcardConfig_s {
     int8_t  device;
-    uint32_t cardDetectTag;
-    uint32_t chipSelectTag;
+    ioTag_t cardDetectTag;
+    ioTag_t chipSelectTag;
     uint8_t cardDetectInverted;
     sdcardMode_e mode;
 } sdcardConfig_t;
 
-extern sdcardConfig_t sdcardConfig;
-
-void sdcardConfig_Init(void);
+PG_DECLARE(sdcardConfig_t, sdcardConfig);

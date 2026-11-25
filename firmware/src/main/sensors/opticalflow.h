@@ -25,7 +25,7 @@
 
 #include "drivers/opticalflow/opticalflow.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef enum {
     OPTICALFLOW_NONE = 0,
@@ -41,7 +41,7 @@ typedef struct opticalflowConfig_s {
     uint16_t flow_lpf;
 } opticalflowConfig_t;
 
-extern opticalflowConfig_t opticalflowConfig;
+PG_DECLARE(opticalflowConfig_t, opticalflowConfig);
 
 typedef struct opticalflow_s {
     opticalflowDev_t dev;
@@ -52,7 +52,6 @@ typedef struct opticalflow_s {
 } opticalflow_t;
 
 bool opticalflowInit(void);
-void opticalflowConfig_Init(void);
 
 void opticalflowUpdate(void);
 bool isOpticalflowHealthy(void);

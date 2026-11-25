@@ -22,19 +22,18 @@
 
 #ifdef USE_VCP
 
-//#include "drivers/io.h"
+#include "drivers/io.h"
 
-//#include "pg/pg_ids.h"
+#include "pg/pg_ids.h"
 
 #include "usb.h"
 
-usbDev_t usbDevConfig;
+PG_REGISTER_WITH_RESET_TEMPLATE(usbDev_t, usbDevConfig, PG_USB_CONFIG, 0);
 
-void usbDevConfig_Init(void)
-{
-	usbDevConfig.type = DEFAULT,
-	usbDevConfig.mscButtonPin = 0;//IO_TAG(USB_MSC_BUTTON_PIN),
-	usbDevConfig.mscButtonUsePullup = 0;//MSC_BUTTON_IPU,
-	usbDevConfig.detectPin = 0;//IO_TAG(USB_DETECT_PIN),
-}
+PG_RESET_TEMPLATE(usbDev_t, usbDevConfig,
+    .type = DEFAULT,
+    .mscButtonPin = IO_TAG(USB_MSC_BUTTON_PIN),
+    .mscButtonUsePullup = MSC_BUTTON_IPU,
+    .detectPin = IO_TAG(USB_DETECT_PIN),
+);
 #endif

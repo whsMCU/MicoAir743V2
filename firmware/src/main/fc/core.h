@@ -1,16 +1,27 @@
 /*
- * core.h
+ * This file is part of Cleanflight and Betaflight.
  *
- *  Created on: 2026. 10. 12.
- *      Author: 왕학승
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SRC_MAIN_FC_CORE_H_
-#define SRC_MAIN_FC_CORE_H_
-
-#include "hw.h"
+#pragma once
 
 #include "common/time.h"
+#include "pg/pg.h"
 
 #if defined(USE_GPS) || defined(USE_MAG)
 extern int16_t magHold;
@@ -56,14 +67,12 @@ typedef enum {
 extern const char * const osdLaunchControlModeNames[LAUNCH_CONTROL_MODE_COUNT];
 #endif
 
-extern throttleCorrectionConfig_t throttleCorrectionConfig;
+PG_DECLARE(throttleCorrectionConfig_t, throttleCorrectionConfig);
 
 union rollAndPitchTrims_u;
 void handleInflightCalibrationStickPosition(void);
 
 void resetArmingDisabled(void);
-
-void throttleCorrectionConfig_Init(void);
 
 void disarm(flightLogDisarmReason_e reason);
 void tryArm(void);
@@ -91,5 +100,3 @@ void resetTryingToArm(void);
 void subTaskTelemetryPollSensors(timeUs_t currentTimeUs);
 
 bool isLaunchControlActive(void);
-
-#endif /* SRC_MAIN_FC_CORE_H_ */

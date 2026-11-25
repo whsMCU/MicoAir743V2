@@ -21,12 +21,12 @@
 #include <math.h>
 #include <stdbool.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/maths.h"
 #include "common/sdft.h"
 
-#define SDFT_R 0.9999f  // damping factor for guaranteed SDFT stability (r < 1.0f) 
+#define SDFT_R 0.9999f  // damping factor for guaranteed SDFT stability (r < 1.0f)
 
 static FAST_DATA_ZERO_INIT float     rPowerN;  // SDFT_R to the power of SDFT_SAMPLE_SIZE
 static FAST_DATA_ZERO_INIT bool      isInitialized;
@@ -68,7 +68,7 @@ void sdftInit(sdft_t *sdft, const int startBin, const int endBin, const int numB
 FAST_CODE void sdftPush(sdft_t *sdft, const float sample)
 {
     const float delta = sample - rPowerN * sdft->samples[sdft->idx];
-    
+
     sdft->samples[sdft->idx] = sample;
     sdft->idx = (sdft->idx + 1) % SDFT_SAMPLE_SIZE;
 

@@ -23,7 +23,7 @@
 #include <string.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if defined(USE_MAG)
 
@@ -34,28 +34,37 @@
 
 #include "config/config.h"
 
-//#include "drivers/bus.h"
-//#include "drivers/bus_i2c.h"
-//#include "drivers/bus_i2c_busdev.h"
-//#include "drivers/bus_spi.h"
+#include "drivers/bus.h"
+#include "drivers/bus_i2c.h"
+#include "drivers/bus_i2c_busdev.h"
+#include "drivers/bus_spi.h"
 #include "drivers/compass/compass.h"
-// #include "drivers/compass/compass_ak8975.h"
-// #include "drivers/compass/compass_ak8963.h"
-// #include "drivers/compass/compass_virtual.h"
-// #include "drivers/compass/compass_hmc5883l.h"
-// #include "drivers/compass/compass_lis2mdl.h"
-// #include "drivers/compass/compass_lis3mdl.h"
-// #include "drivers/compass/compass_mmc560x.h"
-// #include "drivers/compass/compass_mpu925x_ak8963.h"
-#include "drivers/compass/compass_qmc5883l.h"
-//#include "drivers/compass/compass_ist8310.h"
+#include "drivers/compass/compass_ak8975.h"
+#include "drivers/compass/compass_ak8963.h"
+#include "drivers/compass/compass_virtual.h"
+#include "drivers/compass/compass_hmc5883l.h"
+#include "drivers/compass/compass_lis2mdl.h"
+#include "drivers/compass/compass_lis3mdl.h"
+#include "drivers/compass/compass_mmc560x.h"
+#include "drivers/compass/compass_mpu925x_ak8963.h"
+#include "drivers/compass/compass_qmc5883.h"
+#include "drivers/compass/compass_ist8310.h"
 
-//#include "drivers/io.h"
-//#include "drivers/light_led.h"
-//#include "drivers/time.h"
+#include "drivers/io.h"
+#include "drivers/light_led.h"
+#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
 #include "flight/imu.h"
+#include "io/beeper.h"
+
+#if ENABLE_DRONECAN
+#include "io/dronecan/dronecan.h"
+#include "io/dronecan/dronecan_mag.h"
+#endif
+
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "scheduler/scheduler.h"
 
@@ -65,11 +74,6 @@
 #include "sensors/sensors.h"
 
 #include "compass.h"
-
-#ifdef _USE_HW_CLI
-static void cliQmc5883l(cli_args_t *args);
-#endif
-
 
 #define LAMBDA_MIN 0.95f // minimal adaptive forgetting factor, range: [0.90, 0.99], currently tuned for 200 Hz
                          // (TASK_COMPASS_RATE_HZ) and update rate of compassBiasEstimatorApply(), not the mag readout
@@ -92,7 +96,7 @@ static compassBiasEstimator_t compassBiasEstimator;
 magDev_t magDev;
 mag_t mag;
 
-compassConfig_t compassConfig;
+PG_REGISTER_WITH_RESET_FN(compassConfig_t, compassConfig, PG_COMPASS_CONFIG, 4);
 
 // If the i2c bus is busy, try again in 500us
 #define COMPASS_BUS_BUSY_INTERVAL_US 500
@@ -118,29 +122,327 @@ static uint32_t compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
 #define MAG_I2C_ADDRESS 0
 #endif
 
-void compassConfig_Init(void)
+void pgResetFn_compassConfig(compassConfig_t *compassConfig)
 {
-  compassConfig.mag_alignment = ALIGN_DEFAULT;
-  memset(&compassConfig.mag_customAlignment, 0x00, sizeof(compassConfig.mag_customAlignment));
-  compassConfig.mag_hardware = MAG_DEFAULT;
-	compassConfig.magZero.values.roll = 326;//-352;
-	compassConfig.magZero.values.pitch = 378;//-368;
-	compassConfig.magZero.values.yaw = -23;//75;
+    compassConfig->mag_alignment = MAG_ALIGN;
+    compassConfig->mag_hardware = MAG_DEFAULT;
+
+// Generate a reasonable default for backward compatibility
+// Strategy is
+// 1. If SPI device is defined, it will take precedence, assuming it's onboard.
+// 2. I2C devices are will be handled by address = 0 (per device default).
+// 3. Slave I2C device on SPI gyro
+
+#if defined(USE_SPI_MAG) && (defined(USE_MAG_SPI_HMC5883) || defined(USE_MAG_SPI_AK8963))
+    compassConfig->mag_busType = BUS_TYPE_SPI;
+    compassConfig->mag_spi_device = SPI_DEV_TO_CFG(spiDeviceByInstance((const spiResource_t *)MAG_SPI_INSTANCE));
+    compassConfig->mag_spi_csn = IO_TAG(MAG_CS_PIN);
+    compassConfig->mag_i2c_device = I2C_DEV_TO_CFG(I2CINVALID);
+    compassConfig->mag_i2c_address = 0;
+#elif defined(USE_MAG_HMC5883) || defined(USE_MAG_QMC5883L) || defined(USE_MAG_QMC5883P) || defined(USE_MAG_AK8975) || defined(USE_MAG_IST8310) || defined(USE_MAG_MMC560X) || (defined(USE_MAG_AK8963) && !(defined(USE_GYRO_SPI_MPU6500) || defined(USE_GYRO_SPI_MPU9250)))
+    compassConfig->mag_busType = BUS_TYPE_I2C;
+    compassConfig->mag_i2c_device = I2C_DEV_TO_CFG(MAG_I2C_INSTANCE);
+    compassConfig->mag_i2c_address = MAG_I2C_ADDRESS;
+    compassConfig->mag_spi_device = SPI_DEV_TO_CFG(SPIINVALID);
+    compassConfig->mag_spi_csn = IO_TAG_NONE;
+#elif defined(USE_MAG_AK8963) && (defined(USE_GYRO_SPI_MPU6500) || defined(USE_GYRO_SPI_MPU9250))
+    compassConfig->mag_busType = BUS_TYPE_MPU_SLAVE;
+    compassConfig->mag_i2c_device = I2C_DEV_TO_CFG(I2CINVALID);
+    compassConfig->mag_i2c_address = MAG_I2C_ADDRESS;
+    compassConfig->mag_spi_device = SPI_DEV_TO_CFG(SPIINVALID);
+    compassConfig->mag_spi_csn = IO_TAG_NONE;
+#elif defined(USE_VIRTUAL_MAG)
+    compassConfig->mag_busType = BUS_TYPE_NONE;
+    compassConfig->mag_i2c_device = I2C_DEV_TO_CFG(I2CINVALID);
+    compassConfig->mag_i2c_address = 0;
+    compassConfig->mag_spi_device = SPI_DEV_TO_CFG(SPIINVALID);
+    compassConfig->mag_spi_csn = IO_TAG_NONE;
+#else
+    compassConfig->mag_hardware = MAG_NONE;
+    compassConfig->mag_busType = BUS_TYPE_NONE;
+    compassConfig->mag_i2c_device = I2C_DEV_TO_CFG(I2CINVALID);
+    compassConfig->mag_i2c_address = 0;
+    compassConfig->mag_spi_device = SPI_DEV_TO_CFG(SPIINVALID);
+    compassConfig->mag_spi_csn = IO_TAG_NONE;
+#endif
+    compassConfig->interruptTag = IO_TAG(MAG_INT_EXTI);
+
+
+    compassConfig->mag_customAlignment.roll = MAG_ALIGN_ROLL;
+    compassConfig->mag_customAlignment.pitch = MAG_ALIGN_PITCH;
+    compassConfig->mag_customAlignment.yaw = MAG_ALIGN_YAW;
 }
 
 static int16_t magADCRaw[XYZ_AXIS_COUNT];
-static uint8_t magInit = 0;
 
-bool compassDetect(magDev_t *magDev, sensor_align_e *alignment)
+#if ENABLE_DRONECAN
+// Frames older than this are treated as no data, so a dead bus trips the
+// compass task's read-failure path rather than latching the last vector.
+#define DRONECAN_MAG_TIMEOUT_US (500 * 1000)
+
+static bool dronecanMagDevInit(magDev_t *magDev)
 {
-  magSensor_e magHardware = MAG_NONE;
+    UNUSED(magDev);
+    return true;
+}
 
-    if (qmc5883lDetect(magDev)) {
+static bool dronecanMagDevRead(magDev_t *magDev, int16_t *magData)
+{
+    UNUSED(magDev);
 
-      *alignment = CW180_DEG;
-
-      magHardware = MAG_QMC5883L;
+    int16_t latest[XYZ_AXIS_COUNT];
+    if (!dronecanMagGetLatest(latest)) {
+        return false;
     }
+
+    if (cmpTimeUs(micros(), dronecanMagLastUpdateUs()) >= DRONECAN_MAG_TIMEOUT_US) {
+        return false;
+    }
+
+    magData[X] = latest[X];
+    magData[Y] = latest[Y];
+    magData[Z] = latest[Z];
+    return true;
+}
+
+static bool dronecanMagDevDetect(magDev_t *magDev)
+{
+    // A DroneCAN mag can't be probed on a bus. dronecanInit() runs before
+    // compassInit() in fc/init.c, so dronecanIsInitialised() already reflects
+    // the enabled flag, a valid node ID and a valid CAN device.
+    if (!dronecanIsInitialised()) {
+        return false;
+    }
+    magDev->init = dronecanMagDevInit;
+    magDev->read = dronecanMagDevRead;
+    return true;
+}
+#endif // ENABLE_DRONECAN
+
+void compassPreInit(void)
+{
+#ifdef USE_SPI
+    if (compassConfig()->mag_busType == BUS_TYPE_SPI) {
+        ioPreinitByTag(compassConfig()->mag_spi_csn, IOCFG_IPU, PREINIT_PIN_STATE_HIGH);
+    }
+#endif
+}
+
+#if !ENABLE_SIMULATOR
+static bool compassDetect(magDev_t *magDev, uint8_t *alignment)
+{
+    *alignment = MAG_ALIGN;
+
+    magSensor_e magHardware = MAG_NONE;
+
+#if ENABLE_DRONECAN
+    // Explicitly-selected only; never part of AUTO probing.
+    if (compassConfig()->mag_hardware == MAG_DRONECAN) {
+        if (dronecanMagDevDetect(magDev)) {
+            detectedSensors[SENSOR_INDEX_MAG] = MAG_DRONECAN;
+            sensorsSet(SENSOR_MAG);
+            return true;
+        }
+        return false;
+    }
+#endif
+
+    extDevice_t *dev = &magDev->dev;
+    // Associate magnetometer bus with its device
+    dev->bus = &magDev->bus;
+
+#ifdef USE_MAG_DATA_READY_SIGNAL
+    magDev->magIntExtiTag = compassConfig()->interruptTag;
+#endif
+
+    switch (compassConfig()->mag_busType) {
+#ifdef USE_I2C
+    case BUS_TYPE_I2C:
+        if (!i2cBusSetInstance(dev, compassConfig()->mag_i2c_device)) {
+            return false;
+        }
+        dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        break;
+#endif
+
+#ifdef USE_SPI
+    case BUS_TYPE_SPI:
+        {
+            if (!spiSetBusInstance(dev, compassConfig()->mag_spi_device)) {
+                return false;
+            }
+
+            dev->busType_u.spi.csnPin = IOGetByTag(compassConfig()->mag_spi_csn);
+        }
+        break;
+#endif
+
+#if defined(USE_MAG_AK8963) && (defined(USE_GYRO_SPI_MPU6500) || defined(USE_GYRO_SPI_MPU9250))
+    case BUS_TYPE_MPU_SLAVE:
+        {
+            if (gyroMpuDetectionResult()->sensor == MPU_9250_SPI) {
+                extDevice_t *masterDev = &gyroActiveDev()->dev;
+
+                dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+                dev->bus->busType = BUS_TYPE_MPU_SLAVE;
+                dev->bus->busType_u.mpuSlave.master = masterDev;
+            } else {
+                return false;
+            }
+        }
+        break;
+#endif
+
+    default:
+        return false;
+    }
+
+    switch (compassConfig()->mag_hardware) {
+    case MAG_DEFAULT:
+        FALLTHROUGH;
+
+    case MAG_HMC5883:
+#if defined(USE_MAG_HMC5883) || defined(USE_MAG_SPI_HMC5883)
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (hmc5883lDetect(magDev)) {
+            magHardware = MAG_HMC5883;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_LIS2MDL:
+#if defined(USE_MAG_LIS2MDL)
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (lis2mdlDetect(magDev)) {
+            magHardware = MAG_LIS2MDL;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_LIS3MDL:
+#if defined(USE_MAG_LIS3MDL)
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (lis3mdlDetect(magDev)) {
+            magHardware = MAG_LIS3MDL;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_AK8975:
+#ifdef USE_MAG_AK8975
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (ak8975Detect(magDev)) {
+            magHardware = MAG_AK8975;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_AK8963:
+#if defined(USE_MAG_AK8963) || defined(USE_MAG_SPI_AK8963)
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+        if (gyroMpuDetectionResult()->sensor == MPU_9250_SPI) {
+            dev->bus->busType = BUS_TYPE_MPU_SLAVE;
+            dev->busType_u.mpuSlave.address = compassConfig()->mag_i2c_address;
+            dev->bus->busType_u.mpuSlave.master = &gyroActiveDev()->dev;
+        }
+
+        if (ak8963Detect(magDev)) {
+            magHardware = MAG_AK8963;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_QMC5883L:
+#ifdef USE_MAG_QMC5883L
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (qmc5883lDetect(magDev)) {
+            magHardware = MAG_QMC5883L;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_QMC5883P:
+#ifdef USE_MAG_QMC5883P
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (qmc5883pDetect(magDev)) {
+            magHardware = MAG_QMC5883P;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_IST8310:
+#ifdef USE_MAG_IST8310
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (ist8310Detect(magDev)) {
+            magHardware = MAG_IST8310;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_MMC560X:
+#ifdef USE_MAG_MMC560X
+        if (dev->bus->busType == BUS_TYPE_I2C) {
+            dev->busType_u.i2c.address = compassConfig()->mag_i2c_address;
+        }
+
+        if (mmc560xDetect(magDev)) {
+            magHardware = MAG_MMC560X;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case MAG_NONE:
+        magHardware = MAG_NONE;
+        break;
+
+    default:
+        magHardware = MAG_NONE;
+        break;
+    }
+
+    // MAG_MPU925X_AK8963 is an MPU925x configured as I2C passthrough to the built-in AK8963 magnetometer
+    // Passthrough mode disables the gyro/acc part of the MPU, so we only want to detect this sensor if mag_hardware was explicitly set to MAG_MPU925X_AK8963
+#ifdef USE_MAG_MPU925X_AK8963
+    if (compassConfig()->mag_hardware == MAG_MPU925X_AK8963){
+        if (mpu925Xak8963CompassDetect(magDev)) {
+            magHardware = MAG_MPU925X_AK8963;
+        } else {
+            return false;
+        }
+    }
+#endif
 
     if (magHardware == MAG_NONE) {
         return false;
@@ -150,6 +452,23 @@ bool compassDetect(magDev_t *magDev, sensor_align_e *alignment)
     sensorsSet(SENSOR_MAG);
     return true;
 }
+#else
+static bool compassDetect(magDev_t *dev, sensor_align_e *alignment)
+{
+#if defined(USE_VIRTUAL_MAG)
+    *alignment = ALIGN_DEFAULT; // virtual mag data is already in the body frame
+    if (compassConfig()->mag_hardware != MAG_NONE && virtualMagDetect(dev)) {
+        detectedSensors[SENSOR_INDEX_MAG] = MAG_DEFAULT;
+        sensorsSet(SENSOR_MAG);
+        return true;
+    }
+#endif
+    UNUSED(dev);
+    UNUSED(alignment);
+
+    return false;
+}
+#endif // !ENABLE_SIMULATOR
 
 bool compassInit(void)
 {
@@ -161,55 +480,50 @@ bool compassInit(void)
         return false;
     }
 
-    //LED1_ON;
+    LED1_ON;
     magDev.init(&magDev);
-    //LED1_OFF;
-    magInit = 1;
-
-    #ifdef _USE_HW_CLI
-    cliAdd("qmc5883l", cliQmc5883l);
-    #endif
+    LED1_OFF;
 
     magDev.magAlignment = alignment;
 
-     if (compassConfig.mag_alignment != ALIGN_DEFAULT) {
-         magDev.magAlignment = compassConfig.mag_alignment;
-     }
+    if (compassConfig()->mag_alignment != ALIGN_DEFAULT) {
+        magDev.magAlignment = compassConfig()->mag_alignment;
+    }
 
-         // Custom alignments are applied via a transposed rotation matrix (matrixTrnVectorMul),
+    // Custom alignments are applied via a transposed rotation matrix (matrixTrnVectorMul),
     // which reverses rotation direction. Negate angles for mag so the resulting rotation
     // matches the user-entered convention and the standard CW alignments.
-    sensorAlignment_t magCustomAlignment = compassConfig.mag_customAlignment;
+    sensorAlignment_t magCustomAlignment = compassConfig()->mag_customAlignment;
     magCustomAlignment.roll = -magCustomAlignment.roll;
     magCustomAlignment.pitch = -magCustomAlignment.pitch;
     magCustomAlignment.yaw = -magCustomAlignment.yaw;
 
-    buildRotationMatrixFromAngles(&magDev.rotationMatrix, &compassConfig.mag_customAlignment);
+    buildRotationMatrixFromAngles(&magDev.rotationMatrix, &magCustomAlignment);
 
     compassBiasEstimatorInit(&compassBiasEstimator, LAMBDA_MIN, P0);
 
-//    if (magDev.magOdrHz) {
-    // For Mags that send data at a fixed ODR, we wait some quiet period after a read before checking for new data
-    // allow two re-check intervals, plus a margin for clock variations in mag vs FC
-    uint16_t odrInterval = (1000 * 1000) / 200;//magDev.magOdrHz;
-    compassReadIntervalUs =  odrInterval - (2 * COMPASS_RECHECK_INTERVAL_US) - (odrInterval / 20);
-//    } else {
-//        // Mags which have no specified ODR will be pinged at the compass task rate
-//        compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
-//    }
+    if (magDev.magOdrHz) {
+        // For Mags that send data at a fixed ODR, we wait some quiet period after a read before checking for new data
+        // allow two re-check intervals, plus a margin for clock variations in mag vs FC
+        uint16_t odrInterval = (1000 * 1000) / magDev.magOdrHz;
+        compassReadIntervalUs =  odrInterval - (2 * COMPASS_RECHECK_INTERVAL_US) - (odrInterval / 20);
+    } else {
+        // Mags which have no specified ODR will be pinged at the compass task rate
+        compassReadIntervalUs = TASK_PERIOD_HZ(TASK_COMPASS_RATE_HZ);
+    }
 
     return true;
 }
 
 bool compassEnabledAndCalibrated(void)
 {
-    return sensors(SENSOR_MAG) && (imuConfig.trust_mag) && (mag.magADC.x != 0) && (mag.magADC.y != 0) && (mag.magADC.z != 0);
+    return sensors(SENSOR_MAG) && (imuConfig()->trust_mag) && (mag.magADC.x != 0) && (mag.magADC.y != 0) && (mag.magADC.z != 0);
 }
 
 void compassStartCalibration(void)
 {
     // starting now, the user has CALIBRATION_WAIT_US to start moving the quad and trigger the actual calibration routine
-    //beeper(BEEPER_ACC_CALIBRATION); // Beep to alert user that calibration request was received
+    beeper(BEEPER_ACC_CALIBRATION); // Beep to alert user that calibration request was received
     magCalProcessActive = true;
     magCalEndTime = micros() + CALIBRATION_WAIT_US;
     didMovementStart = false;
@@ -229,7 +543,7 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
     previousTaskTimeUs = currentTimeUs;
     DEBUG_SET(DEBUG_MAG_TASK_RATE, 6, dTaskTimeUs);
 
-    bool checkBusBusy = busBusy();
+    bool checkBusBusy = busBusy(&magDev.dev, NULL);
     DEBUG_SET(DEBUG_MAG_TASK_RATE, 4, checkBusBusy);
     if (checkBusBusy) {
         // No action is taken, as the bus was busy.
@@ -246,22 +560,22 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
     }
 
     // if we get here, we have new data to parse
-  for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-      mag.magADC.v[axis] = magADCRaw[axis];
-  }
+    for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+        mag.magADC.v[axis] = magADCRaw[axis];
+    }
     // If debug_mode is DEBUG_GPS_RESCUE_HEADING, we should update the magYaw value, after which isNewMagADCFlag will be set false
     mag.isNewMagADCFlag = true;
 
-  if (magDev.magAlignment == ALIGN_CUSTOM) {
-      alignSensorViaMatrix(&mag.magADC, &magDev.rotationMatrix);
-  } else {
-      alignSensorViaRotation(&mag.magADC, magDev.magAlignment);
-  }
+    if (magDev.magAlignment == ALIGN_CUSTOM) {
+        alignSensorViaMatrix(&mag.magADC, &magDev.rotationMatrix);
+    } else {
+        alignSensorViaRotation(&mag.magADC, magDev.magAlignment);
+    }
 
     // get stored cal/bias values
-  flightDynamicsTrims_t *magZero = &compassConfig.magZero;
+    flightDynamicsTrims_t *magZero = &compassConfigMutable()->magZero;
 
-  // ** perform calibration, if initiated by switch or Configurator button **
+    // ** perform calibration, if initiated by switch or Configurator button **
     if (magCalProcessActive) {
         if (cmpTimeUs(magCalEndTime, currentTimeUs) > 0) {
                 // compare squared norm of rotation rate to GYRO_NORM_SQUARED_MIN
@@ -271,7 +585,7 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
             }
             if (!didMovementStart && gyroNormSquared > GYRO_NORM_SQUARED_MIN) {
                 // movement has started
-                //beeper(BEEPER_READY_BEEP); // Beep to alert user to start moving the quad (does this work?)
+                beeper(BEEPER_READY_BEEP); // Beep to alert user to start moving the quad (does this work?)
                 // zero the old cal/bias values
                 for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
                     magZero->raw[axis] = 0;
@@ -294,11 +608,11 @@ uint32_t compassUpdate(timeUs_t currentTimeUs)
                     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
                         magZero->raw[axis] = lrintf(compassBiasEstimator.b[axis]);
                     }
-                    //beeper(BEEPER_GYRO_CALIBRATED); // re-purpose gyro cal success beep
-                    //saveConfigAndNotify();
+                    beeper(BEEPER_GYRO_CALIBRATED); // re-purpose gyro cal success beep
+                    saveConfigAndNotify();
                 } else {
                     // there was no movement, and no new calibration values were saved
-                    //beeper(BEEPER_ACC_CALIBRATION_FAIL); // calibration fail beep
+                    beeper(BEEPER_ACC_CALIBRATION_FAIL); // calibration fail beep
                 }
                 // didMovementStart remains true until next run
                 // signal that the calibration process is finalised, whether successful or not, by setting end time to zero
@@ -447,55 +761,3 @@ void compassBiasEstimatorApply(compassBiasEstimator_t *cBE, vector3_t *mag)
     cBE->lambda = cBE->lambda_min + (1.0f - cBE->lambda_min) * sq(zn);
 }
 #endif // USE_MAG
-
-#ifdef _USE_HW_CLI
-void cliQmc5883l(cli_args_t *args)
-{
-  bool ret = false;
-
-if (args->argc == 1 && args->isStr(0, "compass_show") == true)
-{
-    uint32_t pre_time;
-    pre_time = millis();
-    while(cliKeepLoop())
-    {
-        if (millis()-pre_time >= 1000)
-        {
-            pre_time = millis();
-            // cliPrintf("acc x: %d, y: %d, z: %d\n\r", x, y, z);
-        }
-    }
-    ret = true;
-    }
-
-  if (args->argc == 3 && args->isStr(0, "mem_read") == true)
-  {
-    uint8_t ch;
-    uint8_t addr;
-
-    ch   = (uint8_t)args->getData(1);
-    addr = (uint8_t)args->getData(2);
-    addr |= 0x80;
-
-    ret = true;
-  }
-
-    if (args->argc == 4 && args->isStr(0, "mem_write") == true)
-  {
-    uint8_t ch;
-    uint8_t addr;
-
-    ch     = (uint8_t)args->getData(1);
-    addr   = (uint8_t)args->getData(2);
-
-    ret = true;
-  }
-
-  if (ret != true)
-  {
-    cliPrintf("qmc5883l show \n\r");
-    cliPrintf("qmc5883l mem_read ch0:1, addr \n\r");
-    cliPrintf("qmc5883l mem_write ch0:1, addr data \n\r");
-  }
-}
-#endif

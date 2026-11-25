@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_OPTICALFLOW
 
@@ -44,21 +44,21 @@
 
 #include "scheduler/scheduler.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
-//#include "drivers/time.h"
+#include "drivers/time.h"
 #include "drivers/rangefinder/rangefinder.h"
 #include "drivers/rangefinder/rangefinder_lidarmt.h"
 #ifdef USE_RANGEFINDER_UPT1
 #include "drivers/rangefinder/rangefinder_upt1.h"
 #endif
 
-//#include "io/beeper.h"
+#include "io/beeper.h"
 
 #include "sensors/sensors.h"
 #include "sensors/gyro.h"
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/opticalflow.h"
 
 #define OPTICALFLOW_CALIBRATION_DURATION_MS 30000
@@ -71,15 +71,14 @@
 static void applySensorRotation(vector2_t * dst, vector2_t * src);
 static void applyLPF(vector2_t * flowRates);
 
-opticalflowConfig_t opticalflowConfig;
+PG_REGISTER_WITH_RESET_TEMPLATE(opticalflowConfig_t, opticalflowConfig, PG_OPTICALFLOW_CONFIG, 1);
 
-void opticalflowConfig_Init(void)
-{
-    opticalflowConfig.opticalflow_hardware = OPTICALFLOW_NONE;
-    opticalflowConfig.rotation = 0;
-    opticalflowConfig.flip_x = 0;
-    opticalflowConfig.flow_lpf = 100;
-}
+PG_RESET_TEMPLATE(opticalflowConfig_t, opticalflowConfig,
+    .opticalflow_hardware = OPTICALFLOW_NONE,
+    .rotation = 0,
+    .flip_x = 0,
+    .flow_lpf = 100
+);
 
 static opticalflow_t opticalflow;
 static float cosRotAngle = 1.0f;
@@ -136,7 +135,7 @@ static bool opticalflowDetect(opticalflowDev_t * dev, uint8_t opticalflowHardwar
 }
 
 bool opticalflowInit(void) {
-    if (!opticalflowDetect(&opticalflow.dev, opticalflowConfig.opticalflow_hardware)) {
+    if (!opticalflowDetect(&opticalflow.dev, opticalflowConfig()->opticalflow_hardware)) {
         return false;
     }
 
@@ -148,11 +147,11 @@ bool opticalflowInit(void) {
     opticalflow.processedFlowRates.y = 0;
     opticalflow.timeStampUs = micros();
 
-    cosRotAngle = cosf(DEGREES_TO_RADIANS(opticalflowConfig.rotation));
-    sinRotAngle = sinf(DEGREES_TO_RADIANS(opticalflowConfig.rotation));
+    cosRotAngle = cosf(DEGREES_TO_RADIANS(opticalflowConfig()->rotation));
+    sinRotAngle = sinf(DEGREES_TO_RADIANS(opticalflowConfig()->rotation));
     //low pass filter
-    if (opticalflowConfig.flow_lpf != 0) {
-        const float flowCutoffHz = (float)opticalflowConfig.flow_lpf / 100.0f;
+    if (opticalflowConfig()->flow_lpf != 0) {
+        const float flowCutoffHz = (float)opticalflowConfig()->flow_lpf / 100.0f;
         const float flowGain     = pt2FilterGain(flowCutoffHz, opticalflow.dev.delayMs / 1000.0f);
 
         pt2FilterInit(&xFlowLpf, flowGain);
@@ -164,7 +163,7 @@ bool opticalflowInit(void) {
 void opticalflowUpdate(void) {
     if (opticalflow.dev.update) {
         opticalflow.dev.update(&opticalflow.dev);
-                }
+    }
 }
 
 void opticalflowProcess(void) {
@@ -221,7 +220,7 @@ void opticalflowProcess(void) {
         DEBUG_SET(DEBUG_OPTICALFLOW, 4, lrintf(processed.x * 1000));
         DEBUG_SET(DEBUG_OPTICALFLOW, 5, lrintf(processed.y * 1000));
 
-				applyLPF(&processed);
+        applyLPF(&processed);
 
         DEBUG_SET(DEBUG_OPTICALFLOW, 6, lrintf(processed.x * 1000));
         DEBUG_SET(DEBUG_OPTICALFLOW, 7, lrintf(processed.y * 1000));
@@ -233,12 +232,12 @@ void opticalflowProcess(void) {
 }
 
 static void applySensorRotation(vector2_t * dst, vector2_t * src) {
-    dst->x = (opticalflowConfig.flip_x ? -1.0f : 1.0f) * (src->x * cosRotAngle - src->y * sinRotAngle);
+    dst->x = (opticalflowConfig()->flip_x ? -1.0f : 1.0f) * (src->x * cosRotAngle - src->y * sinRotAngle);
     dst->y = src->x * sinRotAngle + src->y * cosRotAngle;
 }
 
 static void applyLPF(vector2_t * flowRates) {
-    if (opticalflowConfig.flow_lpf == 0) {
+    if (opticalflowConfig()->flow_lpf == 0) {
         return;
     }
 

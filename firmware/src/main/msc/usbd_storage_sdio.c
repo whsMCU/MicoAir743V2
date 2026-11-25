@@ -35,13 +35,13 @@
 
 #include "common/utils.h"
 
-//#include "drivers/io.h"
-//#include "drivers/light_led.h"
+#include "drivers/io.h"
+#include "drivers/light_led.h"
 #include "drivers/sdcard.h"
 #include "drivers/sdmmc_sdio.h"
 #include "drivers/usb_msc.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 #include "pg/sdcard.h"
 
 #include "usbd_storage.h"
@@ -124,9 +124,9 @@ USBD_MSC_StorageType USBD_MSC_MICRO_SDIO_fops =
 static int8_t STORAGE_Init (uint8_t lun)
 {
     //Initialize SD_DET
-//    const IO_t sd_det = IOGetByTag(sdcardConfig()->cardDetectTag);
-//    IOInit(sd_det, OWNER_SDCARD_DETECT, 0);
-//    IOConfigGPIO(sd_det, IOCFG_IPU);
+    const IO_t sd_det = IOGetByTag(sdcardConfig()->cardDetectTag);
+    IOInit(sd_det, OWNER_SDCARD_DETECT, 0);
+    IOConfigGPIO(sd_det, IOCFG_IPU);
 
     UNUSED(lun);
     LED0_OFF;

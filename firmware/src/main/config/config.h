@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef enum {
     CONFIGURATION_STATE_UNCONFIGURED = 0,
@@ -45,8 +45,7 @@ typedef struct systemConfig_s {
     uint8_t activeBatteryProfile;
 } systemConfig_t;
 
-extern systemConfig_t systemConfig;
-void systemConfig_Init(void);
+PG_DECLARE(systemConfig_t, systemConfig);
 
 struct pidProfile_s;
 extern struct pidProfile_s *currentPidProfile;

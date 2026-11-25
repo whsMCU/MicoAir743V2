@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stdbool.h>
@@ -20,7 +23,9 @@
 #include <string.h>
 #include <math.h>
 
-//#include <platform.h>
+#include "platform.h"
+
+#ifdef USE_RANGEFINDER
 
 #include "build/build_config.h"
 #include "build/debug.h"
@@ -32,9 +37,9 @@
 #include "config/config.h"
 #include "config/feature.h"
 
-//#include "drivers/io.h"
+#include "drivers/io.h"
 #include "drivers/rangefinder/rangefinder.h"
-//#include "drivers/rangefinder/rangefinder_hcsr04.h"
+#include "drivers/rangefinder/rangefinder_hcsr04.h"
 #include "drivers/rangefinder/rangefinder_lidartf.h"
 #include "drivers/rangefinder/rangefinder_lidarmt.h"
 #include "drivers/rangefinder/rangefinder_nooploop.h"
@@ -43,8 +48,8 @@
 
 #include "fc/runtime_config.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "scheduler/scheduler.h"
 
@@ -68,14 +73,20 @@ rangefinder_t rangefinder;
 #define RANGEFINDER_DYNAMIC_THRESHOLD           600     //Used to determine max. usable rangefinder disatance
 #define RANGEFINDER_DYNAMIC_FACTOR              75
 
-#ifdef USE_RANGEFINDER
+PG_REGISTER_WITH_RESET_TEMPLATE(rangefinderConfig_t, rangefinderConfig, PG_RANGEFINDER_CONFIG, 0);
 
-rangefinderConfig_t rangefinderConfig;
+PG_RESET_TEMPLATE(rangefinderConfig_t, rangefinderConfig,
+    .rangefinder_hardware = RANGEFINDER_NONE,
+);
 
-void rangefinder_Init(void)
-{
-  rangefinderConfig.rangefinder_hardware = RANGEFINDER_NONE;
-}
+#ifdef USE_RANGEFINDER_HCSR04
+PG_REGISTER_WITH_RESET_TEMPLATE(sonarConfig_t, sonarConfig, PG_SONAR_CONFIG, 1);
+
+PG_RESET_TEMPLATE(sonarConfig_t, sonarConfig,
+    .triggerTag = IO_TAG(RANGEFINDER_HCSR04_TRIGGER_PIN),
+    .echoTag = IO_TAG(RANGEFINDER_HCSR04_ECHO_PIN),
+);
+#endif
 
 /*
  * Detect which rangefinder is present
@@ -173,7 +184,7 @@ void rangefinderResetDynamicThreshold(void)
 
 bool rangefinderInit(void)
 {
-    if (!rangefinderDetect(&rangefinder.dev, rangefinderConfig.rangefinder_hardware)) {
+    if (!rangefinderDetect(&rangefinder.dev, rangefinderConfig()->rangefinder_hardware)) {
         return false;
     }
 

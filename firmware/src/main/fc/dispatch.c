@@ -22,11 +22,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/utils.h"
 
-#include "common/time.h"
+#include "drivers/time.h"
 
 #include "fc/dispatch.h"
 

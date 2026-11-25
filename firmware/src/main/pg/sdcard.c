@@ -25,15 +25,15 @@
 
 #ifdef USE_SDCARD
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "sdcard.h"
-//#include "drivers/bus_spi.h"
+#include "drivers/bus_spi.h"
 #include "drivers/sdio.h"
-//#include "drivers/io.h"
-//#include "drivers/dma.h"
-//#include "drivers/dma_reqmap.h"
+#include "drivers/io.h"
+#include "drivers/dma.h"
+#include "drivers/dma_reqmap.h"
 
 #ifdef USE_SDCARD_SPI
 #ifndef SDCARD_SPI_INSTANCE
@@ -45,7 +45,7 @@
 #endif // USE_SDCARD_SPI
 
 #ifndef SDCARD_DETECT_PIN
-//#define SDCARD_DETECT_PIN NONE
+#define SDCARD_DETECT_PIN NONE
 #endif
 
 #ifdef SDCARD_DETECT_INVERTED
@@ -54,43 +54,43 @@
 #define SDCARD_DETECT_IS_INVERTED 0
 #endif
 
-sdcardConfig_t sdcardConfig;
+PG_REGISTER_WITH_RESET_FN(sdcardConfig_t, sdcardConfig, PG_SDCARD_CONFIG, 2);
 
-void sdcardConfig_Init(void)
+void pgResetFn_sdcardConfig(sdcardConfig_t *config)
 {
-	sdcardConfig.cardDetectTag = 0;//IO_TAG(SDCARD_DETECT_PIN);
-	sdcardConfig.cardDetectInverted = SDCARD_DETECT_IS_INVERTED;
+    config->cardDetectTag = IO_TAG(SDCARD_DETECT_PIN);
+    config->cardDetectInverted = SDCARD_DETECT_IS_INVERTED;
 
     // We can safely handle SPI and SDIO cases separately on custom targets, as these are exclusive per target.
     // On generic targets, SPI has precedence over SDIO; SDIO must be post-flash configured.
-	sdcardConfig.device = 0;//SPI_DEV_TO_CFG(SPIINVALID);
+    config->device = SPI_DEV_TO_CFG(SPIINVALID);
 
 #ifdef CONFIG_IN_SDCARD
     // CONFIG_ID_SDDCARD requires a default mode.
 #if defined(USE_SDCARD_SDIO)
-	sdcardConfig.mode = SDCARD_MODE_SDIO;
+    config->mode = SDCARD_MODE_SDIO;
 #elif defined(USE_SDCARD_SPI)
-	sdcardConfig.mode = SDCARD_MODE_SPI;
+    config->mode = SDCARD_MODE_SPI;
 #endif
 #else
-	sdcardConfig.mode = SDCARD_MODE_NONE;
+    config->mode = SDCARD_MODE_NONE;
 #endif
 
 #ifdef USE_SDCARD_SPI
     // These settings do not work for Unified Targets
     // They are only left in place to support legacy targets
     const spiDevice_e spidevice = spiDeviceByInstance((const spiResource_t *)SDCARD_SPI_INSTANCE);
-    sdcardConfig.device = SPI_DEV_TO_CFG(spidevice);
-    sdcardConfig.chipSelectTag = IO_TAG(SDCARD_SPI_CS_PIN);
+    config->device = SPI_DEV_TO_CFG(spidevice);
+    config->chipSelectTag = IO_TAG(SDCARD_SPI_CS_PIN);
 
     if (spidevice != SPIINVALID && config->chipSelectTag) {
-    	sdcardConfig.mode = SDCARD_MODE_SPI;
+        config->mode = SDCARD_MODE_SPI;
     }
 #endif
 
 #if defined(USE_SDCARD_SDIO) && defined(SDIO_DEVICE)
     if (SDIO_DEVICE != SDIOINVALID) {
-    	sdcardConfig.mode = SDCARD_MODE_SDIO;
+        config->mode = SDCARD_MODE_SDIO;
     }
 #endif
 }

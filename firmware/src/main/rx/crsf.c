@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_SERIALRX_CRSF
 
@@ -36,15 +36,15 @@
 
 #include "config/config.h"
 
-//#include "pg/rx.h"
+#include "pg/rx.h"
 
-//#include "drivers/persistent.h"
-//#include "drivers/serial.h"
-//#include "drivers/serial_uart.h"
-//#include "drivers/system.h"
-//#include "drivers/time.h"
+#include "drivers/persistent.h"
+#include "drivers/serial.h"
+#include "drivers/serial_uart.h"
+#include "drivers/system.h"
+#include "drivers/time.h"
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
 #include "rx/rx.h"
 #include "rx/crsf.h"
@@ -70,7 +70,7 @@ STATIC_UNIT_TESTED crsfFrame_t crsfFrame;
 STATIC_UNIT_TESTED crsfFrame_t crsfChannelDataFrame;
 STATIC_UNIT_TESTED uint32_t crsfChannelData[CRSF_MAX_CHANNEL];
 
-//static serialPort_t *serialPort;
+static serialPort_t *serialPort;
 static timeUs_t crsfFrameStartAtUs = 0;
 static uint8_t telemetryBuf[CRSF_FRAME_SIZE_MAX];
 static uint8_t telemetryBufLen = 0;
@@ -358,7 +358,7 @@ static bool crsfFrameLengthIsValid(void)
 }
 
 // Receive ISR callback, called back from serial port
-void crsfDataReceive(uint16_t c, void *data)
+STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
 {
     rxRuntimeState_t *const rxRuntimeState = (rxRuntimeState_t *const)data;
 
@@ -369,7 +369,7 @@ void crsfDataReceive(uint16_t c, void *data)
     const timeUs_t currentTimeUs = microsISR();
 
 #ifdef DEBUG_CRSF_PACKETS
-    //debug[2] = currentTimeUs - crsfFrameStartAtUs;
+    debug[2] = currentTimeUs - crsfFrameStartAtUs;
 #endif
 
     if (cmpTimeUs(currentTimeUs, crsfFrameStartAtUs) > frameTimeNeededUs) {
@@ -644,7 +644,9 @@ void crsfRxSendTelemetryData(void)
 {
     // if there is telemetry data to write
     if (telemetryBufLen > 0) {
-        serialWriteBuf(_DEF_UART6, telemetryBuf, telemetryBufLen);
+        if (serialPort != NULL) {
+            serialWriteBuf(serialPort, telemetryBuf, telemetryBufLen);
+        }
         telemetryBufLen = 0; // reset telemetry buffer
     }
 }
@@ -654,21 +656,35 @@ bool crsfRxIsTelemetryBufEmpty(void)
     return telemetryBufLen == 0;
 }
 
-bool crsfRxInit(rxRuntimeState_t *rxRuntimeState)
+bool crsfRxInit(const rxConfig_t *rxConfig, rxRuntimeState_t *rxRuntimeState)
 {
     for (int ii = 0; ii < CRSF_MAX_CHANNEL; ++ii) {
-        crsfChannelData[ii] = (16 * rxConfig.midrc) / 10 - 1408;
+        crsfChannelData[ii] = (16 * rxConfig->midrc) / 10 - 1408;
     }
 
     rxRuntimeState->channelCount = CRSF_MAX_CHANNEL;
     rxRuntimeState->rcReadRawFn = crsfReadRawRC;
     rxRuntimeState->rcFrameStatusFn = crsfFrameStatus;
 
+    const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_RX_SERIAL);
+    if (!portConfig) {
+        return false;
+    }
+
     uint32_t crsfBaudrate = CRSF_BAUDRATE;
-    #if defined(USE_CRSF_V3)
+
+#if defined(USE_CRSF_V3)
     crsfBaudrate = rxConfig->crsf_use_negotiated_baud ? getCrsfCachedBaudrate() : CRSF_BAUDRATE;
 #endif
-    uartOpen(_DEF_UART6, crsfBaudrate);
+
+    serialPort = openSerialPort(portConfig->identifier,
+        FUNCTION_RX_SERIAL,
+        crsfDataReceive,
+        rxRuntimeState,
+        crsfBaudrate,
+        CRSF_PORT_MODE,
+        CRSF_PORT_OPTIONS | (rxConfig->serialrx_inverted ? SERIAL_INVERTED : 0)
+        );
 
     if (rssiSource == RSSI_SOURCE_NONE) {
         rssiSource = RSSI_SOURCE_RX_PROTOCOL_CRSF;
@@ -678,7 +694,8 @@ bool crsfRxInit(rxRuntimeState_t *rxRuntimeState)
         linkQualitySource = LQ_SOURCE_RX_PROTOCOL_CRSF;
     }
 #endif
-    return true;
+
+    return serialPort != NULL;
 }
 
 #if defined(USE_CRSF_V3)
@@ -719,22 +736,24 @@ bool crsfRxUseNegotiatedBaud(void)
 
 bool crsfRxIsActive(void)
 {
-    return true;
+    return serialPort != NULL;
 }
 
 void crsfRxBind(void)
 {
-		uint8_t bindFrame[] = {
-				CRSF_SYNC_BYTE,
-				0x07,  // frame length
-				CRSF_FRAMETYPE_COMMAND,
-				CRSF_ADDRESS_CRSF_RECEIVER,
-				CRSF_ADDRESS_FLIGHT_CONTROLLER,
-				CRSF_COMMAND_SUBCMD_RX,
-				CRSF_COMMAND_SUBCMD_RX_BIND,
-				0x9E,  // Command CRC8
-				0xE8,  // Packet CRC8
-		};
-		serialWriteBuf(_DEF_UART6, bindFrame, 9);
+    if (serialPort != NULL) {
+        uint8_t bindFrame[] = {
+            CRSF_SYNC_BYTE,
+            0x07,  // frame length
+            CRSF_FRAMETYPE_COMMAND,
+            CRSF_ADDRESS_CRSF_RECEIVER,
+            CRSF_ADDRESS_FLIGHT_CONTROLLER,
+            CRSF_COMMAND_SUBCMD_RX,
+            CRSF_COMMAND_SUBCMD_RX_BIND,
+            0x9E,  // Command CRC8
+            0xE8,  // Packet CRC8
+        };
+        serialWriteBuf(serialPort, bindFrame, 9);
+    }
 }
 #endif

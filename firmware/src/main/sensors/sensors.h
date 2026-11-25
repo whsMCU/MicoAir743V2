@@ -1,16 +1,26 @@
 /*
- * sensor.h
+ * This file is part of Cleanflight and Betaflight.
  *
- *  Created on: 2020. 12. 20.
- *      Author: WANG
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SRC_COMMON_CORE_SENSOR_H_
-#define SRC_COMMON_CORE_SENSOR_H_
+#pragma once
 
-#include "hw.h"
-
-#define GYRO_COUNT 2
+#include "platform.h"
 
 typedef enum {
     SENSOR_INDEX_GYRO = 0,
@@ -49,41 +59,13 @@ typedef enum {
     SENSOR_OPTICALFLOW = 1 << 7
 } sensors_e;
 
-// Type of accelerometer used/detected
-// Acc hardware types were updated in PR #14087 (removed ACC_ADXL345, ACC_MMA8452, ACC_BMA280, ACC_LSM303DLHC)
-typedef enum {
-    ACC_DEFAULT,
-    ACC_NONE,
-    ACC_MPU6050,
-    ACC_MPU6000,
-    ACC_MPU6500,
-    ACC_MPU9250,
-    ACC_ICM20601,
-    ACC_ICM20602,
-    ACC_ICM20608G,
-    ACC_ICM20649,
-    ACC_ICM20689,
-    ACC_ICM42605,
-    ACC_ICM42688P,
-    ACC_BMI160,
-    ACC_BMI270,
-    ACC_LSM6DSO,
-    ACC_LSM6DSV16X,
-    ACC_IIM42653,
-    ACC_ICM45605,
-    ACC_ICM45686,
-    ACC_ICM40609D,
-    ACC_IIM42652,
-    ACC_LSM6DSK320X,
-    ACC_ICM42622P,
-    ACC_ICM42686P,
-    ACC_ICM56686,
-    ACC_VIRTUAL,
-    ACC_HARDWARE_COUNT
-} accelerationSensor_e;
+extern const char * const lookupTableGyroHardware[];
+extern const char * const lookupTableAccHardware[];
+extern const char * const lookupTableBaroHardware[];
+extern const char * const lookupTableMagHardware[];
+extern const char * const lookupTableRangefinderHardware[];
+extern const char * const lookupTableOpticalflowHardware[];
 
-bool Sensor_Init(void);
-
-
-
-#endif /* SRC_COMMON_CORE_SENSOR_H_ */
+const char * const *sensorHardwareNames(sensorIndex_e sensor, int *count);
+sensorIndex_e sensorIndexFromName(const char *name);
+const char *sensorTypeName(sensorIndex_e sensor);

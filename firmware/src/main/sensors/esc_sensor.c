@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if defined(USE_ESC_SENSOR)
 
@@ -32,27 +32,26 @@
 #include "common/time.h"
 
 #include "config/feature.h"
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
-//#include "pg/motor.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
+#include "pg/motor.h"
 
 #include "common/maths.h"
 #include "common/utils.h"
 
-//#include "drivers/timer.h"
+#include "drivers/timer.h"
 #include "drivers/motor.h"
-//#include "drivers/dshot.h"
-//#include "drivers/dshot_dpwm.h"
-//#include "drivers/serial.h"
-//#include "drivers/serial_uart.h"
+#include "drivers/dshot.h"
+#include "drivers/serial.h"
+#include "drivers/serial_uart.h"
 
 #include "esc_sensor.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 
-//#include "flight/mixer.h"
+#include "flight/mixer.h"
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
 /*
 KISS ESC TELEMETRY PROTOCOL
@@ -73,17 +72,11 @@ Byte 9: 8-bit CRC
 
 */
 
-//PG_REGISTER_WITH_RESET_TEMPLATE(escSensorConfig_t, escSensorConfig, PG_ESC_SENSOR_CONFIG, 0);
-//
-//PG_RESET_TEMPLATE(escSensorConfig_t, escSensorConfig,
-//        .halfDuplex = 0
-//);
+PG_REGISTER_WITH_RESET_TEMPLATE(escSensorConfig_t, escSensorConfig, PG_ESC_SENSOR_CONFIG, 0);
 
-escSensorConfig_t escSensorConfig;
-
-void escSensorConfig_Init(void){
-  escSensorConfig.halfDuplex = 0;
-}
+PG_RESET_TEMPLATE(escSensorConfig_t, escSensorConfig,
+        .halfDuplex = 0
+);
 
 /*
 DEBUG INFORMATION
@@ -123,7 +116,7 @@ static volatile uint8_t *buffer;
 static volatile uint8_t bufferSize = 0;
 static volatile uint8_t bufferPosition = 0;
 
-//static serialPort_t *escSensorPort = NULL;
+static serialPort_t *escSensorPort = NULL;
 
 static escSensorData_t escSensorData[MAX_SUPPORTED_MOTORS];
 
@@ -154,9 +147,9 @@ static bool isFrameComplete(void)
     return bufferPosition == bufferSize;
 }
 
-static bool isEscSensorActive(void)
+LOCAL_UNUSED_FUNCTION static bool isEscSensorActive(void)
 {
-    return true;//escSensorPort != NULL;
+    return escSensorPort != NULL;
 }
 
 escSensorData_t *getEscSensorData(uint8_t motorNumber)
@@ -199,6 +192,45 @@ escSensorData_t *getEscSensorData(uint8_t motorNumber)
     }
 }
 
+#if ENABLE_DRONECAN_ESC
+// External telemetry feed (e.g. DroneCAN esc.Status). Lets an out-of-band
+// source publish into the same escSensorData[] store the serial KISS decoder
+// uses, so every consumer (battery, OSD, telemetry, MSP, blackbox) reads it
+// through getEscSensorData() unchanged. Values use the escSensorData_t units:
+// temperature °C, voltage 0.01V, current 0.01A, consumption mAh, rpm eRPM/100.
+void escSensorSetExternal(uint8_t motorIndex, const escSensorData_t *data)
+{
+    if (motorIndex >= MAX_SUPPORTED_MOTORS || data == NULL) {
+        return;
+    }
+    escSensorData[motorIndex] = *data;
+    escSensorData[motorIndex].dataAge = 0;
+    combinedDataNeedsUpdate = true;
+}
+
+// Mark every slot invalid. Called by the external source at init so a consumer
+// that polls before the first frame arrives sees ESC_DATA_INVALID rather than
+// a zero-filled "valid" reading.
+void escSensorExternalInit(void)
+{
+    for (int i = 0; i < MAX_SUPPORTED_MOTORS; i++) {
+        escSensorData[i].dataAge = ESC_DATA_INVALID;
+    }
+}
+
+// Age a single slot towards ESC_DATA_INVALID. The external source calls this on
+// its own cadence for motors it hasn't heard from, mirroring increaseDataAge()
+// for the serial path.
+void escSensorExternalAge(uint8_t motorIndex)
+{
+    if (motorIndex < MAX_SUPPORTED_MOTORS
+            && escSensorData[motorIndex].dataAge < ESC_DATA_INVALID) {
+        escSensorData[motorIndex].dataAge++;
+        combinedDataNeedsUpdate = true;
+    }
+}
+#endif // ENABLE_DRONECAN_ESC
+
 // Receive ISR callback
 static void escSensorDataReceive(uint16_t c, void *data)
 {
@@ -216,18 +248,21 @@ static void escSensorDataReceive(uint16_t c, void *data)
 
 bool escSensorInit(void)
 {
-    //portOptions_e options = SERIAL_NOT_INVERTED  | (escSensorConfig()->halfDuplex ? SERIAL_BIDIR : 0);
+    const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_ESC_SENSOR);
+    if (!portConfig) {
+        return false;
+    }
+
+    portOptions_e options = SERIAL_NOT_INVERTED  | (escSensorConfig()->halfDuplex ? SERIAL_BIDIR : 0);
 
     // Initialize serial port
-    //escSensorPort = openSerialPort(portConfig->identifier, FUNCTION_ESC_SENSOR, escSensorDataReceive, NULL, ESC_SENSOR_BAUDRATE, MODE_RX, options);
-
-    uartOpen(_DEF_UART7, ESC_SENSOR_BAUDRATE);
+    escSensorPort = openSerialPort(portConfig->identifier, FUNCTION_ESC_SENSOR, escSensorDataReceive, NULL, ESC_SENSOR_BAUDRATE, MODE_RX, options);
 
     for (int i = 0; i < MAX_SUPPORTED_MOTORS; i = i + 1) {
         escSensorData[i].dataAge = ESC_DATA_INVALID;
     }
 
-    return uartIsConnected(_DEF_UART7);//escSensorPort != NULL;
+    return escSensorPort != NULL;
 }
 
 static uint8_t updateCrc8(uint8_t crc, uint8_t crc_seed)
@@ -275,7 +310,7 @@ static uint8_t decodeEscFrame(void)
         frameStatus = ESC_SENSOR_FRAME_COMPLETE;
 
         if (escSensorMotor < 4) {
-            //DEBUG_SET(DEBUG_ESC_SENSOR_RPM, escSensorMotor, lrintf(erpmToRpm(escSensorData[escSensorMotor].rpm) / 10.0f)); // output actual rpm/10 to fit in 16bit signed.
+            DEBUG_SET(DEBUG_ESC_SENSOR_RPM, escSensorMotor, lrintf(erpmToRpm(escSensorData[escSensorMotor].rpm) / 10.0f)); // output actual rpm/10 to fit in 16bit signed.
             DEBUG_SET(DEBUG_ESC_SENSOR_TMP, escSensorMotor, escSensorData[escSensorMotor].temperature);
         }
     } else {
@@ -308,7 +343,7 @@ void escSensorProcess(timeUs_t currentTimeUs)
 {
     const timeMs_t currentTimeMs = currentTimeUs / 1000;
 
-    if (!uartIsConnected(_DEF_UART7) || !motorIsEnabled()) {
+    if (!escSensorPort || !motorIsEnabled()) {
         return;
     }
 
@@ -324,8 +359,7 @@ void escSensorProcess(timeUs_t currentTimeUs)
             escTriggerTimestamp = currentTimeMs;
 
             startEscDataRead(telemetryBuffer, TELEMETRY_FRAME_SIZE);
-            //motorDmaOutput_t * const motor = getMotorDmaOutput(escSensorMotor);
-            //motor->protocolControl.requestTelemetry = true;
+            motorRequestTelemetry(escSensorMotor);
             escSensorTriggerState = ESC_SENSOR_TRIGGER_PENDING;
 
             DEBUG_SET(DEBUG_ESC_SENSOR, DEBUG_ESC_MOTOR_INDEX, escSensorMotor + 1);

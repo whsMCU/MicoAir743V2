@@ -22,7 +22,7 @@
 
 #include "common/crc.h"
 
-#include "hw.h"
+#include "platform.h"
 
 #include "streambuf.h"
 

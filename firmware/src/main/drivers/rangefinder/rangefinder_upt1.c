@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_RANGEFINDER_UPT1
 

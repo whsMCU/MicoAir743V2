@@ -1,15 +1,26 @@
 /*
- * failsafe.h
+ * This file is part of Cleanflight and Betaflight.
  *
- *  Created on: Nov 1, 2024
- *      Author: WANG
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SRC_MAIN_FLIGHT_FAILSAFE_H_
-#define SRC_MAIN_FLIGHT_FAILSAFE_H_
+#pragma once
 
-#include "hw.h"
-#include "rx/rx.h"
+#include "pg/pg.h"
 
 #define FAILSAFE_POWER_ON_DELAY_US (1000 * 1000 * 5)
 #define MILLIS_PER_TENTH_SECOND      100
@@ -31,7 +42,7 @@ typedef struct failsafeConfig_s {
     uint8_t failsafe_stick_threshold;       // Stick deflection percentage to exit GPS Rescue procedure
 } failsafeConfig_t;
 
-extern failsafeConfig_t failsafeConfig;
+PG_DECLARE(failsafeConfig_t, failsafeConfig);
 
 typedef enum {
     FAILSAFE_IDLE = 0,
@@ -41,10 +52,7 @@ typedef enum {
     FAILSAFE_RX_LOSS_MONITORING,
     FAILSAFE_RX_LOSS_RECOVERED,
     FAILSAFE_GPS_RESCUE,
-    FAILSAFE_AUTOPILOT,      // continuing an autopilot mission under rx loss (ap_rx_loss_policy = CONTINUE)
-	FAILSAFE_RX_SWITCH,
-	FAILSAFE_BATTERY_LOW,
-	FAILSAFE_LOOP_TIME
+    FAILSAFE_AUTOPILOT      // continuing an autopilot mission under rx loss (ap_rx_loss_policy = CONTINUE)
 } failsafePhase_e;
 
 typedef enum {
@@ -90,8 +98,6 @@ typedef struct failsafeState_s {
 } failsafeState_t;
 
 void failsafeInit(void);
-void failsafeConfig_Init(void);
-void failsafeConfig_Init(void);
 void failsafeReset(void);
 
 void failsafeStartMonitoring(void);
@@ -106,6 +112,3 @@ void failsafeOnRxSuspend(uint32_t suspendPeriod);
 void failsafeOnRxResume(void);
 void failsafeOnValidDataReceived(void);
 void failsafeOnValidDataFailed(void);
-
-
-#endif /* SRC_MAIN_FLIGHT_FAILSAFE_H_ */

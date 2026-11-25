@@ -24,9 +24,9 @@
 #include <string.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
-//#include "blackbox/blackbox.h"
+#include "blackbox/blackbox.h"
 
 #include "build/build_config.h"
 
@@ -35,33 +35,32 @@
 
 #include "config/feature.h"
 
-//#include "drivers/camera_control.h"
+#include "drivers/camera_control.h"
 
 #include "config/config.h"
 #include "fc/core.h"
 #include "fc/rc.h"
 #include "fc/runtime_config.h"
-#include "fc/rc_modes.h"
 
 #include "flight/pid.h"
 #include "flight/failsafe.h"
 
-//#include "io/beeper.h"
-//#include "io/usb_cdc_hid.h"
-//#include "io/dashboard.h"
-//#include "io/gimbal_control.h"
+#include "io/beeper.h"
+#include "io/usb_cdc_hid.h"
+#include "io/dashboard.h"
+#include "io/gimbal_control.h"
 #include "io/gps.h"
-//#include "io/vtx_control.h"
+#include "io/vtx_control.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
-//#include "pg/rx.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
+#include "pg/rx.h"
 
 #include "rx/rx.h"
 
 #include "scheduler/scheduler.h"
 
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/barometer.h"
 #include "sensors/battery.h"
 #include "sensors/compass.h"
@@ -73,37 +72,34 @@
 static bool isUsingSticksToArm = true;
 static bool disarmUserRequested = false; // has the user requested a disarm, using either sticks or switches, whether armed or disarmed
 
-
 float rcCommand[4];           // interval [1000;2000] for THROTTLE and [-500;+500] for ROLL/PITCH/YAW
 
-rcControlsConfig_t rcControlsConfig;
-void rcControlsConfig_Init(void)
-{
-	rcControlsConfig.deadband = 5;
-	rcControlsConfig.yaw_deadband = 5;
-	rcControlsConfig.yaw_control_reversed = true;
-}
+PG_REGISTER_WITH_RESET_TEMPLATE(rcControlsConfig_t, rcControlsConfig, PG_RC_CONTROLS_CONFIG, 1);
 
-armingConfig_t armingConfig;
-void armingConfig_Init(void)
-{
-	armingConfig.gyro_cal_on_first_arm = 0;  // TODO - Cleanup retarded arm support
-	armingConfig.auto_disarm_delay = 5;
-    armingConfig.prearm_allow_rearm = 0;
-}
+PG_RESET_TEMPLATE(rcControlsConfig_t, rcControlsConfig,
+    .deadband = 0,
+    .yaw_deadband = 0,
+    .yaw_control_reversed = false,
+);
 
-flight3DConfig_t flight3DConfig;
-void flight3DConfig_Init(void)
-{
-	flight3DConfig.deadband3d_low = 1406;
-	flight3DConfig.deadband3d_high = 1514;
-	flight3DConfig.neutral3d = 1460;
-	flight3DConfig.deadband3d_throttle = 50;
-	flight3DConfig.limit3d_low = 1000;
-	flight3DConfig.limit3d_high = 2000;
-	flight3DConfig.switched_mode3d = false;
-}
+PG_REGISTER_WITH_RESET_TEMPLATE(armingConfig_t, armingConfig, PG_ARMING_CONFIG, 2);
 
+PG_RESET_TEMPLATE(armingConfig_t, armingConfig,
+    .gyro_cal_on_first_arm = 0,
+    .auto_disarm_delay = 5,
+    .prearm_allow_rearm = 0,
+);
+
+PG_REGISTER_WITH_RESET_TEMPLATE(flight3DConfig_t, flight3DConfig, PG_MOTOR_3D_CONFIG, 0);
+PG_RESET_TEMPLATE(flight3DConfig_t, flight3DConfig,
+    .deadband3d_low = 1406,
+    .deadband3d_high = 1514,
+    .neutral3d = 1460,
+    .deadband3d_throttle = 50,
+    .limit3d_low = 1000,
+    .limit3d_high = 2000,
+    .switched_mode3d = false
+);
 
 bool isUsingSticksForArming(void)
 {
@@ -124,14 +120,14 @@ void clearWasLastDisarmUserRequested(void)
 throttleStatus_e calculateThrottleStatus(void)
 {
     if (featureIsEnabled(FEATURE_3D)) {
-        if (IS_RC_MODE_ACTIVE(BOX3D) || flight3DConfig.switched_mode3d) {
-            if (rcData[THROTTLE] < rxConfig.mincheck) {
+        if (IS_RC_MODE_ACTIVE(BOX3D) || flight3DConfig()->switched_mode3d) {
+            if (rcData[THROTTLE] < rxConfig()->mincheck) {
                 return THROTTLE_LOW;
             }
-        } else if ((rcData[THROTTLE] > (rxConfig.midrc - flight3DConfig.deadband3d_throttle) && rcData[THROTTLE] < (rxConfig.midrc + flight3DConfig.deadband3d_throttle))) {
+        } else if ((rcData[THROTTLE] > (rxConfig()->midrc - flight3DConfig()->deadband3d_throttle) && rcData[THROTTLE] < (rxConfig()->midrc + flight3DConfig()->deadband3d_throttle))) {
             return THROTTLE_LOW;
         }
-    } else if (rcData[THROTTLE] < rxConfig.mincheck) {
+    } else if (rcData[THROTTLE] < rxConfig()->mincheck) {
         return THROTTLE_LOW;
     }
 
@@ -161,10 +157,10 @@ void processRcStickPositions(void)
     uint8_t stTmp = 0;
     for (int i = 0; i < 4; i++) {
         stTmp >>= 2;
-        if (rcData[i] > rxConfig.mincheck) {
+        if (rcData[i] > rxConfig()->mincheck) {
             stTmp |= 0x80;  // check for MIN
         }
-        if (rcData[i] < rxConfig.maxcheck) {
+        if (rcData[i] < rxConfig()->maxcheck) {
             stTmp |= 0x40;  // check for MAX
         }
     }
@@ -212,7 +208,7 @@ void processRcStickPositions(void)
             if (ARMING_FLAG(ARMED)){
                 disarm(DISARM_REASON_STICKS);
            } else {
-                //beeper(BEEPER_DISARM_REPEAT);     // sound tone while stick held
+                beeper(BEEPER_DISARM_REPEAT);     // sound tone while stick held
                 repeatAfter(STICK_AUTOREPEAT_MS); // disarm tone will repeat
 
 #ifdef USE_RUNAWAY_TAKEOFF
@@ -233,7 +229,7 @@ void processRcStickPositions(void)
                 // Arm via YAW
                 tryArm();
                 if (isTryingToArm() ||
-                    ((getArmingDisableFlags() == ARMING_DISABLED_CALIBRATING) && armingConfig.gyro_cal_on_first_arm)) {
+                    ((getArmingDisableFlags() == ARMING_DISABLED_CALIBRATING) && armingConfig()->gyro_cal_on_first_arm)) {
                     doNotRepeat = false;
                 }
             } else {
@@ -271,7 +267,7 @@ void processRcStickPositions(void)
 
 #ifdef USE_BARO
         if (sensors(SENSOR_BARO)) {
-        baroSetGroundLevel();
+            baroSetGroundLevel();
         }
 #endif
 
@@ -280,7 +276,7 @@ void processRcStickPositions(void)
 
     if (featureIsEnabled(FEATURE_INFLIGHT_ACC_CAL) && (rcSticks == THR_LO + YAW_LO + PIT_HI + ROL_HI)) {
         // Inflight ACC Calibration
-        //handleInflightCalibrationStickPosition();
+        handleInflightCalibrationStickPosition();
         return;
     }
 
@@ -288,20 +284,20 @@ void processRcStickPositions(void)
     switch (rcSticks) {
     case THR_LO + YAW_LO + PIT_CE + ROL_LO:
         // ROLL left -> PID profile 1
-        //changePidProfile(0);
+        changePidProfile(0);
         return;
     case THR_LO + YAW_LO + PIT_HI + ROL_CE:
         // PITCH up -> PID profile 2
-        //changePidProfile(1);
+        changePidProfile(1);
         return;
     case THR_LO + YAW_LO + PIT_CE + ROL_HI:
         // ROLL right -> PID profile 3
-        //changePidProfile(2);
+        changePidProfile(2);
         return;
     }
 
     if (rcSticks == THR_LO + YAW_LO + PIT_LO + ROL_HI) {
-        //saveConfigAndNotify();
+        saveConfigAndNotify();
     }
 
 #ifdef USE_ACC
@@ -327,117 +323,37 @@ void processRcStickPositions(void)
         memset(&accelerometerTrimsDelta, 0, sizeof(accelerometerTrimsDelta));
 
         if (pendingApplyRollAndPitchTrimDeltaSave && ((rcSticks & THR_MASK) != THR_HI)) {
-            //saveConfigAndNotify();
+            saveConfigAndNotify();
             pendingApplyRollAndPitchTrimDeltaSave = false;
             return;
         }
 
         bool shouldApplyRollAndPitchTrimDelta = false;
         switch (rcSticks) {
-        case THR_CE + YAW_LO + PIT_HI + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = 1;
-            _ROLL.out.kp += 1;
-            _PITCH.out.kp += 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_LO + PIT_LO + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = -1;
-            _ROLL.out.kp -= 1;
-            _PITCH.out.kp -= 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_LO + PIT_CE + ROL_HI:
-            //accelerometerTrimsDelta.values.roll = 1;
-            _ROLL.out.ki += 1;
-            _PITCH.out.ki += 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_LO + PIT_CE + ROL_LO:
-            //accelerometerTrimsDelta.values.roll = -1;
-            _ROLL.out.ki -= 1;
-            _PITCH.out.ki -= 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-
-
         case THR_HI + YAW_CE + PIT_HI + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = 1;
-            _ROLL.in.kp += 1;
-            _PITCH.in.kp += 1;
+            accelerometerTrimsDelta.values.pitch = 1;
             shouldApplyRollAndPitchTrimDelta = true;
             break;
         case THR_HI + YAW_CE + PIT_LO + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = -1;
-            _ROLL.in.kp -= 1;
-            _PITCH.in.kp -= 1;
+            accelerometerTrimsDelta.values.pitch = -1;
             shouldApplyRollAndPitchTrimDelta = true;
             break;
         case THR_HI + YAW_CE + PIT_CE + ROL_HI:
-            //accelerometerTrimsDelta.values.roll = 1;
-            _ROLL.in.ki += 1;
-            _PITCH.in.ki += 1;
+            accelerometerTrimsDelta.values.roll = 1;
             shouldApplyRollAndPitchTrimDelta = true;
             break;
         case THR_HI + YAW_CE + PIT_CE + ROL_LO:
-            //accelerometerTrimsDelta.values.roll = -1;
-            _ROLL.in.ki -= 1;
-            _PITCH.in.ki -= 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-
-        case THR_CE + YAW_HI + PIT_HI + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = 1;
-            _YAW_Heading.kp += 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_HI + PIT_LO + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = -1;
-            _YAW_Heading.kp -= 1;
-          shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_HI + PIT_CE + ROL_HI:
-            //accelerometerTrimsDelta.values.roll = 1;
-            _YAW_Heading.ki += 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_HI + PIT_CE + ROL_LO:
-            //accelerometerTrimsDelta.values.roll = -1;
-            _YAW_Heading.ki -= 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-
-        case THR_CE + YAW_CE + PIT_HI + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = 1;
-            _ROLL.out.kd += 1;
-            _PITCH.out.kd += 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_CE + PIT_LO + ROL_CE:
-            //accelerometerTrimsDelta.values.pitch = -1;
-            _ROLL.out.kd -= 1;
-            _PITCH.out.kd -= 1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_CE + PIT_CE + ROL_HI:
-            //accelerometerTrimsDelta.values.roll = 1;
-            _ROLL.in.kd += 0.1;
-            _PITCH.in.kd += 0.1;
-            shouldApplyRollAndPitchTrimDelta = true;
-            break;
-        case THR_CE + YAW_CE + PIT_CE + ROL_LO:
-            //accelerometerTrimsDelta.values.roll = -1;
-            _ROLL.in.kd -= 0.1;
-            _PITCH.in.kd -= 0.1;
+            accelerometerTrimsDelta.values.roll = -1;
             shouldApplyRollAndPitchTrimDelta = true;
             break;
         }
         if (shouldApplyRollAndPitchTrimDelta) {
 #if defined(USE_ACC)
-            //applyAccelerometerTrimsDelta(&accelerometerTrimsDelta);
+            applyAccelerometerTrimsDelta(&accelerometerTrimsDelta);
 #endif
             pendingApplyRollAndPitchTrimDeltaSave = true;
 
-            //beeperConfirmationBeeps(1);
+            beeperConfirmationBeeps(1);
 
             repeatAfter(STICK_AUTOREPEAT_MS);
 
@@ -447,16 +363,16 @@ void processRcStickPositions(void)
         // in ACRO mode, so use sticks to change RATE profile
         switch (rcSticks) {
         case THR_HI + YAW_CE + PIT_HI + ROL_CE:
-            //changeControlRateProfile(0);
+            changeControlRateProfile(0);
             return;
         case THR_HI + YAW_CE + PIT_LO + ROL_CE:
-            //changeControlRateProfile(1);
+            changeControlRateProfile(1);
             return;
         case THR_HI + YAW_CE + PIT_CE + ROL_HI:
-            //changeControlRateProfile(2);
+            changeControlRateProfile(2);
             return;
         case THR_HI + YAW_CE + PIT_CE + ROL_LO:
-            //changeControlRateProfile(3);
+            changeControlRateProfile(3);
             return;
         }
     }
@@ -511,5 +427,5 @@ void processRcStickPositions(void)
 void rcControlsInit(void)
 {
     analyzeModeActivationConditions();
-    isUsingSticksToArm = !isModeActivationConditionPresent(BOXARM) && systemConfig.enableStickArming;
+    isUsingSticksToArm = !isModeActivationConditionPresent(BOXARM) && systemConfig()->enableStickArming;
 }

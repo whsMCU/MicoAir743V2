@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if defined(USE_TELEMETRY_MAVLINK)
 
@@ -39,9 +39,9 @@
 #include "common/utils.h"
 
 #include "config/feature.h"
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
-//#include "pg/rx.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
+#include "pg/rx.h"
 
 #include "drivers/accgyro/accgyro.h"
 #include "drivers/sensor.h"
@@ -52,14 +52,14 @@
 #include "fc/runtime_config.h"
 
 #include "flight/flight_plan_nav.h"
-//#include "flight/mixer.h"
+#include "flight/mixer.h"
 #include "flight/pid.h"
 #include "flight/imu.h"
 #include "flight/failsafe.h"
 #include "flight/position.h"
 
-//#include "io/serial.h"
-//#include "io/gimbal.h"
+#include "io/serial.h"
+#include "io/gimbal.h"
 #include "io/gps.h"
 #include "io/ledstrip.h"
 
@@ -67,7 +67,7 @@
 #include "rx/mavlink.h"
 
 #include "sensors/sensors.h"
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/gyro.h"
 #include "sensors/barometer.h"
 #include "sensors/boardalignment.h"
@@ -89,7 +89,7 @@
 #include "common/mavlink.h"
 #pragma GCC diagnostic pop
 
-//#define TELEMETRY_MAVLINK_INITIAL_PORT_MODE MODE_RXTX
+#define TELEMETRY_MAVLINK_INITIAL_PORT_MODE MODE_RXTX
 #define TELEMETRY_MAVLINK_MAXRATE 50
 #define TELEMETRY_MAVLINK_DELAY ((1000 * 1000) / TELEMETRY_MAVLINK_MAXRATE)
 
@@ -97,11 +97,11 @@
 #define MAVLINK_COMPONENT_ID MAV_COMP_ID_AUTOPILOT1
 extern uint16_t rssi; // FIXME dependency on mw.c
 
-static uint8_t mavlinkPort = _DEF_UART1;
-//static const serialPortConfig_t *portConfig;
+static serialPort_t *mavlinkPort = NULL;
+static const serialPortConfig_t *portConfig;
 
 static bool mavlinkTelemetryEnabled =  false;
-//static portSharing_e mavlinkPortSharing;
+static portSharing_e mavlinkPortSharing;
 static uint32_t lastMavlinkMessageTime = 0;
 static armingDisableFlags_e lastArmingDisableFlags = 0;
 
@@ -146,10 +146,8 @@ static uint8_t mavBuffer[MAVLINK_MAX_PACKET_LEN];
 
 static void mavlinkSerialWrite(uint8_t * buf, uint16_t length)
 {
-    for (int i = 0; i < length; i++)	{
-        //serialWrite(mavlinkPort, buf[i]);
-				uartWrite(mavlinkPort, &buf[i], 1);
-    }
+    for (int i = 0; i < length; i++)
+        serialWrite(mavlinkPort, buf[i]);
 }
 
 // Pack-to-buffer + write helper shared with telemetry/mavlink_mission so the
@@ -165,9 +163,9 @@ void mavlinkSendMessage(mavlink_message_t *msg)
 
 static int16_t headingOrScaledMilliAmpereHoursDrawn(void)
 {
-    if (isAmperageConfigured() && telemetryConfig.mavlink_mah_as_heading_divisor > 0) {
+    if (isAmperageConfigured() && telemetryConfig()->mavlink_mah_as_heading_divisor > 0) {
         // In the Connex Prosight OSD, this goes between 0 and 999, so it will need to be scaled in that range.
-        return getMAhDrawn() / telemetryConfig.mavlink_mah_as_heading_divisor;
+        return getMAhDrawn() / telemetryConfig()->mavlink_mah_as_heading_divisor;
     }
     // heading Current heading in degrees, in compass units (0..360, 0=north)
     return DECIDEGREES_TO_DEGREES(attitude.values.yaw);
@@ -567,11 +565,9 @@ static void mavlinkProcessIncoming(void)
     }
     // Bound the drain so a flooded link cannot starve the telemetry task.
     uint16_t rxBudget = 64;
-    //uint32_t rxBytesWaiting = serialRxBytesWaiting(mavlinkPort);
-    uint32_t rxBytesWaiting = uartAvailable(mavlinkPort);
+    uint32_t rxBytesWaiting = serialRxBytesWaiting(mavlinkPort);
     while (rxBudget-- && rxBytesWaiting-- > 0) {
-        //const uint8_t c = serialRead(mavlinkPort);
-        const uint8_t c = uartRead(mavlinkPort);
+        const uint8_t c = serialRead(mavlinkPort);
         if (mavlink_parse_char(MAVLINK_COMM_1, c, &mavRxMsg, &mavRxStatus) == MAVLINK_FRAMING_OK) {
             mavlinkDispatch(&mavRxMsg);
         }
@@ -590,32 +586,31 @@ static void mavlinkProcessQueueMessages(void)
 
 void freeMAVLinkTelemetryPort(void)
 {
-    //closeSerialPort(mavlinkPort);
-    mavlinkPort = 0;
+    closeSerialPort(mavlinkPort);
+    mavlinkPort = NULL;
     mavlinkPortOwned = false;
     mavlinkTelemetryEnabled = false;
 }
 
 void initMAVLinkTelemetry(void)
 {
-    //portConfig = findSerialPortConfig(FUNCTION_TELEMETRY_MAVLINK);
-    //mavlinkPortSharing = determinePortSharing(portConfig, FUNCTION_TELEMETRY_MAVLINK);
-	uartOpen(_DEF_UART1, 115200);
+    portConfig = findSerialPortConfig(FUNCTION_TELEMETRY_MAVLINK);
+    mavlinkPortSharing = determinePortSharing(portConfig, FUNCTION_TELEMETRY_MAVLINK);
 }
 
 void configureMAVLinkTelemetryPort(void)
 {
-//    if (!portConfig) {
-//        return;
-//    }
-//
-//    baudRate_e baudRateIndex = portConfig->telemetry_baudrateIndex;
-//    if (baudRateIndex == BAUD_AUTO) {
-//        // default rate for minimOSD
-//        baudRateIndex = BAUD_57600;
-//    }
-//
-//    mavlinkPort = openSerialPort(portConfig->identifier, FUNCTION_TELEMETRY_MAVLINK, NULL, NULL, baudRates[baudRateIndex], TELEMETRY_MAVLINK_INITIAL_PORT_MODE, telemetryConfig()->telemetry_inverted ? SERIAL_INVERTED : SERIAL_NOT_INVERTED);
+    if (!portConfig) {
+        return;
+    }
+
+    baudRate_e baudRateIndex = portConfig->telemetry_baudrateIndex;
+    if (baudRateIndex == BAUD_AUTO) {
+        // default rate for minimOSD
+        baudRateIndex = BAUD_57600;
+    }
+
+    mavlinkPort = openSerialPort(portConfig->identifier, FUNCTION_TELEMETRY_MAVLINK, NULL, NULL, baudRates[baudRateIndex], TELEMETRY_MAVLINK_INITIAL_PORT_MODE, telemetryConfig()->telemetry_inverted ? SERIAL_INVERTED : SERIAL_NOT_INVERTED);
 
     if (!mavlinkPort) {
         return;
@@ -921,42 +916,41 @@ static void mavlinkSendHeartbeat(void)
         mavModes |= MAV_MODE_MANUAL_ARMED;
 
     uint8_t mavSystemType;
-    mavSystemType = MAV_TYPE_QUADROTOR;
-//    switch (mixerConfig()->mixerMode)
-//    {
-//        case MIXER_TRI:
-//            mavSystemType = MAV_TYPE_TRICOPTER;
-//            break;
-//        case MIXER_QUADP:
-//        case MIXER_QUADX:
-//        case MIXER_Y4:
-//        case MIXER_VTAIL4:
-//            mavSystemType = MAV_TYPE_QUADROTOR;
-//            break;
-//        case MIXER_Y6:
-//        case MIXER_HEX6:
-//        case MIXER_HEX6X:
-//            mavSystemType = MAV_TYPE_HEXAROTOR;
-//            break;
-//        case MIXER_OCTOX8:
-//        case MIXER_OCTOX8P:
-//        case MIXER_OCTOFLATP:
-//        case MIXER_OCTOFLATX:
-//            mavSystemType = MAV_TYPE_OCTOROTOR;
-//            break;
-//        case MIXER_FLYING_WING:
-//        case MIXER_AIRPLANE:
-//        case MIXER_CUSTOM_AIRPLANE:
-//            mavSystemType = MAV_TYPE_FIXED_WING;
-//            break;
-//        case MIXER_HELI_120_CCPM:
-//        case MIXER_HELI_90_DEG:
-//            mavSystemType = MAV_TYPE_HELICOPTER;
-//            break;
-//        default:
-//            mavSystemType = MAV_TYPE_GENERIC;
-//            break;
-//    }
+    switch (mixerConfig()->mixerMode)
+    {
+        case MIXER_TRI:
+            mavSystemType = MAV_TYPE_TRICOPTER;
+            break;
+        case MIXER_QUADP:
+        case MIXER_QUADX:
+        case MIXER_Y4:
+        case MIXER_VTAIL4:
+            mavSystemType = MAV_TYPE_QUADROTOR;
+            break;
+        case MIXER_Y6:
+        case MIXER_HEX6:
+        case MIXER_HEX6X:
+            mavSystemType = MAV_TYPE_HEXAROTOR;
+            break;
+        case MIXER_OCTOX8:
+        case MIXER_OCTOX8P:
+        case MIXER_OCTOFLATP:
+        case MIXER_OCTOFLATX:
+            mavSystemType = MAV_TYPE_OCTOROTOR;
+            break;
+        case MIXER_FLYING_WING:
+        case MIXER_AIRPLANE:
+        case MIXER_CUSTOM_AIRPLANE:
+            mavSystemType = MAV_TYPE_FIXED_WING;
+            break;
+        case MIXER_HELI_120_CCPM:
+        case MIXER_HELI_90_DEG:
+            mavSystemType = MAV_TYPE_HELICOPTER;
+            break;
+        default:
+            mavSystemType = MAV_TYPE_GENERIC;
+            break;
+    }
 
     const uint32_t mavCustomMode = mavlinkComputeCustomMode();
     if (mavCustomMode != BF_MAV_MODE_ACRO) {
@@ -1040,7 +1034,7 @@ static void mavlinkSendBatteryStatus(void)
     memset(voltagesExt, 0, sizeof(voltagesExt));
     if (isBatteryVoltageConfigured()) {
         uint8_t batteryCellCount = getBatteryCellCount();
-        if (batteryCellCount > 0 && telemetryConfig.report_cell_voltage) {
+        if (batteryCellCount > 0 && telemetryConfig()->report_cell_voltage) {
             for (int cell=0; cell < batteryCellCount && cell < MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_LEN + MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_EXT_LEN; cell++) {
                 if (cell < MAVLINK_MSG_BATTERY_STATUS_FIELD_VOLTAGES_LEN) {
                     voltages[cell] = getBatteryAverageCellVoltage() * 10;
@@ -1190,22 +1184,22 @@ static uint32_t getConfigStreamUpdateInterval(uint8_t stream) {
 
     switch (stream) {
     case MAV_DATA_STREAM_EXTENDED_STATUS:
-        rate = telemetryConfig.mavlink_extended_status_rate;
+        rate = telemetryConfig()->mavlink_extended_status_rate;
         break;
     case MAV_DATA_STREAM_RC_CHANNELS:
-        rate = telemetryConfig.mavlink_rc_channels_rate;
+        rate = telemetryConfig()->mavlink_rc_channels_rate;
         break;
     case MAV_DATA_STREAM_EXTRA1:
-        rate = telemetryConfig.mavlink_extra1_rate;
+        rate = telemetryConfig()->mavlink_extra1_rate;
         break;
     case MAV_DATA_STREAM_EXTRA2:
-        rate = telemetryConfig.mavlink_extra2_rate;
+        rate = telemetryConfig()->mavlink_extra2_rate;
         break;
     case MAV_DATA_STREAM_EXTRA3:
-        rate = telemetryConfig.mavlink_extra3_rate;
+        rate = telemetryConfig()->mavlink_extra3_rate;
         break;
     case MAV_DATA_STREAM_POSITION:
-        rate = telemetryConfig.mavlink_position_rate;
+        rate = telemetryConfig()->mavlink_position_rate;
         break;
     }
 
@@ -1288,16 +1282,16 @@ static void processMAVLinkTelemetry(void)
 
 void checkMAVLinkTelemetryState(void)
 {
-    if (telemetryCheckRxPortShared()) {
-        if (!mavlinkTelemetryEnabled) {
-            mavlinkPort = _DEF_UART1;
+    if (portConfig && telemetryCheckRxPortShared(portConfig, rxRuntimeState.serialrxProvider)) {
+        if (!mavlinkTelemetryEnabled && telemetrySharedPort != NULL) {
+            mavlinkPort = telemetrySharedPort;
             lastArmingDisableFlags = 0;
             mavlinkPortOwned = false;
             mavlinkTelemetryEnabled = true;
             configureMAVLinkOutputMessagesIntervals();
         }
     } else {
-        bool newTelemetryEnabledValue = telemetryDetermineEnabledState();
+        bool newTelemetryEnabledValue = telemetryDetermineEnabledState(mavlinkPortSharing);
 
         if (newTelemetryEnabledValue == mavlinkTelemetryEnabled) {
             return;

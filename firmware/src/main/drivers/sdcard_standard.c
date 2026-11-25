@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "sdcard_standard.h"
 #include "common/maths.h"

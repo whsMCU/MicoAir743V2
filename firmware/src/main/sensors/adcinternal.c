@@ -18,9 +18,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "adcinternal.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
+
+#include "adcinternal.h"
 
 #if defined(USE_ADC_INTERNAL)
 
@@ -28,7 +31,7 @@
 
 #include "common/utils.h"
 
-#include "adc.h"
+#include "drivers/adc.h"
 
 typedef struct movingAverageStateUint16_s {
     uint32_t sum;
@@ -94,7 +97,7 @@ void adcInternalProcess(timeUs_t currentTimeUs)
     DEBUG_SET(DEBUG_ADC_INTERNAL, 2, tempsensorSample);
     DEBUG_SET(DEBUG_ADC_INTERNAL, 3, vrefMv);
 
-    //adcInternalStartConversion(); // Start next conversion
+    adcInternalStartConversion(); // Start next conversion
 }
 
 void adcInternalInit(void)

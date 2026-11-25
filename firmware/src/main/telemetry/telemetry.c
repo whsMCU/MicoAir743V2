@@ -22,22 +22,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_TELEMETRY
 
 #include "common/utils.h"
 #include "common/unit.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
-//#include "pg/rx.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
+#include "pg/rx.h"
 
-//#include "drivers/timer.h"
-//#include "drivers/serial.h"
-//#include "drivers/serial_softserial.h"
+#include "drivers/timer.h"
+#include "drivers/serial.h"
+#include "drivers/serial_softserial.h"
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
 #include "config/config.h"
 #include "fc/rc_modes.h"
@@ -48,44 +48,47 @@
 #include "rx/rx.h"
 
 #include "telemetry/telemetry.h"
-//#include "telemetry/frsky_hub.h"
-//#include "telemetry/hott.h"
-//#include "telemetry/smartport.h"
-//#include "telemetry/ltm.h"
-//#include "telemetry/jetiexbus.h"
+#include "telemetry/frsky_hub.h"
+#include "telemetry/hott.h"
+#include "telemetry/smartport.h"
+#include "telemetry/ltm.h"
+#include "telemetry/jetiexbus.h"
 #include "telemetry/mavlink.h"
 #include "telemetry/crsf.h"
-//#include "telemetry/ghst.h"
-//#include "telemetry/srxl.h"
-//#include "telemetry/ibus.h"
+#include "telemetry/ghst.h"
+#include "telemetry/srxl.h"
+#include "telemetry/ibus.h"
 #include "telemetry/msp_shared.h"
 
+PG_REGISTER_WITH_RESET_TEMPLATE(telemetryConfig_t, telemetryConfig, PG_TELEMETRY_CONFIG, 6);
 
-telemetryConfig_t telemetryConfig;
-
-void telemetryConfig_Init(void)
-{
-	telemetryConfig.telemetry_inverted = false;
-	telemetryConfig.halfDuplex = 1;
-	telemetryConfig.gpsNoFixLatitude = 0;
-	telemetryConfig.gpsNoFixLongitude = 0;
-	telemetryConfig.frsky_coordinate_format = FRSKY_FORMAT_DMS;
-	telemetryConfig.frsky_unit = UNIT_METRIC;
-	telemetryConfig.frsky_vfas_precision = 0;
-	telemetryConfig.hottAlarmSoundInterval = 5;
-	telemetryConfig.pidValuesAsTelemetry = 0;
-	telemetryConfig.report_cell_voltage = false;
-	telemetryConfig.disabledSensors = ESC_SENSOR_ALL | SENSOR_CAP_USED;
-	telemetryConfig.mavlink_mah_as_heading_divisor = 0;
-	telemetryConfig.mavlink_min_txbuff = 35;
-	telemetryConfig.mavlink_extended_status_rate = 2;
-	telemetryConfig.mavlink_rc_channels_rate = 1;
-	telemetryConfig.mavlink_position_rate = 2;
-	telemetryConfig.mavlink_extra1_rate = 2;
-	telemetryConfig.mavlink_extra2_rate = 2;
-	telemetryConfig.mavlink_extra3_rate = 1;
-	telemetryConfig.crsf_tlm_accgyro = 0;
-}
+PG_RESET_TEMPLATE(telemetryConfig_t, telemetryConfig,
+    .telemetry_inverted = false,
+    .halfDuplex = 1,
+    .gpsNoFixLatitude = 0,
+    .gpsNoFixLongitude = 0,
+    .frsky_coordinate_format = FRSKY_FORMAT_DMS,
+    .frsky_unit = UNIT_METRIC,
+    .frsky_vfas_precision = 0,
+    .hottAlarmSoundInterval = 5,
+    .pidValuesAsTelemetry = 0,
+    .report_cell_voltage = false,
+    .flysky_sensors = {
+            IBUS_SENSOR_TYPE_TEMPERATURE,
+            IBUS_SENSOR_TYPE_RPM_FLYSKY,
+            IBUS_SENSOR_TYPE_EXTERNAL_VOLTAGE
+    },
+    .disabledSensors = ESC_SENSOR_ALL | SENSOR_CAP_USED,
+    .mavlink_mah_as_heading_divisor = 0,
+    .mavlink_min_txbuff = 35,
+    .mavlink_extended_status_rate = 2,
+    .mavlink_rc_channels_rate = 1,
+    .mavlink_position_rate = 2,
+    .mavlink_extra1_rate = 2,
+    .mavlink_extra2_rate = 2,
+    .mavlink_extra3_rate = 1,
+    .crsf_tlm_accgyro = 0,
+);
 
 void telemetryInit(void)
 {
@@ -129,35 +132,35 @@ void telemetryInit(void)
     telemetryCheckState();
 }
 
-bool telemetryDetermineEnabledState(void)
+bool telemetryDetermineEnabledState(portSharing_e portSharing)
 {
-    bool enabled = true;
+    bool enabled = portSharing == PORTSHARING_NOT_SHARED;
 
-//    if (portSharing == PORTSHARING_SHARED) {
-//        if (isModeActivationConditionPresent(BOXTELEMETRY))
-//            enabled = IS_RC_MODE_ACTIVE(BOXTELEMETRY);
-//        else
-//            enabled = ARMING_FLAG(ARMED);
-//    }
+    if (portSharing == PORTSHARING_SHARED) {
+        if (isModeActivationConditionPresent(BOXTELEMETRY))
+            enabled = IS_RC_MODE_ACTIVE(BOXTELEMETRY);
+        else
+            enabled = ARMING_FLAG(ARMED);
+    }
 
     return enabled;
 }
 
-bool telemetryCheckRxPortShared(void)
+bool telemetryCheckRxPortShared(const serialPortConfig_t *portConfig, const SerialRXType serialrxProvider)
 {
-//    if (portConfig->functionMask & FUNCTION_RX_SERIAL && portConfig->functionMask & TELEMETRY_SHAREABLE_PORT_FUNCTIONS_MASK &&
-//        (serialrxProvider == SERIALRX_SPEKTRUM1024 ||
-//        serialrxProvider == SERIALRX_SPEKTRUM2048 ||
-//        serialrxProvider == SERIALRX_SBUS ||
-//        serialrxProvider == SERIALRX_SUMD ||
-//        serialrxProvider == SERIALRX_SUMH ||
-//        serialrxProvider == SERIALRX_XBUS_MODE_B ||
-//        serialrxProvider == SERIALRX_XBUS_MODE_B_RJ01 ||
-//        serialrxProvider == SERIALRX_IBUS ||
-//        serialrxProvider == SERIALRX_MAVLINK)) {
-//
-//        return true;
-//    }
+    if (portConfig->functionMask & FUNCTION_RX_SERIAL && portConfig->functionMask & TELEMETRY_SHAREABLE_PORT_FUNCTIONS_MASK &&
+        (serialrxProvider == SERIALRX_SPEKTRUM1024 ||
+        serialrxProvider == SERIALRX_SPEKTRUM2048 ||
+        serialrxProvider == SERIALRX_SBUS ||
+        serialrxProvider == SERIALRX_SUMD ||
+        serialrxProvider == SERIALRX_SUMH ||
+        serialrxProvider == SERIALRX_XBUS_MODE_B ||
+        serialrxProvider == SERIALRX_XBUS_MODE_B_RJ01 ||
+        serialrxProvider == SERIALRX_IBUS ||
+        serialrxProvider == SERIALRX_MAVLINK)) {
+
+        return true;
+    }
 #ifdef USE_TELEMETRY_IBUS
     if (portConfig->functionMask & FUNCTION_TELEMETRY_IBUS
         && portConfig->functionMask & FUNCTION_RX_SERIAL
@@ -174,7 +177,7 @@ bool telemetryCheckRxPortShared(void)
     return false;
 }
 
-//serialPort_t *telemetrySharedPort = NULL;
+serialPort_t *telemetrySharedPort = NULL;
 
 void telemetryCheckState(void)
 {
@@ -250,6 +253,6 @@ void telemetryProcess(uint32_t currentTime)
 
 bool telemetryIsSensorEnabled(sensor_e sensor)
 {
-    return ~(telemetryConfig.disabledSensors) & sensor;
+    return ~(telemetryConfig()->disabledSensors) & sensor;
 }
 #endif

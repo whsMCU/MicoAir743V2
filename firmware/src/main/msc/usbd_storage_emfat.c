@@ -32,7 +32,7 @@
 
 #include "common/utils.h"
 
-//#include "drivers/light_led.h"
+#include "drivers/light_led.h"
 #include "drivers/usb_msc.h"
 
 #include "msc/usbd_storage.h"

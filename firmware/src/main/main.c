@@ -1,306 +1,156 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2023 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
-#include "main.h"
+/*
+ * This file is part of Cleanflight and Betaflight.
+ *
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
+#include <stdbool.h>
+#include <stdint.h>
 
+#include "platform.h"
 
-#include "drivers/nvic.h"
+#include "drivers/light_led.h"
+#include "drivers/time.h"
 
-#include "config/config.h"
+#ifdef USE_VCP
+#include "drivers/serial_usb_vcp.h"
+#endif
+
+#include "drivers/system.h"
+
+#if ENABLE_LCD_CONSOLE && ENABLE_LCD_PRINTF_REDIRECT
+#include "common/printf_serial.h"
+#include "drivers/serial_lcd_console.h"
+#endif
 
 #include "fc/init.h"
-#include "fc/rc_modes.h"
-#include "fc/rc_controls.h"
-#include "fc/core.h"
-#include "fc/tasks.h"
-//
-#include "flight/imu.h"
-//#include "flight/pid_init.h"
-#include "flight/position.h"
 
-#include "sensors/sensors.h"
-#include "sensors/barometer.h"
-#include "sensors/compass.h"
-#include "sensors/gyro_init.h"
-#include "sensors/adcinternal.h"
-#include "sensors/battery.h"
+// USE_MULTICORE turns on the multicore API and its features (core 1 + dispatch).
+// ENABLE_MULTICORE_INIT is the optional core-allocation policy (RP2350) of
+// running the FC init phases on the second core; it requires USE_MULTICORE.
+#if defined(ENABLE_MULTICORE_INIT) && !defined(USE_MULTICORE)
+#error "ENABLE_MULTICORE_INIT requires USE_MULTICORE"
+#endif
 
-#include "io/gps.h"
+#ifdef USE_MULTICORE
+#include "platform/multicore.h"
+#endif
 
-#include "hw/timer.h"
+#ifdef USE_USB_MSC
+#include "drivers/usb_msc.h"
+#endif
 
-#include "rx/rx.h"
-#include "rx/crsf.h"
+#include "scheduler/scheduler.h"
 
-#include "target/memprot.h"
-
-#include "drivers/accgyro/accgyro_spi_bmi270.h"
-
-
-extern uint32_t cachedResetFlags;
-
-void initialiseMemorySections(void);
-
-void SystemClock_Config(void);
-static void CPU_CACHE_Enable(void);
-static void HandleStuckSysTick(void);
-
-void hwInit(void);
+#ifdef CONFIG_IN_FILE
+#include "cli/cli.h"
+#endif
 
 void run(void);
 
-int main(void)
+int main(int argc, char * argv[])
 {
+#ifdef USE_MAIN_ARGS
+    targetParseArgs(argc, argv);
+#else
+    UNUSED(argc);
+    UNUSED(argv);
+#endif
 
-	memProtReset();
+#if SERIAL_PORT_COUNT > 0
+    printfSerialInit();
+#endif
 
-  initialiseMemorySections();
+    // Do basic system initialisation including multicore support if applicable
+    systemInit();
 
-  // Configure MPU
-  memProtConfigure(mpuRegions, mpuRegionCount);
+#ifdef ENABLE_MULTICORE_INIT
+    // Perform early initialisation prior to USB
+    multicoreExecuteBlocking(initPhase1);
 
-  /* Enable the CPU Cache */
-  CPU_CACHE_Enable();
+    // Now perform the core initialisation
+    multicoreExecuteBlocking(initPhase2);
+#else
+    initPhase1();
+    initPhase2();
+#endif
 
-  HAL_Init();
-  SystemClock_Config();
+#ifdef USE_USB_MSC
+    mscButtonInit();
+    if (checkMsc()) {
+        // MSC mode TODO: boot using single core
+        initMsc();
+        // Never returns (but just in case...)
+        return 0;
+    }
+#endif
 
-  // Configure NVIC preempt/priority groups
-  HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITY_GROUPING);
+#ifdef USE_VCP
+    // initialise the USB CDC interface using core 0 all USB code, including
+    // interrupts, must run on core 0
+    usbVcpInit();
+#endif
 
-  cachedResetFlags = RCC->RSR;
+#ifdef ENABLE_MULTICORE_INIT
+    // Now perform the final initialisation
+    multicoreExecuteBlocking(initPhase3);
+#else
+    initPhase3();
+#endif
 
-  __HAL_RCC_D2SRAM1_CLK_ENABLE();
-  __HAL_RCC_D2SRAM2_CLK_ENABLE();
-  __HAL_RCC_D2SRAM3_CLK_ENABLE();
+#if ENABLE_LCD_CONSOLE && ENABLE_LCD_PRINTF_REDIRECT
+    // Open the LCD console after every other peripheral init has
+    // finished and after USB VCP comes up. Earlier peripheral inits can
+    // touch GPIO MODER for pins on the same ports as the LTDC signals,
+    // so running LCD setup last keeps the AF mode bits intact; opening
+    // the panel last also means a wedge in panel bring-up doesn't take
+    // VCP down with it (feedback_n6_lcd_wedge.md).
+    {
+        struct serialPort_s *lcdPort = lcdConsoleSerialOpen();
+        if (lcdPort) {
+            setPrintfSerialPort(lcdPort);
+        }
+    }
+#endif
 
-  cycleCounterInit();
+#ifdef CONFIG_IN_FILE
+    {
+        const char *configFile = targetGetConfigFile();
+        if (configFile) {
+            cliProcessConfigFile(configFile);
+            // cliProcessConfigFile handles exit internally
+            return 0;
+        }
+    }
+#endif
 
-  hwInit();
+    // Launch the scheduler
+    run();
 
-  init();
-
-  run();
-
-  return 0;
-
+    return 0;
 }
 
 void FAST_CODE run(void)
 {
     while (true) {
-    	scheduler();
-    }
-}
+        scheduler();
 
-void hwInit(void)
-{
-  #ifdef _USE_HW_RTC
-    rtcInit();
-  #endif
-  gpioInit();
-//  flashInit();
-  ledInit();
-  MX_DMA_Init();
-  usbInit();
-  uartInit();
-  cliInit();
-  i2cInit();
-  spiInit();
-  adcInit();
-  timerInit();
-
-//  if (MX_SDMMC1_SD_Init() == true)
-//  {
-//  	//fatfsInit();
-//  }
-
-}
-
-void initialiseMemorySections(void)
-{
-
-  #ifdef USE_ITCM_RAM
-    /* Load fast-functions into ITCM RAM */
-    extern uint8_t tcm_code_start;
-    extern uint8_t tcm_code_end;
-    extern uint8_t tcm_code;
-    memcpy(&tcm_code_start, &tcm_code, (size_t) (&tcm_code_end - &tcm_code_start));
-  #endif
-
-	#ifdef USE_CCM_CODE
-		/* Load functions into RAM */
-		extern uint8_t ccm_code_start;
-		extern uint8_t ccm_code_end;
-		extern uint8_t ccm_code;
-		memcpy(&ccm_code_start, &ccm_code, (size_t) (&ccm_code_end - &ccm_code_start));
-	#endif
-
-  #ifdef USE_FAST_DATA
-   /* Load FAST_DATA variable initializers into DTCM RAM */
-   extern uint8_t _sfastram_data;
-   extern uint8_t _efastram_data;
-   extern uint8_t _sfastram_idata;
-   memcpy(&_sfastram_data, &_sfastram_idata, (size_t) (&_efastram_data - &_sfastram_data));
-
-   extern uint32_t __fastram_bss_start__;
-   extern uint32_t __fastram_bss_end__;
-   uint32_t *p = &__fastram_bss_start__;
-   while (p < &__fastram_bss_end__)
-       *p++ = 0;
-
-   /* Load DMA_DATA variable intializers into D2 RAM */
-   extern uint8_t _sdmaram_bss;
-   extern uint8_t _edmaram_bss;
-   extern uint8_t _sdmaram_data;
-   extern uint8_t _edmaram_data;
-   extern uint8_t _sdmaram_idata;
-   bzero(&_sdmaram_bss, (size_t) (&_edmaram_bss - &_sdmaram_bss));
-   memcpy(&_sdmaram_data, &_sdmaram_idata, (size_t) (&_edmaram_data - &_sdmaram_data));
-
-  /* sram2 variable intializers*/
-   extern uint8_t _ssram2;
-   extern uint8_t _esram2;
-   bzero(&_ssram2, (size_t) (&_esram2 - &_ssram2));
- #endif
-}
-
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  /** Supply configuration update enable
-  */
-  HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
-
-  /** Configure the main internal regulator output voltage
-  */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
-
-  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
-
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_LSI
-                              |RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 4;
-  RCC_OscInitStruct.PLL.PLLN = 480;
-  RCC_OscInitStruct.PLL.PLLP = 2;
-  RCC_OscInitStruct.PLL.PLLQ = 8;
-  RCC_OscInitStruct.PLL.PLLR = 2;
-  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
-  RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
-  RCC_OscInitStruct.PLL.PLLFRACN = 0;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
-                              |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
-
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  HandleStuckSysTick();
-  HAL_Delay(10);
-}
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
-
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
-}
-
-#ifdef  USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
-}
-#endif /* USE_FULL_ASSERT */
-
-/**
-  * @brief  CPU L1-Cache enable.
-  * @param  None
-  * @retval None
-  */
-static void CPU_CACHE_Enable(void)
-{
-  /* Enable I-Cache */
-  SCB_EnableICache();
-
-  /* Enable D-Cache */
-  SCB_EnableDCache();
-}
-
-static void HandleStuckSysTick(void)
-{
-    uint32_t tickStart = HAL_GetTick();
-    uint32_t tickEnd = 0;
-
-    // H7 at 480Mhz requires a loop count of 160000. Double this for the timeout to be safe.
-    int attemptsRemaining = 320000;
-    while (((tickEnd = HAL_GetTick()) == tickStart) && --attemptsRemaining) {
-    }
-
-    if (tickStart == tickEnd) {
-        systemResetWithoutDisablingCaches();
+#if defined(RUN_LOOP_DELAY_US) && RUN_LOOP_DELAY_US > 0
+        delayMicroseconds_real(RUN_LOOP_DELAY_US);
+#endif
     }
 }

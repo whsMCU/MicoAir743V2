@@ -21,9 +21,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
-//#include "io/serial.h"
+#include "io/serial.h"
 #include "scheduler/scheduler.h"
 #include "serial.h"
 

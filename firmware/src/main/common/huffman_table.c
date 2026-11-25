@@ -18,10 +18,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdint.h>
-
-#include "hw.h"
-
+#include "platform.h"
 #include "huffman.h"
 
 /*

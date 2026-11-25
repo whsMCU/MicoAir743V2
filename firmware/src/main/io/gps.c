@@ -23,7 +23,7 @@
 #include <string.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_GPS
 
@@ -37,31 +37,30 @@
 
 #include "config/feature.h"
 
-//#include "drivers/light_led.h"
-//#include "drivers/time.h"
-//#include "drivers/system.h"
+#include "drivers/light_led.h"
+#include "drivers/time.h"
+#include "drivers/system.h"
 
-//#include "io/beeper.h"
+#include "io/beeper.h"
 #ifdef USE_DASHBOARD
 #include "io/dashboard.h"
 #endif
 
 #include "io/gps.h"
-//#include "io/gps_virtual.h"
+#include "io/gps_virtual.h"
 
 #if ENABLE_DRONECAN
 #include "io/dronecan/dronecan_gnss.h"
 #endif
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
-//#include "config/config.h"
+#include "config/config.h"
 
 #include "fc/gps_lap_timer.h"
 #include "fc/runtime_config.h"
 
-//#include "flight/gps_rescue.h"
-#include "flight/gps_rescue_multirotor.h"
+#include "flight/gps_rescue.h"
 #include "flight/imu.h"
 #include "flight/pid.h"
 
@@ -101,7 +100,7 @@ GPS_svinfo_t GPS_svinfo[GPS_SV_MAXSATS_M8N];
 // Decay the estimated max task duration by 1/(1 << GPS_TASK_DECAY_SHIFT) on every invocation
 #define GPS_TASK_DECAY_SHIFT 9         // Smoothing factor for GPS task re-scheduler
 
-static bool gpsPort;
+static serialPort_t *gpsPort;
 static float gpsDataIntervalSeconds = 0.1f;
 static float gpsDataFrequencyHz = 10.0f;
 static uint16_t currentGpsStamp = 0; // logical timer for received position update
@@ -397,30 +396,6 @@ static void gpsSetState(gpsState_e state)
     gpsData.ackState = UBLOX_ACK_IDLE;
 }
 
-gpsConfig_t gpsConfig;
-
-void gpsConfig_Init(void)
-{
-	#if defined(USE_VIRTUAL_GPS)
-		gpsConfig.provider = GPS_VIRTUAL;
-	#else
-		gpsConfig.provider = GPS_UBLOX;
-	#endif
-		gpsConfig.sbasMode = SBAS_NONE;
-		gpsConfig.autoConfig = GPS_AUTOCONFIG_ON;
-		gpsConfig.autoBaud = GPS_AUTOBAUD_OFF;
-		gpsConfig.gps_ublox_acquire_model = UBLOX_MODEL_STATIONARY;
-		gpsConfig.gps_ublox_flight_model = UBLOX_MODEL_AIRBORNE_4G;
-		gpsConfig.gps_update_rate_hz = 10;
-		gpsConfig.gps_ublox_use_galileo = false;
-		gpsConfig.gps_set_home_point_once = false;
-		gpsConfig.gps_use_3d_speed = false;
-		gpsConfig.sbas_integrity = false;
-		gpsConfig.gps_ublox_utc_standard = UBLOX_UTC_STANDARD_AUTO;
-		gpsConfig.gps_ublox_enable_ana = false;
-		gpsConfig.nmeaCustomCommands[0] = '\0';
-}
-
 void gpsInit(void)
 {
     gpsDataIntervalSeconds = 0.1f;
@@ -432,7 +407,6 @@ void gpsInit(void)
 #endif
     gpsData.updateRateHz = 10; // initialise at 10hz
     gpsData.platformVersion = UBX_VERSION_UNDEF;
-    gpsData.gps_baudrateIndex = BAUD_57600;
 
 #ifdef USE_DASHBOARD
     gpsData.errors = 0;
@@ -442,12 +416,24 @@ void gpsInit(void)
     // init gpsData structure. if we're not actually enabled, don't bother doing anything else
     gpsSetState(GPS_STATE_UNKNOWN);
 
+    // MSP / virtual / DroneCAN providers don't own a serial port — the
+    // frame source is another subsystem feeding gpsSol through updateXxxGPS().
+    if (GPS_PROVIDER_REQUIRES_NO_SERIAL_PORT(gpsConfig()->provider)) {
+        gpsSetState(GPS_STATE_INITIALIZED);
+        return;
+    }
+
+    const serialPortConfig_t *gpsPortConfig = findSerialPortConfig(FUNCTION_GPS);
+    if (!gpsPortConfig) {
+        return;
+    }
+
     // set the user's intended baud rate
     initBaudRateIndex = BAUD_COUNT;
     initBaudRateCycleCount = 0;
     gpsData.userBaudRateIndex = DEFAULT_BAUD_RATE_INDEX;
     for (unsigned i = 0; i < ARRAYLEN(gpsInitData); i++) {
-        if (gpsInitData[i].baudrateIndex == gpsData.gps_baudrateIndex) {
+        if (gpsInitData[i].baudrateIndex == gpsPortConfig->gps_baudrateIndex) {
             gpsData.userBaudRateIndex = i;
             break;
         }
@@ -455,9 +441,24 @@ void gpsInit(void)
     // the user's intended baud rate will be used as the initial baud rate when connecting
     gpsData.tempBaudRateIndex = gpsData.userBaudRateIndex;
 
+    portMode_e mode = MODE_RXTX;
+    portOptions_e options = SERIAL_NOT_INVERTED;
+
+#if defined(GPS_NMEA_TX_ONLY)
+    if (gpsConfig()->provider == GPS_NMEA) {
+        mode &= ~MODE_TX;
+    }
+#endif
+    if (serialType(gpsPortConfig->identifier) == SERIALTYPE_UART
+        || serialType(gpsPortConfig->identifier) == SERIALTYPE_LPUART
+        || serialType(gpsPortConfig->identifier) == SERIALTYPE_PIOUART) {
+#if !ENABLE_SERIAL_SKIP_CHECK_TX
+        options |= SERIAL_CHECK_TX;
+#endif
+    }
+
     // no callback - buffer will be consumed in gpsUpdate()
-    gpsPort = uartOpen(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
-    //gpsPort = openSerialPort(gpsPortConfig->identifier, FUNCTION_GPS, NULL, NULL, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex], mode, options);
+    gpsPort = openSerialPort(gpsPortConfig->identifier, FUNCTION_GPS, NULL, NULL, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex], mode, options);
     if (!gpsPort) {
         return;
     }
@@ -535,12 +536,11 @@ static uint8_t ubloxValSet(ubxMessage_t * tx_buffer, ubxValGetSetBytes_e key, ui
     return ubloxAddValSet(tx_buffer, key, payload, 0);
 }
 
-static void ubloxSendByteUpdateChecksum(uint8_t data, uint8_t *checksumA, uint8_t *checksumB)
+static void ubloxSendByteUpdateChecksum(const uint8_t data, uint8_t *checksumA, uint8_t *checksumB)
 {
     *checksumA += data;
     *checksumB += *checksumA;
-    //serialWrite(gpsPort, data);
-    uartWrite(_DEF_UART3, &data, 1);
+    serialWrite(gpsPort, data);
 }
 
 static void ubloxSendDataUpdateChecksum(const ubxMessage_t *msg, uint8_t *checksumA, uint8_t *checksumB)
@@ -556,18 +556,14 @@ static void ubloxSendDataUpdateChecksum(const ubxMessage_t *msg, uint8_t *checks
     }
 }
 
-static void ubloxSendMessage(ubxMessage_t *msg, bool skipAck)
+static void ubloxSendMessage(const ubxMessage_t *msg, bool skipAck)
 {
     uint8_t checksumA = 0, checksumB = 0;
-    //serialWrite(gpsPort, msg->header.preamble1);
-    //serialWrite(gpsPort, msg->header.preamble2);
-    uartWrite(_DEF_UART3, &msg->header.preamble1, 1);
-    uartWrite(_DEF_UART3, &msg->header.preamble2, 1);
+    serialWrite(gpsPort, msg->header.preamble1);
+    serialWrite(gpsPort, msg->header.preamble2);
     ubloxSendDataUpdateChecksum(msg, &checksumA, &checksumB);
-//    serialWrite(gpsPort, checksumA);
-//    serialWrite(gpsPort, checksumB);
-    uartWrite(_DEF_UART3, &checksumA, 1);
-    uartWrite(_DEF_UART3, &checksumB, 1);
+    serialWrite(gpsPort, checksumA);
+    serialWrite(gpsPort, checksumB);
     // Save state for ACK waiting
     gpsData.ackWaitingMsgId = msg->header.msg_id; //save message id for ACK
     gpsData.ackState = skipAck ? UBLOX_ACK_GOT_ACK : UBLOX_ACK_WAITING;
@@ -620,7 +616,7 @@ static void ubloxSendNAV5Message(uint8_t model)
 //         payload[0] = 3; // set 2D/3D fix mode to auto, which is the default
 //         offset += ubloxAddValSet(&tx_buffer, CFG_NAVSPG_FIXMODE, payload, offset); // 10
 
-        payload[0] = ubloxUTCStandardConfig_int[gpsConfig.gps_ublox_utc_standard];
+        payload[0] = ubloxUTCStandardConfig_int[gpsConfig()->gps_ublox_utc_standard];
         offset += ubloxAddValSet(&tx_buffer, CFG_NAVSPG_UTCSTANDARD, payload, offset); // 15
 
 //         payload[0] = 0;
@@ -689,7 +685,7 @@ static void ubloxSendNAV5Message(uint8_t model)
         tx_buffer.payload.cfg_nav5.cnoThreshNumSVs = 0;
         tx_buffer.payload.cfg_nav5.cnoThresh = 0;
         tx_buffer.payload.cfg_nav5.staticHoldMaxDist = 200;
-        tx_buffer.payload.cfg_nav5.utcStandard = ubloxUTCStandardConfig_int[gpsConfig.gps_ublox_utc_standard];
+        tx_buffer.payload.cfg_nav5.utcStandard = ubloxUTCStandardConfig_int[gpsConfig()->gps_ublox_utc_standard];
 
         ubloxSendConfigMessage(&tx_buffer, MSG_CFG_NAV_SETTINGS, sizeof(ubxCfgNav5_t), false);
     }
@@ -834,7 +830,7 @@ static void ubloxSetSbas(void)
 
     if (gpsData.ubloxM9orAbove) {
         uint8_t payload[8];
-        payload[0] = gpsConfig.sbasMode != SBAS_NONE;
+        payload[0] = gpsConfig()->sbasMode != SBAS_NONE;
 
         size_t offset = ubloxValSet(&tx_buffer, CFG_SBAS_USE_TESTMODE, payload, UBX_VAL_LAYER_RAM);
 
@@ -842,12 +838,12 @@ static void ubloxSetSbas(void)
         offset += ubloxAddValSet(&tx_buffer, CFG_SBAS_USE_RANGING, payload, offset);
         offset += ubloxAddValSet(&tx_buffer, CFG_SBAS_USE_DIFFCORR, payload, offset);
 
-        if (gpsConfig.sbas_integrity) {
+        if (gpsConfig()->sbas_integrity) {
             offset += ubloxAddValSet(&tx_buffer, CFG_SBAS_USE_INTEGRITY, payload, offset);
         }
 
         uint64_t mask = SBAS_SEARCH_ALL;
-        switch (gpsConfig.sbasMode) {
+        switch (gpsConfig()->sbasMode) {
         case SBAS_EGNOS:
             mask = SBAS_SEARCH_PRN(123) | SBAS_SEARCH_PRN(126) | SBAS_SEARCH_PRN(136);
             break;
@@ -880,19 +876,19 @@ static void ubloxSetSbas(void)
     } else {
         //NOTE: default ublox config for sbas mode is: UBLOX_MODE_ENABLED, test is disabled
         tx_buffer.payload.cfg_sbas.mode = UBLOX_MODE_TEST;
-        if (gpsConfig.sbasMode != SBAS_NONE) {
+        if (gpsConfig()->sbasMode != SBAS_NONE) {
             tx_buffer.payload.cfg_sbas.mode |= UBLOX_MODE_ENABLED;
         }
 
         // NOTE: default ublox config for sbas mode is: UBLOX_USAGE_RANGE | UBLOX_USAGE_DIFFCORR, integrity is disabled
         tx_buffer.payload.cfg_sbas.usage = UBLOX_USAGE_RANGE | UBLOX_USAGE_DIFFCORR;
-        if (gpsConfig.sbas_integrity) {
+        if (gpsConfig()->sbas_integrity) {
             tx_buffer.payload.cfg_sbas.usage |= UBLOX_USAGE_INTEGRITY;
         }
 
         tx_buffer.payload.cfg_sbas.maxSBAS = 3;
         tx_buffer.payload.cfg_sbas.scanmode2 = 0;
-        switch (gpsConfig.sbasMode) {
+        switch (gpsConfig()->sbasMode) {
         case SBAS_AUTO:
             tx_buffer.payload.cfg_sbas.scanmode1 = 0;
             break;
@@ -947,7 +943,7 @@ static void gpsConfigureNmea(void)
     gpsData.state_ts = gpsData.now;
 
     // Check that the GPS transmit buffer is empty
-    if (!uartTxBufEmpty(_DEF_UART3)) {
+    if (!isSerialTransmitBufferEmpty(gpsPort)) {
         return;
     }
 
@@ -962,14 +958,13 @@ static void gpsConfigureNmea(void)
 #if !defined(GPS_NMEA_TX_ONLY)
         if (gpsData.state_position < 1) {
             // set the FC's baud rate to the user's configured baud rate
-            //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
-            uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
+            serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
             gpsData.state_position++;
         } else if (gpsData.state_position < 2) {
             // send NMEA custom commands to select which messages being sent, data rate etc
             // use PUBX, MTK, SiRF or GTK format commands, depending on module type
             static int commandOffset = 0;
-            const char *commands = gpsConfig.nmeaCustomCommands;
+            const char *commands = gpsConfig()->nmeaCustomCommands;
             const char *cmd = commands + commandOffset;
             // skip leading whitespaces and get first command length
             int commandLen;
@@ -978,10 +973,8 @@ static void gpsConfigureNmea(void)
             }
             if (*cmd) {
                 // Send the current command to the GPS
-//                serialWriteBuf(gpsPort, (uint8_t *)cmd, commandLen);
-//                serialWriteBuf(gpsPort, (uint8_t *)"\r\n", 2);
-                uartWrite(_DEF_UART3, (uint8_t *)cmd, commandLen);
-                uartWrite(_DEF_UART3, (uint8_t *)"\r\n", 2);
+                serialWriteBuf(gpsPort, (uint8_t *)cmd, commandLen);
+                serialWriteBuf(gpsPort, (uint8_t *)"\r\n", 2);
                 // Move to the next command
                 cmd += commandLen;
             }
@@ -1011,9 +1004,9 @@ static void gpsConfigureUblox(void)
 {
 
     // Wait until GPS transmit buffer is empty
-   if (!uartTxBufEmpty(_DEF_UART3)) {
-       return;
-   }
+    if (!isSerialTransmitBufferEmpty(gpsPort)) {
+        return;
+    }
 
     switch (gpsData.state) {
     case GPS_STATE_DETECT_BAUD:
@@ -1024,7 +1017,7 @@ static void gpsConfigureUblox(void)
         // initially the FC will be at the user-configured baud rate.
         if (gpsData.platformVersion > UBX_VERSION_UNDEF) {
             // set the GPS module's serial port to the user's intended baud rate
-            serialPrint(_DEF_UART3, gpsInitData[gpsData.userBaudRateIndex].ubx);
+            serialPrint(gpsPort, gpsInitData[gpsData.userBaudRateIndex].ubx);
             // use this baud rate for re-connections
             gpsData.tempBaudRateIndex = gpsData.userBaudRateIndex;
             // we're done here, let's move the the next state
@@ -1062,8 +1055,7 @@ static void gpsConfigureUblox(void)
             gpsData.tempBaudRateIndex--;
         }
         // set the FC baud rate to the new temp baud rate
-        //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex]);
-        uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex]);
+        serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.tempBaudRateIndex].baudrateIndex]);
         initBaudRateCycleCount++;
 
         break;
@@ -1076,8 +1068,7 @@ static void gpsConfigureUblox(void)
             return;
         }
         // set the FC's serial port to the configured rate
-        //serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
-        uartSetBaud(_DEF_UART3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
+        serialSetBaudRate(gpsPort, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex]);
         DEBUG_SET(DEBUG_GPS_CONNECTION, 3, baudRates[gpsInitData[gpsData.userBaudRateIndex].baudrateIndex] / 100);
         // then start sending configuration settings
         gpsSetState(GPS_STATE_CONFIGURE);
@@ -1085,7 +1076,7 @@ static void gpsConfigureUblox(void)
 
     case GPS_STATE_CONFIGURE:
         // Either use specific config file for GPS or let dynamically upload config
-        if (gpsConfig.autoConfig == GPS_AUTOCONFIG_OFF) {
+        if (gpsConfig()->autoConfig == GPS_AUTOCONFIG_OFF) {
             gpsSetState(GPS_STATE_RECEIVING_DATA);
             break;
         }
@@ -1146,10 +1137,10 @@ static void gpsConfigureUblox(void)
                 ubloxSetMessageRate(CLASS_NMEA_STD, MSG_NMEA_RMC, 0); // RMC: Recommended Minimum data
                 break;
             case UBLOX_ACQUIRE_MODEL:
-                ubloxSendNAV5Message(gpsConfig.gps_ublox_acquire_model);
+                ubloxSendNAV5Message(gpsConfig()->gps_ublox_acquire_model);
                 break;
             case UBLOX_CFG_ANA:
-                if (gpsData.ubloxM7orAbove && gpsConfig.gps_ublox_enable_ana) {
+                if (gpsData.ubloxM7orAbove && gpsConfig()->gps_ublox_enable_ana) {
                     ubloxAssistNowAutonomous();
                 } else {
                     gpsData.state_position++;
@@ -1224,11 +1215,11 @@ static void gpsConfigureUblox(void)
                 break;
             case UBLOX_SET_NAV_RATE:
                 // set the nav solution rate to the user's configured update rate
-                gpsData.updateRateHz = gpsConfig.gps_update_rate_hz;
+                gpsData.updateRateHz = gpsConfig()->gps_update_rate_hz;
                 ubloxSetNavRate(gpsData.updateRateHz, 1, 1);
                 break;
             case UBLOX_MSG_CFG_GNSS:
-                if ((gpsConfig.sbasMode == SBAS_NONE) || (gpsConfig.gps_ublox_use_galileo)) {
+                if ((gpsConfig()->sbasMode == SBAS_NONE) || (gpsConfig()->gps_ublox_use_galileo)) {
                     ubloxSendPollMessage(MSG_CFG_GNSS); // poll messages wait for ACK
                 } else {
                     gpsData.state_position++;
@@ -1281,7 +1272,7 @@ static void gpsConfigureUblox(void)
 
 static void gpsConfigureHardware(void)
 {
-    switch (gpsConfig.provider) {
+    switch (gpsConfig()->provider) {
     case GPS_NMEA:
 #ifdef USE_GPS_NMEA
         gpsConfigureNmea();
@@ -1301,7 +1292,7 @@ static void gpsConfigureHardware(void)
 static void updateGpsIndicator(timeUs_t currentTimeUs)
 {
     static uint32_t GPSLEDTime;
-    if (cmp32(currentTimeUs, GPSLEDTime) >= 0 && STATE(GPS_FIX) && (gpsSol.numSat >= gpsRescueConfig.minSats)) {
+    if (cmp32(currentTimeUs, GPSLEDTime) >= 0 && STATE(GPS_FIX) && (gpsSol.numSat >= gpsRescueConfig()->minSats)) {
         GPSLEDTime = currentTimeUs + 150000;
         LED1_TOGGLE;
     }
@@ -1460,31 +1451,30 @@ void gpsUpdate(timeUs_t currentTimeUs)
     uint32_t rxBytesWaiting = 0;
     gpsData.now = millis();
 
-    switch (gpsConfig.provider) {
+    switch (gpsConfig()->provider) {
 #ifdef USE_GPS_UBLOX
     case GPS_UBLOX:
     {
         if (!gpsPort) {
             break;
         }
-        //rxBytesWaiting = serialRxBytesWaiting(gpsPort);
-        rxBytesWaiting = uartAvailable(_DEF_UART3);
+        rxBytesWaiting = serialRxBytesWaiting(gpsPort);
         DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         const uint32_t initialCycleCount = getCycleCounter();
         static uint8_t wait = 0;
         static bool isFast = false;
         while (rxBytesWaiting-- > 0) {
-           wait = 0;
-           if (!isFast) {
-               rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
-               isFast = true;
-           }
-           if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
-               break;
-           }
-           if (gpsNewFrameUBLOX(uartRead(_DEF_UART3))) {
-               gpsHandleFrameComplete();
-           }
+            wait = 0;
+            if (!isFast) {
+                rescheduleTask(TASK_SELF, TASK_PERIOD_HZ(TASK_GPS_RATE_FAST));
+                isFast = true;
+            }
+            if (cmp32((getCycleCounter() - initialCycleCount), cpuCycleLimit()) > 0) {
+                break;
+            }
+            if (gpsNewFrameUBLOX(serialRead(gpsPort))) {
+                gpsHandleFrameComplete();
+            }
         }
         rescheduleWhenNecessary(&wait, &isFast);
         break;
@@ -1497,7 +1487,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
         if (!gpsPort) {
             break;
         }
-        rxBytesWaiting = uartAvailable(_DEF_UART3);;
+        rxBytesWaiting = serialRxBytesWaiting(gpsPort);
         DEBUG_SET(DEBUG_GPS_CONNECTION, 7, rxBytesWaiting);
         static uint8_t wait = 0;
         static bool isFast = false;
@@ -1510,7 +1500,7 @@ void gpsUpdate(timeUs_t currentTimeUs)
             if (cmpTimeUs(micros(), currentTimeUs) > GPS_RECV_TIME_MAX) {
                 break;
             }
-            if (gpsNewFrameNMEA(uartRead(_DEF_UART3))) {
+            if (gpsNewFrameNMEA(serialRead(gpsPort))) {
                 gpsHandleFrameComplete();
             }
         }
@@ -1576,12 +1566,12 @@ void gpsUpdate(timeUs_t currentTimeUs)
 
     case GPS_STATE_RECEIVING_DATA:
 #ifdef USE_GPS_UBLOX
-        if (gpsConfig.provider == GPS_UBLOX || gpsConfig.provider == GPS_NMEA) {      // TODO  Send ublox message to nmea GPS?
-            if (gpsConfig.autoConfig == GPS_AUTOCONFIG_ON) {
+        if (gpsConfig()->provider == GPS_UBLOX || gpsConfig()->provider == GPS_NMEA) {      // TODO  Send ublox message to nmea GPS?
+            if (gpsConfig()->autoConfig == GPS_AUTOCONFIG_ON) {
                 // when we are connected up, and get a 3D fix, enable the 'flight' fix model
                 if (!gpsData.ubloxUsingFlightModel && STATE(GPS_FIX)) {
                     gpsData.ubloxUsingFlightModel = true;
-                    ubloxSendNAV5Message(gpsConfig.gps_ublox_flight_model);
+                    ubloxSendNAV5Message(gpsConfig()->gps_ublox_flight_model);
                 }
             }
         }
@@ -1603,14 +1593,14 @@ void gpsUpdate(timeUs_t currentTimeUs)
 
     static bool hasBeeped = false;
     if (!ARMING_FLAG(ARMED)) {
-        if (!gpsConfig.gps_set_home_point_once) {
+        if (!gpsConfig()->gps_set_home_point_once) {
         // clear the home fix icon between arms if the user configuration is to reset home point between arms
             DISABLE_STATE(GPS_FIX_HOME);
         }
         // while disarmed, beep when requirements for a home fix are met
         // ?? should we also beep if home fix requirements first appear after arming?
-        if (!hasBeeped && STATE(GPS_FIX) && gpsSol.numSat >= gpsRescueConfig.minSats) {
-            //beeper(BEEPER_READY_BEEP);
+        if (!hasBeeped && STATE(GPS_FIX) && gpsSol.numSat >= gpsRescueConfig()->minSats) {
+            beeper(BEEPER_READY_BEEP);
             hasBeeped = true;
         }
     }
@@ -1630,8 +1620,8 @@ void gpsUpdate(timeUs_t currentTimeUs)
     schedulerSetNextStateTime(gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT);
 
     DEBUG_SET(DEBUG_GPS_CONNECTION, 5, executeTimeUs);
-    //keeping temporarily, to be used when debugging the scheduler stuff
-    DEBUG_SET(DEBUG_GPS_CONNECTION, 6, (gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT));
+//    keeping temporarily, to be used when debugging the scheduler stuff
+//    DEBUG_SET(DEBUG_GPS_CONNECTION, 6, (gpsStateDurationFractionUs[gpsCurrentState] >> GPS_TASK_DECAY_SHIFT));
 }
 
 static void gpsHandleFrameComplete(void)
@@ -1670,7 +1660,7 @@ static ubloxVersion_e ubloxParseVersion(const uint32_t version)
 
 bool gpsNewFrame(uint8_t c)
 {
-    switch (gpsConfig.provider) {
+    switch (gpsConfig()->provider) {
     case GPS_NMEA:          // NMEA
 #ifdef USE_GPS_NMEA
         return gpsNewFrameNMEA(c);
@@ -2690,13 +2680,13 @@ static bool UBLOX_parse_gps(void)
 
             for (int i = 0; i < ubxRcvMsgPayload.ubxCfgGnss.numConfigBlocks; i++) {
                 if (ubxRcvMsgPayload.ubxCfgGnss.configblocks[i].gnssId == UBLOX_GNSS_SBAS) {
-                    if (gpsConfig.sbasMode == SBAS_NONE) {
+                    if (gpsConfig()->sbasMode == SBAS_NONE) {
                         tx_buffer.payload.cfg_gnss.configblocks[i].flags &= ~UBLOX_GNSS_ENABLE; // Disable SBAS
                     }
                 }
 
                 if (ubxRcvMsgPayload.ubxCfgGnss.configblocks[i].gnssId == UBLOX_GNSS_GALILEO) {
-                    if (gpsConfig.gps_ublox_use_galileo) {
+                    if (gpsConfig()->gps_ublox_use_galileo) {
                         tx_buffer.payload.cfg_gnss.configblocks[i].flags |= UBLOX_GNSS_ENABLE; // Enable Galileo
                     } else {
                         tx_buffer.payload.cfg_gnss.configblocks[i].flags &= ~UBLOX_GNSS_ENABLE; // Disable Galileo
@@ -2882,31 +2872,31 @@ static void gpsHandlePassthrough(uint8_t data)
 // forward GPS data to specified port (used by CLI)
 // return false if forwarding failed
 // curently only way to stop forwarding is to reset the board
-//bool gpsPassthrough(serialPort_t *gpsPassthroughPort)
-//{
-//    if (!gpsPort) {
-//        // GPS port is not open for some reason - no GPS, MSP GPS, ..
-//        return false;
-//    }
-//    waitForSerialPortToFinishTransmitting(gpsPort);
-//    waitForSerialPortToFinishTransmitting(gpsPassthroughPort);
-//
-//    if (!(gpsPort->mode & MODE_TX)) {
-//        // try to switch TX mode on
-//        serialSetMode(gpsPort, gpsPort->mode | MODE_TX);
-//    }
-//
-//#ifdef USE_DASHBOARD
-//    if (featureIsEnabled(FEATURE_DASHBOARD)) {
-//        // Should be handled via a generic callback hook, so the GPS module doesn't have to be coupled to the dashboard module.
-//        dashboardShowFixedPage(PAGE_GPS);
-//    }
-//#endif
-//
-//    serialPassthrough(gpsPort, gpsPassthroughPort, &gpsHandlePassthrough, NULL);
-//    // allow exitting passthrough mode in future
-//    return true;
-//}
+bool gpsPassthrough(serialPort_t *gpsPassthroughPort)
+{
+    if (!gpsPort) {
+        // GPS port is not open for some reason - no GPS, MSP GPS, ..
+        return false;
+    }
+    waitForSerialPortToFinishTransmitting(gpsPort);
+    waitForSerialPortToFinishTransmitting(gpsPassthroughPort);
+
+    if (!(gpsPort->mode & MODE_TX)) {
+        // try to switch TX mode on
+        serialSetMode(gpsPort, gpsPort->mode | MODE_TX);
+    }
+
+#ifdef USE_DASHBOARD
+    if (featureIsEnabled(FEATURE_DASHBOARD)) {
+        // Should be handled via a generic callback hook, so the GPS module doesn't have to be coupled to the dashboard module.
+        dashboardShowFixedPage(PAGE_GPS);
+    }
+#endif
+
+    serialPassthrough(gpsPort, gpsPassthroughPort, &gpsHandlePassthrough, NULL);
+    // allow exitting passthrough mode in future
+    return true;
+}
 
 static float GPS_cosLat = 1.0f;
     // this is used to offset the shrinking longitude as we go towards the poles
@@ -2927,11 +2917,11 @@ static void GPS_calculateDistanceFlown(bool initialize)
     if (initialize) {
         GPS_distanceFlownInCm = 0;
     } else if (STATE(GPS_FIX_HOME) && ARMING_FLAG(ARMED)) {
-        uint16_t speed = gpsConfig.gps_use_3d_speed ? gpsSol.speed3d : gpsSol.groundSpeed;
+        uint16_t speed = gpsConfig()->gps_use_3d_speed ? gpsSol.speed3d : gpsSol.groundSpeed;
         // Only add up movement when speed is faster than minimum threshold
         if (speed > GPS_DISTANCE_FLOWN_MIN_SPEED_THRESHOLD_CM_S) {
             uint32_t dist;
-            GPS_distance_cm_bearing(&gpsSol.llh, &lastLLH, gpsConfig.gps_use_3d_speed, &dist, NULL);
+            GPS_distance_cm_bearing(&gpsSol.llh, &lastLLH, gpsConfig()->gps_use_3d_speed, &dist, NULL);
             GPS_distanceFlownInCm += dist;
         }
     }
@@ -2941,8 +2931,8 @@ static void GPS_calculateDistanceFlown(bool initialize)
 void GPS_reset_home_position(void)
 // runs, if GPS is defined, on arming via tryArm() in core.c, and on gyro cal via processRcStickPositions() in rc_controls.c
 {
-    if (!STATE(GPS_FIX_HOME) || !gpsConfig.gps_set_home_point_once) {
-        if (STATE(GPS_FIX) && gpsSol.numSat >= gpsRescueConfig.minSats) {
+    if (!STATE(GPS_FIX_HOME) || !gpsConfig()->gps_set_home_point_once) {
+        if (STATE(GPS_FIX) && gpsSol.numSat >= gpsRescueConfig()->minSats) {
             // those checks are always true for tryArm, but may not be true for gyro cal
             GPS_home_llh = gpsSol.llh;
             GPS_calc_longitude_scaling(gpsSol.llh.lat);
@@ -2956,7 +2946,7 @@ void GPS_reset_home_position(void)
 
 #ifdef USE_GPS_UBLOX
     // disable Sat Info requests on arming
-    if (gpsConfig.provider == GPS_UBLOX) {
+    if (gpsConfig()->provider == GPS_UBLOX) {
         setSatInfoMessageRate(0);
     }
 #endif
@@ -3059,7 +3049,7 @@ void gpsSetFixState(bool state)
 {
     if (state) {
         ENABLE_STATE(GPS_FIX);
-        //ENABLE_STATE(GPS_FIX_EVER);
+        ENABLE_STATE(GPS_FIX_EVER);
     } else {
         DISABLE_STATE(GPS_FIX);
     }
@@ -3082,19 +3072,7 @@ float getGpsCosLat(void)
 
 baudRate_e getGpsPortActualBaudRateIndex(void)
 {
-    return lookupBaudRateIndex(uartGetBaud(_DEF_UART3));
-}
-
-//It was mobed here since even i2cgps code needs it
-int32_t wrap_18000(int32_t ang) {
-  if (ang > 18000)  ang -= 36000;
-  if (ang < -18000) ang += 36000;
-  return ang;
-}
-
-bool isGPSHeadingValid(void)
-{
-    return sensors(SENSOR_GPS) && STATE(GPS_FIX) && gpsSol.numSat >= 6;// && gpsSol.groundSpeed >= 300;
+    return lookupBaudRateIndex(serialGetBaudRate(gpsPort));
 }
 
 #endif // USE_GPS

@@ -22,13 +22,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/debug.h"
 
-//#include "cli/cli.h"
+#include "cli/cli.h"
 
-//#include "cms/cms.h"
+#include "cms/cms.h"
 
 #include "common/color.h"
 #include "common/utils.h"
@@ -36,15 +36,15 @@
 #include "config/feature.h"
 
 #include "drivers/accgyro/accgyro.h"
-//#include "drivers/camera_control.h"
+#include "drivers/camera_control.h"
 #include "drivers/compass/compass.h"
 #include "drivers/sensor.h"
-//#include "drivers/serial.h"
-//#include "drivers/serial_usb_vcp.h"
-//#include "drivers/stack_check.h"
-//#include "drivers/transponder_ir.h"
-//#include "drivers/usb_io.h"
-//#include "drivers/vtx_common.h"
+#include "drivers/serial.h"
+#include "drivers/serial_usb_vcp.h"
+#include "drivers/stack_check.h"
+#include "drivers/transponder_ir.h"
+#include "drivers/usb_io.h"
+#include "drivers/vtx_common.h"
 
 #include "config/config.h"
 #include "fc/core.h"
@@ -56,26 +56,26 @@
 #include "flight/alt_hold.h"
 #include "flight/gps_rescue.h"
 #include "flight/imu.h"
-//#include "flight/mixer.h"
+#include "flight/mixer.h"
 #include "flight/pid.h"
 #include "flight/position.h"
 #include "flight/pos_hold.h"
 
 #include "io/asyncfatfs/asyncfatfs.h"
-//#include "io/beeper.h"
-//#include "io/dashboard.h"
-//#include "io/dronecan/dronecan.h"
-//#include "io/flashfs.h"
-//#include "io/gimbal_control.h"
+#include "io/beeper.h"
+#include "io/dashboard.h"
+#include "io/dronecan/dronecan.h"
+#include "io/flashfs.h"
+#include "io/gimbal_control.h"
 #include "io/gps.h"
 #include "io/ledstrip.h"
-//#include "io/piniobox.h"
-//#include "io/serial.h"
-//#include "io/transponder_ir.h"
-//#include "io/vtx_tramp.h" // Will be gone
-//#include "io/rcdevice_cam.h"
-//#include "io/usb_cdc_hid.h"
-//#include "io/vtx.h"
+#include "io/piniobox.h"
+#include "io/serial.h"
+#include "io/transponder_ir.h"
+#include "io/vtx_tramp.h" // Will be gone
+#include "io/rcdevice_cam.h"
+#include "io/usb_cdc_hid.h"
+#include "io/vtx.h"
 
 #include "msp/msp.h"
 #include "msp/msp_serial.h"
@@ -85,15 +85,15 @@
 #include "osd/osd_custom_text.h"
 #endif
 
-//#include "pg/rx.h"
-//#include "pg/motor.h"
+#include "pg/rx.h"
+#include "pg/motor.h"
 
 #include "rx/rx.h"
 #include "rx/rc_stats.h"
 
 #include "scheduler/scheduler.h"
 
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/adcinternal.h"
 #include "sensors/barometer.h"
 #include "sensors/battery.h"
@@ -135,27 +135,6 @@ static void taskMain(timeUs_t currentTimeUs)
     flashfsEraseAsync();
 #endif
 }
-static void ledUpdate(uint32_t currentTimeUs)
-{
-    static uint32_t pre_time = 0;
-    if(currentTimeUs - pre_time >= 1000000)
-    {
-        pre_time = currentTimeUs;
-        if(ARMING_FLAG(ARMED))
-        {
-        	ledOn(BLUE);
-        }
-        else
-        {
-          LED0_TOGGLE;
-        }
-    }
-}
-
-static void debugPrint(uint32_t currentTimeUs)
-{
-  //uartPrintf_IT(_DEF_UART1, "adcValue =  %d, buff = %d\r\n", adcGetValue(0), adcInternalRead(4));
-}
 
 static void taskHandleSerial(timeUs_t currentTimeUs)
 {
@@ -169,14 +148,13 @@ static void taskHandleSerial(timeUs_t currentTimeUs)
 
     UNUSED(currentTimeUs);
 
-    #if defined(USE_VCP)
+#if defined(USE_VCP)
     DEBUG_SET(DEBUG_USB, 0, usbCableIsInserted());
     DEBUG_SET(DEBUG_USB, 1, usbVcpIsConnected());
 #endif
 
     bool evaluateMspData = ARMING_FLAG(ARMED) ? MSP_SKIP_NON_MSP_DATA : MSP_EVALUATE_NON_MSP_DATA;
     mspSerialProcess(evaluateMspData, mspFcProcessCommand, mspFcProcessReply);
-    cliMain();
 }
 
 static void taskBatteryAlerts(timeUs_t currentTimeUs)
@@ -354,7 +332,7 @@ static void taskUpdateOpticalflow(timeUs_t currentTimeUs)
 #ifdef USE_TELEMETRY
 static void taskTelemetry(timeUs_t currentTimeUs)
 {
-    if (featureIsEnabled(FEATURE_TELEMETRY)) { //!cliMode &&
+    if (!cliMode && featureIsEnabled(FEATURE_TELEMETRY)) {
         subTaskTelemetryPollSensors(currentTimeUs);
 
         telemetryProcess(currentTimeUs);
@@ -374,12 +352,12 @@ static void taskCameraControl(timeUs_t currentTimeUs)
 #endif
 
 #define DEFINE_TASK(taskNameParam, subTaskNameParam, checkFuncParam, taskFuncParam, desiredPeriodParam, staticPriorityParam) {  \
-	    .taskName = taskNameParam, \
-	    .subTaskName = subTaskNameParam, \
-	    .checkFunc = checkFuncParam, \
-	    .taskFunc = taskFuncParam, \
-	    .desiredPeriodUs = desiredPeriodParam, \
-	    .staticPriority = staticPriorityParam \
+    .taskName = taskNameParam, \
+    .subTaskName = subTaskNameParam, \
+    .checkFunc = checkFuncParam, \
+    .taskFunc = taskFuncParam, \
+    .desiredPeriodUs = desiredPeriodParam, \
+    .staticPriority = staticPriorityParam \
 }
 
 // Task info in .bss (unitialised data)
@@ -409,14 +387,11 @@ task_attribute_t task_attributes[TASK_COUNT] = {
 
 #ifdef USE_ACC
     [TASK_ACCEL] = DEFINE_TASK("ACC", NULL, NULL, taskUpdateAccelerometer, TASK_PERIOD_HZ(1000), TASK_PRIORITY_MEDIUM),
-    [TASK_ATTITUDE] = DEFINE_TASK("ATTITUDE", NULL, NULL, imuUpdateAttitude, TASK_PERIOD_HZ(400), TASK_PRIORITY_MEDIUM),
+    [TASK_ATTITUDE] = DEFINE_TASK("ATTITUDE", NULL, NULL, imuUpdateAttitude, TASK_PERIOD_HZ(100), TASK_PRIORITY_MEDIUM),
 #endif
 
     [TASK_RX] = DEFINE_TASK("RX", NULL, rxUpdateCheck, taskUpdateRxMain, TASK_PERIOD_HZ(33), TASK_PRIORITY_HIGH), // If event-based scheduling doesn't work, fallback to periodic scheduling
     [TASK_DISPATCH] = DEFINE_TASK("DISPATCH", NULL, NULL, dispatchProcess, TASK_PERIOD_HZ(1000), TASK_PRIORITY_HIGH),
-
-    [TASK_LED] = DEFINE_TASK("LED", NULL, NULL, ledUpdate, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
-    [TASK_DEBUG] = DEFINE_TASK("DEBUG", NULL, NULL, debugPrint, TASK_PERIOD_HZ(50), TASK_PRIORITY_LOW),
 
 #ifdef USE_BEEPER
     [TASK_BEEPER] = DEFINE_TASK("BEEPER", NULL, NULL, beeperUpdate, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
@@ -546,12 +521,9 @@ void tasksInit(void)
     setTaskEnabled(TASK_MAIN, true);
 
     setTaskEnabled(TASK_SERIAL, true);
-    setTaskEnabled(TASK_LED, true);
-    setTaskEnabled(TASK_DEBUG, true);
-    rescheduleTask(TASK_SERIAL, TASK_PERIOD_HZ(100));
+    rescheduleTask(TASK_SERIAL, TASK_PERIOD_HZ(serialConfig()->serial_update_rate_hz));
 
-
-	const bool useBatteryVoltage = batteryConfig.voltageMeterSource != VOLTAGE_METER_NONE;
+    const bool useBatteryVoltage = batteryConfig()->voltageMeterSource != VOLTAGE_METER_NONE;
     setTaskEnabled(TASK_BATTERY_VOLTAGE, useBatteryVoltage);
 
 #if defined(USE_BATTERY_VOLTAGE_SAG_COMPENSATION)
@@ -561,9 +533,9 @@ void tasksInit(void)
     }
 #endif
 
-    const bool useBatteryCurrent = batteryConfig.currentMeterSource != CURRENT_METER_NONE;
+    const bool useBatteryCurrent = batteryConfig()->currentMeterSource != CURRENT_METER_NONE;
     setTaskEnabled(TASK_BATTERY_CURRENT, useBatteryCurrent);
-    const bool useBatteryAlerts = batteryConfig.useVBatAlerts || batteryConfig.useConsumptionAlerts || featureIsEnabled(FEATURE_OSD);
+    const bool useBatteryAlerts = batteryConfig()->useVBatAlerts || batteryConfig()->useConsumptionAlerts || featureIsEnabled(FEATURE_OSD);
     setTaskEnabled(TASK_BATTERY_ALERTS, (useBatteryVoltage || useBatteryCurrent) && useBatteryAlerts);
 
 #ifdef USE_STACK_CHECK
@@ -571,21 +543,21 @@ void tasksInit(void)
 #endif
 
     if (sensors(SENSOR_GYRO)) {
-      rescheduleTask(TASK_GYRO, bmi270.gyro.sampleLooptime);
-      rescheduleTask(TASK_FILTER, bmi270.gyro.targetLooptime);
-      rescheduleTask(TASK_PID, bmi270.gyro.targetLooptime);
-      setTaskEnabled(TASK_GYRO, true);
-      setTaskEnabled(TASK_FILTER, true);
-      setTaskEnabled(TASK_PID, true);
-      schedulerEnableGyro();
+        rescheduleTask(TASK_GYRO, gyro.sampleLooptime);
+        rescheduleTask(TASK_FILTER, gyro.targetLooptime);
+        rescheduleTask(TASK_PID, gyro.targetLooptime);
+        setTaskEnabled(TASK_GYRO, true);
+        setTaskEnabled(TASK_FILTER, true);
+        setTaskEnabled(TASK_PID, true);
+        schedulerEnableGyro();
     }
 
 #if defined(USE_ACC)
-	if (sensors(SENSOR_ACC) && bmi270.acc.sampleRateHz) {
-    setTaskEnabled(TASK_ACCEL, true);
-    rescheduleTask(TASK_ACCEL, TASK_PERIOD_HZ(bmi270.acc.sampleRateHz));
-    setTaskEnabled(TASK_ATTITUDE, true);
-	}
+    if (sensors(SENSOR_ACC) && acc.sampleRateHz) {
+        setTaskEnabled(TASK_ACCEL, true);
+        rescheduleTask(TASK_ACCEL, TASK_PERIOD_HZ(acc.sampleRateHz));
+        setTaskEnabled(TASK_ATTITUDE, true);
+    }
 #endif
 
 #ifdef USE_RANGEFINDER
@@ -600,9 +572,9 @@ void tasksInit(void)
     }
 #endif
 
-  setTaskEnabled(TASK_RX, true);
+    setTaskEnabled(TASK_RX, true);
 
-  setTaskEnabled(TASK_DISPATCH, dispatchIsEnabled());
+    setTaskEnabled(TASK_DISPATCH, dispatchIsEnabled());
 
 #ifdef USE_BEEPER
     setTaskEnabled(TASK_BEEPER, true);
@@ -644,14 +616,14 @@ void tasksInit(void)
 
 #ifdef USE_TELEMETRY
     if (featureIsEnabled(FEATURE_TELEMETRY)) {
-    	setTaskEnabled(TASK_TELEMETRY, true);
-      if (rxRuntimeState.serialrxProvider == SERIALRX_JETIEXBUS) {
-          // Reschedule telemetry to 500hz for Jeti Exbus
-          rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
-      } else if (rxRuntimeState.serialrxProvider == SERIALRX_CRSF) {
-				// Reschedule telemetry to 500hz, 2ms for CRSF
-				rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
-      }
+        setTaskEnabled(TASK_TELEMETRY, true);
+        if (rxRuntimeState.serialrxProvider == SERIALRX_JETIEXBUS) {
+            // Reschedule telemetry to 500hz for Jeti Exbus
+            rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
+        } else if (rxRuntimeState.serialrxProvider == SERIALRX_CRSF) {
+            // Reschedule telemetry to 500hz, 2ms for CRSF
+            rescheduleTask(TASK_TELEMETRY, TASK_PERIOD_HZ(500));
+        }
     }
 #endif
 
@@ -664,7 +636,7 @@ void tasksInit(void)
 #endif
 
 #ifdef USE_OSD
-    rescheduleTask(TASK_OSD, TASK_PERIOD_HZ(osdConfig.framerate_hz));
+    rescheduleTask(TASK_OSD, TASK_PERIOD_HZ(osdConfig()->framerate_hz));
     setTaskEnabled(TASK_OSD, featureIsEnabled(FEATURE_OSD) && osdGetDisplayPort(NULL));
 #endif
 

@@ -18,13 +18,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-//#include "platform.h"
+#include "platform.h"
 
 #include "version.h"
 
-char __TARGET__[] = "STM32H743";
 const char * const targetName = __TARGET__;
-//const char * const shortGitRevision = __REVISION__;
+const char * const shortGitRevision = __REVISION__;
 #if defined(__CONFIG_REVISION__)
 const char * const shortConfigGitRevision = __CONFIG_REVISION__;
 #endif
@@ -42,11 +41,3 @@ const char * const buildTime = __TIME__;
 #else
     const char * const releaseName = NULL;
 #endif
-
-pilotConfig_t pilotConfig;
-
-void pilotConfig_Init(void)
-{
-	pilotConfig.name[MAX_NAME_LENGTH + 1] = 0;
-	pilotConfig.displayName[MAX_NAME_LENGTH + 1] = 0;
-}

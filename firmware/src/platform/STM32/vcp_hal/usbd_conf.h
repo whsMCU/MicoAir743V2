@@ -50,7 +50,7 @@
 #define __USBD_CONF_H
 
 /* Includes ------------------------------------------------------------------*/
-#include "hw.h"      // Required for inclusion of stm32Yxx_hal.h below within USB device library code
+#include "platform.h"      // Required for inclusion of stm32Yxx_hal.h below within USB device library code
 #include "common/maths.h"  // Required for MIN & MAX within USB device library code
 
 #if defined(STM32F7)

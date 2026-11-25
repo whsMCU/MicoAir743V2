@@ -19,20 +19,22 @@
  */
 
 #include <math.h>
-#include "hw.h"
+
+#include "platform.h"
 
 #ifdef USE_PERSISTENT_STATS
 
-#include "common/time.h"
-
 #include "config/config.h"
+
+#include "drivers/time.h"
+
 #include "fc/dispatch.h"
 #include "fc/runtime_config.h"
 
-//#include "io/beeper.h"
+#include "io/beeper.h"
 #include "io/gps.h"
 
-//#include "pg/stats.h"
+#include "pg/stats.h"
 
 #ifdef USE_BATTERY_CONTINUE
 #include "sensors/battery.h"
@@ -52,18 +54,6 @@ static bool saveRequired = false;
 static void writeStats(dispatchEntry_t *self);
 dispatchEntry_t writeStatsEntry = { writeStats, 0, NULL, false };
 
-statsConfig_t statsConfig;
-
-void statsConfig_Init(void)
-{
-	statsConfig.stats_min_armed_time_s = STATS_OFF;
-	statsConfig.stats_total_flights = 0;
-	statsConfig.stats_total_time_s = 0;
-	statsConfig.stats_total_dist_m = 0;
-	statsConfig.stats_mah_used = 0;
-	statsConfig.statsSaveMoveLimit = 20;
-}
-
 #ifdef USE_GPS
     #define DISTANCE_FLOWN_CM (GPS_distanceFlownInCm)
 #else
@@ -75,7 +65,7 @@ void statsInit(void)
     dispatchEnable();
 }
 
-void writeStats(dispatchEntry_t* self)
+static void writeStats(dispatchEntry_t *self)
 {
     UNUSED(self);
 
@@ -83,14 +73,14 @@ void writeStats(dispatchEntry_t* self)
         // Don't save if the user made config changes that have not yet been saved.
         if (!isConfigDirty()) {
 
-            const bool gyroIsStill = fabsf(bmi270.gyro.gyroADCf[FD_ROLL]) < statsConfig.statsSaveMoveLimit &&
-                fabsf(bmi270.gyro.gyroADCf[FD_PITCH]) < statsConfig.statsSaveMoveLimit &&
-                fabsf(bmi270.gyro.gyroADCf[FD_YAW]) < statsConfig.statsSaveMoveLimit;
+            const bool gyroIsStill = fabsf(gyro.gyroADCf[FD_ROLL]) < statsConfig()->statsSaveMoveLimit &&
+                fabsf(gyro.gyroADCf[FD_PITCH]) < statsConfig()->statsSaveMoveLimit &&
+                fabsf(gyro.gyroADCf[FD_YAW]) < statsConfig()->statsSaveMoveLimit;
 
-            if (gyroIsStill || statsConfig.statsSaveMoveLimit == 0) {
+            if (gyroIsStill || statsConfig()->statsSaveMoveLimit == 0) {
                 writeEEPROM();
                 // Repeat disarming beep indicating the stats save is complete
-                //beeper(BEEPER_DISARMING);
+                beeper(BEEPER_DISARMING);
             } else {
                 dispatchAdd(&writeStatsEntry, STATS_SAVE_DELAY_US);
             }
@@ -108,14 +98,14 @@ void statsOnArm(void)
 
 void statsOnDisarm(void)
 {
-    int8_t minArmedTimeS = statsConfig.stats_min_armed_time_s;
+    int8_t minArmedTimeS = statsConfig()->stats_min_armed_time_s;
     if (minArmedTimeS >= 0) {
         uint32_t dtS = (millis() - arm_millis) / 1000;
         if (dtS >= (uint8_t)minArmedTimeS) {
-            statsConfig.stats_total_flights += 1;    // arm / flight counter
-            statsConfig.stats_total_time_s += dtS;
-            statsConfig.stats_total_dist_m += (DISTANCE_FLOWN_CM - arm_distance_cm) / 100;
-            #ifdef USE_BATTERY_CONTINUE
+            statsConfigMutable()->stats_total_flights += 1;    // arm / flight counter
+            statsConfigMutable()->stats_total_time_s += dtS;
+            statsConfigMutable()->stats_total_dist_m += (DISTANCE_FLOWN_CM - arm_distance_cm) / 100;
+#ifdef USE_BATTERY_CONTINUE
             statsConfigMutable()->stats_mah_used = getMAhDrawn();
 #endif
 

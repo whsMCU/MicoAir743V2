@@ -23,12 +23,13 @@
 #include <math.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/utils.h"
-#include "common/maths.h"
-#include "common/axis.h"
 #include "common/sensor_alignment.h"
+
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "drivers/sensor.h"
 
@@ -37,16 +38,23 @@
 static bool standardBoardAlignment = true;     // board orientation correction
 static matrix33_t boardRotation;
 
-// no template required since defaults are zero
+PG_REGISTER_WITH_RESET_TEMPLATE(boardAlignment_t, boardAlignment, PG_BOARD_ALIGNMENT, 1);
 
-boardAlignment_t boardAlignment;
+#ifndef DEFAULT_ALIGN_BOARD_ROLL
+#define DEFAULT_ALIGN_BOARD_ROLL 0
+#endif
+#ifndef DEFAULT_ALIGN_BOARD_PITCH
+#define DEFAULT_ALIGN_BOARD_PITCH 0
+#endif
+#ifndef DEFAULT_ALIGN_BOARD_YAW
+#define DEFAULT_ALIGN_BOARD_YAW 0
+#endif
 
-void boardAlignment_Init(int32_t roll, int32_t pitch, int32_t yaw)
-{
-	boardAlignment.rollDegrees  = roll;
-	boardAlignment.pitchDegrees = pitch;
-	boardAlignment.yawDegrees   = yaw;
-}
+PG_RESET_TEMPLATE(boardAlignment_t, boardAlignment,
+        .rollDegrees = DEFAULT_ALIGN_BOARD_ROLL,
+        .pitchDegrees = DEFAULT_ALIGN_BOARD_PITCH,
+        .yawDegrees = DEFAULT_ALIGN_BOARD_YAW,
+);
 
 static bool isBoardAlignmentStandard(const boardAlignment_t *boardAlignment)
 {

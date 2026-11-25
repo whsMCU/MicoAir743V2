@@ -22,11 +22,9 @@
 
 #include <stdbool.h>
 
-#include "hw.h"
-
 #include "fc/rc_modes.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef enum {
     ADJUSTMENT_NONE = 0,
@@ -97,7 +95,7 @@ typedef struct adjustmentRange_s {
     uint16_t adjustmentScale;
 } adjustmentRange_t;
 
-extern adjustmentRange_t adjustmentRanges[MAX_ADJUSTMENT_RANGE_COUNT];
+PG_DECLARE_ARRAY(adjustmentRange_t, MAX_ADJUSTMENT_RANGE_COUNT, adjustmentRanges);
 
 typedef struct timedAdjustmentState_s {
     uint32_t timeoutAt;
@@ -111,7 +109,7 @@ typedef struct continuosAdjustmentState_s {
 } continuosAdjustmentState_t;
 
 struct controlRateConfig_s;
-void processRcAdjustments(void);
+void processRcAdjustments(struct controlRateConfig_s *controlRateConfig);
 const char *getAdjustmentsRangeName(void);
 int getAdjustmentsRangeValue(void);
 void activeAdjustmentRangeReset(void);

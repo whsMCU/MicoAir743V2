@@ -22,6 +22,8 @@
 
 #include <stdint.h>
 
+#include "pg/pg.h"
+
 typedef enum {
     RATES_TYPE_BETAFLIGHT = 0,
     RATES_TYPE_RACEFLIGHT,
@@ -44,13 +46,7 @@ typedef enum {
     THROTTLE_LIMIT_TYPE_COUNT   // must be the last entry
 } throttleLimitType_e;
 
-typedef enum {
-    TPA_MODE_PD,
-    TPA_MODE_D
-} tpaMode_e;
-
 #define MAX_RATE_PROFILE_NAME_LENGTH 8u
-#define CONTROL_RATE_PROFILE_COUNT  6
 
 typedef struct controlRateConfig_s {
     uint8_t thrMid8;
@@ -59,23 +55,18 @@ typedef struct controlRateConfig_s {
     uint8_t rcRates[3];
     uint8_t rcExpo[3];
     uint8_t rates[3];
-    uint8_t tpa_rate;                       // Percent reduction in P or D at full throttle
-    uint16_t tpa_breakpoint;                // Breakpoint where TPA is activated
     uint8_t throttle_limit_type;            // Sets the throttle limiting type - off, scale or clip
     uint8_t throttle_limit_percent;         // Sets the maximum pilot commanded throttle limit
     uint16_t rate_limit[3];                 // Sets the maximum rate for the axes
-    uint8_t tpaMode;                        // Controls which PID terms TPA effects
     char profileName[MAX_RATE_PROFILE_NAME_LENGTH + 1]; // Descriptive name for rate profile
     uint8_t quickRatesRcExpo;               // Sets expo on rc command for quick rates
-    uint8_t levelExpo[2];                   // roll/pitch level mode expo
     uint8_t thrHover8;
 } controlRateConfig_t;
 
-extern controlRateConfig_t controlRateProfiles[CONTROL_RATE_PROFILE_COUNT];
+PG_DECLARE_ARRAY(controlRateConfig_t, CONTROL_RATE_PROFILE_COUNT, controlRateProfiles);
+
 extern controlRateConfig_t *currentControlRateProfile;
 extern const ratesSettingsLimits_t ratesSettingLimits[RATES_TYPE_COUNT];
-
-void controlRateProfiles_Init(void);
 
 void loadControlRateProfile(void);
 void changeControlRateProfile(uint8_t controlRateProfileIndex);

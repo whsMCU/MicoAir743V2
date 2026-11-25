@@ -20,7 +20,7 @@
 
 #pragma once
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 #ifndef DEFAULT_FEATURES
 #define DEFAULT_FEATURES 0
@@ -77,13 +77,11 @@ typedef struct featureConfig_s {
     uint32_t enabledFeatures;
 } featureConfig_t;
 
-extern featureConfig_t featureConfig;
+PG_DECLARE(featureConfig_t, featureConfig);
 
 // Mask of features that have code compiled in with current config.
 //  Other restrictions on available features may apply.
 extern uint32_t featuresSupportedByBuild;
-
-void featureConfig_Init(void);
 
 void featureInit(void);
 bool featureIsEnabled(const uint32_t mask);

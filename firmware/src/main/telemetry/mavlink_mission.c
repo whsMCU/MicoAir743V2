@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if ENABLE_TELEMETRY_MAVLINK_MISSION
 
@@ -40,8 +40,8 @@
 
 #include "io/gps.h"
 
-//#include "pg/autopilot.h"
-//#include "pg/flight_plan.h"
+#include "pg/autopilot.h"
+#include "pg/flight_plan.h"
 
 #include "telemetry/mavlink.h"
 #include "telemetry/mavlink_mission.h"

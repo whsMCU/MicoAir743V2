@@ -49,7 +49,7 @@
 
 #include <stdbool.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_VCP
 

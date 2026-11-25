@@ -15,7 +15,7 @@
  * along with Betaflight. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "hw.h"
+#include "platform.h"
 
 #ifndef USE_WING
 
@@ -37,7 +37,7 @@
 #include "flight/position_nav.h"
 
 #include "rx/rx.h"
-//#include "pg/autopilot.h"
+#include "pg/autopilot.h"
 
 #include "alt_hold.h"
 
@@ -53,14 +53,6 @@ typedef struct {
 } altHoldState_t;
 
 altHoldState_t altHold;
-
-altHoldConfig_t altHoldConfig;
-
-void altHoldConfig_Init(void)
-{
-	altHoldConfig.climbRate = 50; // max vertical velocity change at full/zero throttle. 50 means 5 m/s
-	altHoldConfig.deadband = 20; // throttle deadband in percent of stick travel
-}
 
 // A rescue in progress substitutes gpsRescueConfig()'s ascend/descend rate for
 // the alt-hold climbRate cap; failsafe auto-landing and pilot alt-hold keep it.
@@ -80,9 +72,9 @@ static void altHoldReset(void)
 void altHoldInit(void)
 {
     altHold.isActive = false;
-    altHold.deadband = altHoldConfig.deadband / 100.0f;
-    altHold.allowStickAdjustment = altHoldConfig.deadband;
-    altHold.maxClimbRate = altHoldConfig.climbRate * 10.0f; // 50 in CLI means 500cm/s
+    altHold.deadband = altHoldConfig()->deadband / 100.0f;
+    altHold.allowStickAdjustment = altHoldConfig()->deadband;
+    altHold.maxClimbRate = altHoldConfig()->climbRate * 10.0f; // 50 in CLI means 500cm/s
     altHoldReset();
 }
 
@@ -158,7 +150,7 @@ static void altHoldUpdateTargetAltitude(void)
 static void altHoldUpdate(void)
 {
     
-    if (altHoldConfig.climbRate) {
+    if (altHoldConfig()->climbRate) {
         altHoldUpdateTargetAltitude(); // check if the pilot has changed the target altitude using sticks
     }
 
@@ -171,7 +163,7 @@ static void altHoldUpdate(void)
             targetAltitudeCm = navCmd->targetPosEfM.z * 100.0f;
             if (positionNavTargetReached()) {
                 altHold.targetAltitudeCm = targetAltitudeCm; // store target altitude so Alt Hold does not revert to pre-nav target altitude on the next cycle.
-                targetAltitudeVelocity = 0.0f;
+            targetAltitudeVelocity = 0.0f;
             } else {
                  targetAltitudeVelocity = positionNavGetTargetVelocityCmS().z; 
             }

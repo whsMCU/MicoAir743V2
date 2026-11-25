@@ -20,9 +20,10 @@
 
 #pragma once
 
-#include "hw.h"
-#include "common/time.h"
-//#include "io/serial.h"
+#include "drivers/time.h"
+
+#include "io/serial.h"
+
 #include "msp/msp.h"
 
 // Each MSP port requires state and a receive buffer, revisit this default if someone needs more than 3 MSP ports.
@@ -103,9 +104,9 @@ typedef struct __attribute__((packed)) {
 
 #define MSP_MAX_HEADER_SIZE     9
 
+struct serialPort_s;
 typedef struct mspPort_s {
-    uint8_t port;       // UART channel (_DEF_UARTx)
-    bool portActive;    // false when port unused (channel 0 is valid, so can't use port==0 as 'unused')
+    struct serialPort_s *port; // null when port unused.
     timeMs_t lastActivityMs;
     mspPendingSystemRequest_e pendingRequest;
     mspPortState_e portState;
@@ -129,9 +130,9 @@ void mspSerialInit(void);
 bool mspSerialWaiting(void);
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn);
 void mspSerialAllocatePorts(void);
-//void mspSerialReleasePortIfAllocated(struct serialPort_s *serialPort);
+void mspSerialReleasePortIfAllocated(struct serialPort_s *serialPort);
 void mspSerialReleaseSharedTelemetryPorts(void);
-//mspDescriptor_t getMspSerialPortDescriptor(const serialPortIdentifier_e portIdentifier);
-//int mspSerialPush(serialPortIdentifier_e port, uint8_t cmd, uint8_t *data, int datalen, mspDirection_e direction, mspVersion_e mspVersion);
-//uint32_t mspSerialTxBytesFree(void);
-//bool mspSerialIsConfiguratorActive(void);
+mspDescriptor_t getMspSerialPortDescriptor(const serialPortIdentifier_e portIdentifier);
+int mspSerialPush(serialPortIdentifier_e port, uint8_t cmd, uint8_t *data, int datalen, mspDirection_e direction, mspVersion_e mspVersion);
+uint32_t mspSerialTxBytesFree(void);
+bool mspSerialIsConfiguratorActive(void);

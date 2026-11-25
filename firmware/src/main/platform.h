@@ -39,7 +39,7 @@
 // MCU specific platform from platform/X
 #include "platform/platform.h"
 
-#include "hw.h"
+#include "target.h"
 #include "target/common_post.h"
 #include "target/common_defaults_post.h"
 

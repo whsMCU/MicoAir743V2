@@ -20,8 +20,6 @@
 
 #pragma once
 
-#include "hw.h"
-
 typedef enum {
     SYSTEM_STATE_INITIALISING   = 0,
     SYSTEM_STATE_CONFIG_LOADED  = (1 << 0),
@@ -33,4 +31,8 @@ typedef enum {
 
 extern uint8_t systemState;
 
-void init(void);
+void initPhase1(void);
+void initPhase2(void);
+void initPhase3(void);
+bool checkMsc(void);
+void initMsc(void);

@@ -22,76 +22,105 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/debug.h"
 
-//#include "cli/cli.h"
+#include "cli/cli.h"
 
 #include "common/streambuf.h"
 #include "common/utils.h"
 #include "common/crc.h"
 
-//#include "drivers/system.h"
+#include "drivers/system.h"
 
-//#include "io/displayport_msp.h"
+#include "io/displayport_msp.h"
 
 #include "msp/msp.h"
 
 #include "msp_serial.h"
 
-//#include "pg/msp.h"
+#include "pg/msp.h"
 
 static mspPort_t mspPorts[MAX_MSP_PORT_COUNT];
 
-static void resetMspPort(uint8_t ch, mspPort_t *mspPortToReset)
+static void resetMspPort(mspPort_t *mspPortToReset, serialPort_t *serialPort, bool sharedWithTelemetry)
 {
     memset(mspPortToReset, 0, sizeof(mspPort_t));
 
-    mspPortToReset->port = ch;
-    mspPortToReset->portActive = true;
-    //mspPortToReset->sharedWithTelemetry = sharedWithTelemetry;
+    mspPortToReset->port = serialPort;
+    mspPortToReset->sharedWithTelemetry = sharedWithTelemetry;
     mspPortToReset->descriptor = mspDescriptorAlloc();
 }
 
 void mspSerialAllocatePorts(void)
 {
-    resetMspPort(_DEF_UART1, &mspPorts[0]);
-    //resetMspPort(_DEF_UART3, &mspPorts[1]);
-    //resetMspPort(_DEF_UART4, &mspPorts[2]);
+    uint8_t portIndex = 0;
+    const serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_MSP);
+    while (portConfig && portIndex < ARRAYLEN(mspPorts)) {
+        mspPort_t *mspPort = &mspPorts[portIndex];
+
+        if (mspPort->port) {
+            portIndex++;
+            continue;
+        }
+
+        portOptions_e options = SERIAL_NOT_INVERTED;
+
+        if (mspConfig()->halfDuplex) {
+            options |= SERIAL_BIDIR;
+        } else if (serialType(portConfig->identifier) == SERIALTYPE_UART
+                   || serialType(portConfig->identifier) == SERIALTYPE_LPUART
+                   || serialType(portConfig->identifier) == SERIALTYPE_PIOUART) {
+#if !ENABLE_SERIAL_SKIP_CHECK_TX
+            options |= SERIAL_CHECK_TX;
+#endif
+        }
+
+        serialPort_t *serialPort = openSerialPort(portConfig->identifier, FUNCTION_MSP, NULL, NULL, baudRates[portConfig->msp_baudrateIndex], MODE_RXTX, options);
+        if (serialPort) {
+            bool sharedWithTelemetry = isSerialPortShared(portConfig, FUNCTION_MSP, TELEMETRY_PORT_FUNCTIONS_MASK);
+            resetMspPort(mspPort, serialPort, sharedWithTelemetry);
+
+            portIndex++;
+        }
+
+        portConfig = findNextSerialPortConfig(FUNCTION_MSP);
+    }
 }
 
-//void mspSerialReleasePortIfAllocated(struct serialPort_s *serialPort)
-//{
-//    for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
-//        if (candidateMspPort->port == serialPort) {
-//            closeSerialPort(serialPort);
-//            memset(candidateMspPort, 0, sizeof(mspPort_t));
-//        }
-//    }
-//}
+void mspSerialReleasePortIfAllocated(serialPort_t *serialPort)
+{
+    for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
+        if (candidateMspPort->port == serialPort) {
+            closeSerialPort(serialPort);
+            memset(candidateMspPort, 0, sizeof(mspPort_t));
+        }
+    }
+}
 
-//mspDescriptor_t getMspSerialPortDescriptor(const serialPortIdentifier_e portIdentifier)
-//{
-//    for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
-//        if (candidateMspPort->port && candidateMspPort->port->identifier == portIdentifier) {
-//            return candidateMspPort->descriptor;
-//        }
-//    }
-//    return -1;
-//}
+mspDescriptor_t getMspSerialPortDescriptor(const serialPortIdentifier_e portIdentifier)
+{
+    for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
+        if (candidateMspPort->port && candidateMspPort->port->identifier == portIdentifier) {
+            return candidateMspPort->descriptor;
+        }
+    }
+    return -1;
+}
 
 #if defined(USE_TELEMETRY)
 void mspSerialReleaseSharedTelemetryPorts(void)
 {
     for (mspPort_t *candidateMspPort = mspPorts; candidateMspPort < ARRAYEND(mspPorts); candidateMspPort++) {
         if (candidateMspPort->sharedWithTelemetry) {
-            //closeSerialPort(candidateMspPort->port);
+            closeSerialPort(candidateMspPort->port);
             memset(candidateMspPort, 0, sizeof(mspPort_t));
         }
     }
 }
 #endif
+
 static void mspSerialProcessReceivedPacketData(mspPort_t *mspPort, uint8_t c)
 {
     switch (mspPort->packetState) {
@@ -271,66 +300,24 @@ static uint8_t mspSerialChecksumBuf(uint8_t checksum, const uint8_t *data, int l
     return checksum;
 }
 
-// static int mspSerialSendFrame(mspPort_t *msp, const uint8_t * hdr, int hdrLen, const uint8_t * data, int dataLen, const uint8_t * crc, int crcLen)
-// {
-//     // We are allowed to send out the response if
-//     //  a) TX buffer is completely empty (we are talking to well-behaving party that follows request-response scheduling;
-//     //     this allows us to transmit jumbo frames bigger than TX buffer (serialWriteBuf will block, but for jumbo frames we don't care)
-//     //  b) Response fits into TX buffer
-//     const int totalFrameLength = hdrLen + dataLen + crcLen;
-//     if (!isSerialTransmitBufferEmpty(msp->port) && ((int)serialTxBytesFree(msp->port) < totalFrameLength)) {
-//         return 0;
-//     }
-
-//     // Transmit frame
-//     serialBeginWrite(msp->port);
-//     serialWriteBufNoFlush(msp->port, hdr, hdrLen);
-//     serialWriteBufNoFlush(msp->port, data, dataLen);
-//     serialWriteBufNoFlush(msp->port, crc, crcLen);
-//     serialEndWrite(msp->port);
-
-//     return totalFrameLength;
-// }
-
 #define JUMBO_FRAME_SIZE_LIMIT 255
-static int mspSerialSendFrame(mspPort_t *msp, const uint8_t * hdr, int hdrLen, const uint8_t * data, int dataLen, uint8_t * crc, int crcLen)
+static int mspSerialSendFrame(mspPort_t *msp, const uint8_t * hdr, int hdrLen, const uint8_t * data, int dataLen, const uint8_t * crc, int crcLen)
 {
-    // MSP port might be turned into a CLI port, which will make
-    // msp->port become NULL.
-    if (!msp->portActive) {
-        return 0;
-    }
-    // VSP MSP port might be unconnected. To prevent blocking - check if it's connected first
-    if (!uartIsConnected(msp->port)) {
-        return 0;
-    }
-
     // We are allowed to send out the response if
     //  a) TX buffer is completely empty (we are talking to well-behaving party that follows request-response scheduling;
     //     this allows us to transmit jumbo frames bigger than TX buffer (serialWriteBuf will block, but for jumbo frames we don't care)
     //  b) Response fits into TX buffer
     const int totalFrameLength = hdrLen + dataLen + crcLen;
-    if (!uartTxBufEmpty(msp->port) && ((int)uartTotalTxBytesFree(msp->port) < totalFrameLength))
+    if (!isSerialTransmitBufferEmpty(msp->port) && ((int)serialTxBytesFree(msp->port) < totalFrameLength)) {
         return 0;
+    }
 
-    static DMA_DATA uint8_t frameBuf[16 + JUMBO_FRAME_SIZE_LIMIT + 2]; // 최대 크기 확보
-    int offset = 0;
-
-    memset(frameBuf, 0, sizeof(frameBuf));
-
-    memcpy(&frameBuf[offset], hdr, hdrLen);
-    offset += hdrLen;
-
-    memcpy(&frameBuf[offset], data, dataLen);
-    offset += dataLen;
-
-    memcpy(&frameBuf[offset], crc, crcLen);
-    offset += crcLen;
-
-    //msp_tx_start_time = micros();
-    SCB_CleanDCache_by_Addr((uint32_t *)((uint32_t)frameBuf & ~0x1F),
-                            (((uint32_t)frameBuf & 0x1F) + totalFrameLength + 31) & ~0x1F);
-    uartWriteDMA(msp->port, frameBuf, totalFrameLength);
+    // Transmit frame
+    serialBeginWrite(msp->port);
+    serialWriteBufNoFlush(msp->port, hdr, hdrLen);
+    serialWriteBufNoFlush(msp->port, data, dataLen);
+    serialWriteBufNoFlush(msp->port, crc, crcLen);
+    serialEndWrite(msp->port);
 
     return totalFrameLength;
 }
@@ -462,29 +449,29 @@ static void mspProcessPendingRequest(mspPort_t * mspPort)
         return;
     }
 
-//     switch(mspPort->pendingRequest) {
-//     case MSP_PENDING_BOOTLOADER_ROM:
-//         systemResetToBootloader(BOOTLOADER_REQUEST_ROM);
-//         break;
+    switch(mspPort->pendingRequest) {
+    case MSP_PENDING_BOOTLOADER_ROM:
+        systemResetToBootloader(BOOTLOADER_REQUEST_ROM);
+        break;
 
-// #if defined(USE_FLASH_BOOT_LOADER)
-//     case MSP_PENDING_BOOTLOADER_FLASH:
-//         systemResetToBootloader(BOOTLOADER_REQUEST_FLASH);
-//         break;
-// #endif
+#if defined(USE_FLASH_BOOT_LOADER)
+    case MSP_PENDING_BOOTLOADER_FLASH:
+        systemResetToBootloader(BOOTLOADER_REQUEST_FLASH);
+        break;
+#endif
 
-// #ifdef USE_CLI
-//     case MSP_PENDING_CLI:
-//         mspPort->pendingRequest = MSP_PENDING_NONE;
-//         mspPort->portState = PORT_CLI_ACTIVE;
+#ifdef USE_CLI
+    case MSP_PENDING_CLI:
+        mspPort->pendingRequest = MSP_PENDING_NONE;
+        mspPort->portState = PORT_CLI_ACTIVE;
 
-//         cliEnter(mspPort->port, true);
-//         break;
-// #endif
+        cliEnter(mspPort->port, true);
+        break;
+#endif
 
-//     default:
-//         break;
-//     }
+    default:
+        break;
+    }
 }
 
 static void mspSerialProcessReceivedReply(mspPort_t *msp, mspProcessReplyFnPtr mspProcessReplyFn)
@@ -505,8 +492,8 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
 {
     mspPostProcessFnPtr mspPostProcessFn = NULL;
 
-    while (uartAvailable(mspPort->port)) {
-        const uint8_t c = uartRead(mspPort->port);
+    while (serialRxBytesWaiting(mspPort->port)) {
+        const uint8_t c = serialRead(mspPort->port);
 
         mspSerialProcessReceivedPacketData(mspPort, c);
 
@@ -541,15 +528,14 @@ static void mspProcessPacket(mspPort_t *mspPort, mspProcessCommandFnPtr mspProce
 void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessCommandFnPtr mspProcessCommandFn, mspProcessReplyFnPtr mspProcessReplyFn)
 {
     for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-        if (!mspPort->portActive) {
+        if (!mspPort->port) {
             continue;
         }
 
         // whilst port is idle, poll incoming until portState changes or no more bytes
-        while (mspPort->portState == PORT_IDLE && uartAvailable(mspPort->port)) {
+        while (mspPort->portState == PORT_IDLE && serialRxBytesWaiting(mspPort->port)) {
             mspPort->lastActivityMs = millis();
-            //const uint8_t c = serialRead(mspPort->port);
-            const uint8_t c = uartRead(mspPort->port);
+            const uint8_t c = serialRead(mspPort->port);
             if (c == '$') {
                 // MSP frame incoming — cancel any pending non-MSP request.
                 // Resetting only on '$' (not every byte) allows '#\r' sequences to set
@@ -557,28 +543,27 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
                 mspPort->pendingRequest = MSP_PENDING_NONE;
                 mspPort->portState = PORT_MSP_PACKET;
                 mspPort->packetState = MSP_HEADER_START;
+            } else if ((evaluateNonMspData == MSP_EVALUATE_NON_MSP_DATA)
+#ifdef USE_MSP_DISPLAYPORT
+                       // Don't evaluate non-MSP commands on VTX MSP port
+                       && (mspPort->port->identifier != displayPortMspGetSerial())
+#endif
+                       ) {
+                // evaluate the non-MSP data
+                if (c == serialConfig()->reboot_character) {
+                    mspPort->pendingRequest = MSP_PENDING_BOOTLOADER_ROM;
+#ifdef USE_CLI
+                } else if (c == '#') {
+                    mspPort->pendingRequest = MSP_PENDING_CLI;
+                } else if (c == 0x2) {
+                    mspPort->portState = PORT_CLI_CMD;
+                    cliEnter(mspPort->port, false);
+#endif
+                } else if (mspPort->pendingRequest == MSP_PENDING_BOOTLOADER_ROM) {
+                    // unrecognized byte cancels bootloader-ROM pending; CLI pending is preserved
+                    mspPort->pendingRequest = MSP_PENDING_NONE;
+                }
             }
-//            else if ((evaluateNonMspData == MSP_EVALUATE_NON_MSP_DATA)
-//#ifdef USE_MSP_DISPLAYPORT
-//                       // Don't evaluate non-MSP commands on VTX MSP port
-//                       && (mspPort->port->identifier != displayPortMspGetSerial())
-//#endif
-//                       ) {
-//                // evaluate the non-MSP data
-//                if (c == serialConfig()->reboot_character) {
-//                    mspPort->pendingRequest = MSP_PENDING_BOOTLOADER_ROM;
-//#ifdef USE_CLI
-//                } else if (c == '#') {
-//                    mspPort->pendingRequest = MSP_PENDING_CLI;
-//                } else if (c == 0x2) {
-//                    mspPort->portState = PORT_CLI_CMD;
-//                    cliEnter(mspPort->port, false);
-//#endif
-//                } else if (mspPort->pendingRequest == MSP_PENDING_BOOTLOADER_ROM) {
-//                    // unrecognized byte cancels bootloader-ROM pending; CLI pending is preserved
-//                    mspPort->pendingRequest = MSP_PENDING_NONE;
-//                }
-//            }
         }
 
         switch (mspPort->portState) {
@@ -606,11 +591,11 @@ void mspSerialProcess(mspEvaluateNonMspData_e evaluateNonMspData, mspProcessComm
 bool mspSerialWaiting(void)
 {
     for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-        if (!mspPort->portActive) {
+        if (!mspPort->port) {
             continue;
         }
 
-        if (uartAvailable(mspPort->port)) {
+        if (serialRxBytesWaiting(mspPort->port)) {
             return true;
         }
     }
@@ -625,92 +610,87 @@ bool mspSerialWaiting(void)
  * FUNCTION_VTX_MSP (HD VTX / DisplayPort) are excluded so that
  * peripheral traffic does not accidentally muzzle the beeper.
  */
-//bool mspSerialIsConfiguratorActive(void)
-//{
-//    const timeMs_t now = millis();
-//
-//    for (const mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-//        if (!mspPort->port || mspPort->lastActivityMs == 0) {
-//            continue;
-//        }
-//
-//        const serialPortConfig_t *cfg =
-//            serialFindPortConfiguration(mspPort->port->identifier);
-//        if (!cfg) {
-//            continue;
-//        }
-//
-//        // Skip ports shared with a VTX — those are peripherals, not configurators
-//        if (cfg->functionMask & FUNCTION_VTX_MSP) {
-//            continue;
-//        }
-//
-//        if (cmp32(now, mspPort->lastActivityMs) < (int32_t)MSP_ACTIVITY_DEFAULT_TIMEOUT_MS) {
-//            return true;
-//        }
-//    }
-//
-//    return false;
-//}
+bool mspSerialIsConfiguratorActive(void)
+{
+    const timeMs_t now = millis();
+
+    for (const mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
+        if (!mspPort->port || mspPort->lastActivityMs == 0) {
+            continue;
+        }
+
+        const serialPortConfig_t *cfg =
+            serialFindPortConfiguration(mspPort->port->identifier);
+        if (!cfg) {
+            continue;
+        }
+
+        // Skip ports shared with a VTX — those are peripherals, not configurators
+        if (cfg->functionMask & FUNCTION_VTX_MSP) {
+            continue;
+        }
+
+        if (cmp32(now, mspPort->lastActivityMs) < (int32_t)MSP_ACTIVITY_DEFAULT_TIMEOUT_MS) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 void mspSerialInit(void)
 {
     memset(mspPorts, 0, sizeof(mspPorts));
-
-    //uartOpen(_DEF_UART3, 115200); //OPFLOW, RANGEFINDER
-    uartOpen(_DEF_UART1, 115200); //GCS
-    //uartOpen(_DEF_UART4, 115200); //ESC
-
     mspSerialAllocatePorts();
 }
 
-//int mspSerialPush(serialPortIdentifier_e port, uint16_t cmd, const uint8_t *data, int datalen, mspPort_t *mspPort, mspVersion_e version)
-//{
-//    int ret = 0;
-//
-//    for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-//
-//        // XXX Kludge!!! Avoid zombie VCP port (avoid VCP entirely for now)
-//        if (!mspPort->port
-//#ifndef USE_MSP_PUSH_OVER_VCP
-//            || mspPort->port->identifier == SERIAL_PORT_USB_VCP
-//#endif
-//            || (port != SERIAL_PORT_ALL && mspPort->port->identifier != port)
-//            || mspPort->portState == PORT_CLI_CMD || mspPort->portState == PORT_CLI_ACTIVE) {
-//            continue;
-//        }
-//
-//        mspPacket_t push = {
-//            .buf = { .ptr = data, .end = data + datalen, },
-//            .cmd = cmd,
-//            .result = 0,
-//            .direction = direction,
-//        };
-//
-//        ret = mspSerialEncode(mspPort, &push, mspVersion);
-//    }
-//    return ret; // return the number of bytes written
-//}
+int mspSerialPush(serialPortIdentifier_e port, uint8_t cmd, uint8_t *data, int datalen, mspDirection_e direction, mspVersion_e mspVersion)
+{
+    int ret = 0;
 
-//uint32_t mspSerialTxBytesFree(void)
-//{
-//    uint32_t ret = UINT32_MAX;
-//
-//    for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
-//        if (!mspPort->port) {
-//            continue;
-//        }
-//
-//        // XXX Kludge!!! Avoid zombie VCP port (avoid VCP entirely for now)
-//        if (mspPort->port->identifier == SERIAL_PORT_USB_VCP) {
-//            continue;
-//        }
-//
-//        const uint32_t bytesFree = serialTxBytesFree(mspPort->port);
-//        if (bytesFree < ret) {
-//            ret = bytesFree;
-//        }
-//    }
-//
-//    return ret;
-//}
+    for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
+
+        // XXX Kludge!!! Avoid zombie VCP port (avoid VCP entirely for now)
+        if (!mspPort->port
+#ifndef USE_MSP_PUSH_OVER_VCP
+            || mspPort->port->identifier == SERIAL_PORT_USB_VCP
+#endif
+            || (port != SERIAL_PORT_ALL && mspPort->port->identifier != port)
+            || mspPort->portState == PORT_CLI_CMD || mspPort->portState == PORT_CLI_ACTIVE) {
+            continue;
+        }
+
+        mspPacket_t push = {
+            .buf = { .ptr = data, .end = data + datalen, },
+            .cmd = cmd,
+            .result = 0,
+            .direction = direction,
+        };
+
+        ret = mspSerialEncode(mspPort, &push, mspVersion);
+    }
+    return ret; // return the number of bytes written
+}
+
+uint32_t mspSerialTxBytesFree(void)
+{
+    uint32_t ret = UINT32_MAX;
+
+    for (mspPort_t *mspPort = mspPorts; mspPort < ARRAYEND(mspPorts); mspPort++) {
+        if (!mspPort->port) {
+            continue;
+        }
+
+        // XXX Kludge!!! Avoid zombie VCP port (avoid VCP entirely for now)
+        if (mspPort->port->identifier == SERIAL_PORT_USB_VCP) {
+            continue;
+        }
+
+        const uint32_t bytesFree = serialTxBytesFree(mspPort->port);
+        if (bytesFree < ret) {
+            ret = bytesFree;
+        }
+    }
+
+    return ret;
+}

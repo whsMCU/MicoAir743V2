@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_BARO
 
@@ -31,48 +31,46 @@
 #include "common/maths.h"
 #include "common/filter.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "drivers/barometer/barometer.h"
-// #include "drivers/barometer/barometer_bmp085.h"
-// #include "drivers/barometer/barometer_bmp280.h"
-// #include "drivers/barometer/barometer_bmp388.h"
-// #include "drivers/barometer/barometer_bmp5xx.h"
+#include "drivers/barometer/barometer_bmp085.h"
+#include "drivers/barometer/barometer_bmp280.h"
+#include "drivers/barometer/barometer_bmp388.h"
+#include "drivers/barometer/barometer_bmp5xx.h"
 #include "drivers/barometer/barometer_dps310.h"
-// #include "drivers/barometer/barometer_qmp6988.h"
-// #include "drivers/barometer/barometer_virtual.h"
-// #include "drivers/barometer/barometer_ms5611.h"
-// #include "drivers/barometer/barometer_lps.h"
-// #include "drivers/barometer/barometer_2smpb_02b.h"
-// #include "drivers/barometer/barometer_lps22df.h"
-// #include "drivers/bus.h"
-// #include "drivers/bus_i2c_busdev.h"
-// #include "drivers/bus_spi.h"
-// #include "drivers/io.h"
-// #include "drivers/time.h"
+#include "drivers/barometer/barometer_qmp6988.h"
+#include "drivers/barometer/barometer_virtual.h"
+#include "drivers/barometer/barometer_ms5611.h"
+#include "drivers/barometer/barometer_lps.h"
+#include "drivers/barometer/barometer_2smpb_02b.h"
+#include "drivers/barometer/barometer_lps22df.h"
+#include "drivers/bus.h"
+#include "drivers/bus_i2c_busdev.h"
+#include "drivers/bus_spi.h"
+#include "drivers/io.h"
+#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
 
-#include "sensors/barometer.h"
 #include "sensors/sensors.h"
 
 #include "scheduler/scheduler.h"
 
-#ifdef _USE_HW_CLI
-static void cliDps310(cli_args_t *args);
-#endif
+#include "barometer.h"
 
 baro_t baro;                        // barometer access functions
 
-barometerConfig_t barometerConfig;
+PG_REGISTER_WITH_RESET_FN(barometerConfig_t, barometerConfig, PG_BAROMETER_CONFIG, 3);
 
-void barometerConfig_Init(void)
+#ifndef DEFAULT_BARO_DEVICE
+#define DEFAULT_BARO_DEVICE BARO_DEFAULT
+#endif
+
+void pgResetFn_barometerConfig(barometerConfig_t *barometerConfig)
 {
-    barometerConfig.baro_sample_count = 21;
-    barometerConfig.baro_noise_lpf = 600;
-    barometerConfig.baro_cf_vel = 985;
-    barometerConfig.baro_hardware = BARO_DEFAULT;
+    barometerConfig->baro_hardware = DEFAULT_BARO_DEVICE;
 
     // For backward compatibility; ceate a valid default value for bus parameters
     //
@@ -81,12 +79,93 @@ void barometerConfig_Init(void)
     //   a. Precedence is in the order of popularity; BMP388, BMP280, MS5611 then BMP085, then
     //   b. If SPI variant is specified, it is likely onboard, so take it.
 
-	#define DEFAULT_BARO_DPS310
+#if !(defined(DEFAULT_BARO_SPI_BMP388) || defined(DEFAULT_BARO_BMP388) || defined(DEFAULT_BARO_SPI_BMP280) || \
+    defined(DEFAULT_BARO_BMP280) || defined(DEFAULT_BARO_SPI_MS5611) || defined(DEFAULT_BARO_MS5611) || \
+    defined(DEFAULT_BARO_BMP085) || defined(DEFAULT_BARO_SPI_LPS) || defined(DEFAULT_BARO_SPI_QMP6988) || \
+    defined(DEFAULT_BARO_QMP6988) || defined(DEFAULT_BARO_DPS310) || defined(DEFAULT_BARO_SPI_DPS310) || \
+    defined(DEFAULT_BARO_LPS22DF) || defined(DEFAULT_BARO_SPI_LPS22DF))
 
-    barometerConfig.baro_busType = 1;//;BUS_TYPE_I2C;
-    barometerConfig.baro_i2c_device = 0;//I2C_DEV_TO_CFG(BARO_I2C_INSTANCE);
-    barometerConfig.baro_i2c_address = 0;
+#if defined(USE_BARO_DPS310) || defined(USE_BARO_SPI_DPS310)
+#if defined(USE_BARO_SPI_DPS310)
+#define DEFAULT_BARO_SPI_DPS310
+#else
+#define DEFAULT_BARO_DPS310
+#endif
+#elif defined(USE_BARO_BMP388) || defined(USE_BARO_SPI_BMP388)
+#if defined(USE_BARO_SPI_BMP388)
+#define DEFAULT_BARO_SPI_BMP388
+#else
+#define DEFAULT_BARO_BMP388
+#endif
+#elif defined(USE_BARO_BMP280) || defined(USE_BARO_SPI_BMP280)
+#if defined(USE_BARO_SPI_BMP280)
+#define DEFAULT_BARO_SPI_BMP280
+#else
+#define DEFAULT_BARO_BMP280
+#endif
+#elif defined(USE_BARO_MS5611) || defined(USE_BARO_SPI_MS5611)
+#if defined(USE_BARO_SPI_MS5611)
+#define DEFAULT_BARO_SPI_MS5611
+#else
+#define DEFAULT_BARO_MS5611
+#endif
+#elif defined(USE_BARO_QMP6988) || defined(USE_BARO_SPI_QMP6988)
+#if defined(USE_BARO_SPI_QMP6988)
+#define DEFAULT_BARO_SPI_QMP6988
+#else
+#define DEFAULT_BARO_QMP6988
+#endif
+#elif defined(USE_BARO_SPI_LPS)
+#define DEFAULT_BARO_SPI_LPS
+#elif defined(DEFAULT_BARO_BMP085)
+#define DEFAULT_BARO_BMP085
+#endif
+#elif defined(USE_BARO_2SMBP_02B) || defined(USE_BARO_SPI_2SMBP_02B)
+#if defined(USE_BARO_SPI_2SMBP_02B)
+#define DEFAULT_BARO_SPI_2SMBP_02B
+#else
+#define DEFAULT_BARO_2SMBP_02B
+#endif
+#elif defined(USE_BARO_LPS22DF) || defined(USE_BARO_SPI_LPS22DF)
+#if defined(USE_BARO_LPS22DF)
+#define DEFAULT_BARO_SPI_LPS22DF
+#else
+#define DEFAULT_BARO_LPS22DF
+#endif
+#endif
 
+#ifndef DEFAULT_BARO_I2C_ADDRESS
+#define DEFAULT_BARO_I2C_ADDRESS 0
+#endif
+
+#if defined(DEFAULT_BARO_SPI_BMP388) || defined(DEFAULT_BARO_SPI_BMP280) || defined(DEFAULT_BARO_SPI_MS5611) || defined(DEFAULT_BARO_SPI_QMP6988) || defined(DEFAULT_BARO_SPI_LPS) || defined(DEFAULT_BARO_SPI_DPS310) || defined(DEFAULT_BARO_SPI_2SMBP_02B)
+    barometerConfig->baro_busType = BUS_TYPE_SPI;
+    barometerConfig->baro_spi_device = SPI_DEV_TO_CFG(spiDeviceByInstance((const spiResource_t *)BARO_SPI_INSTANCE));
+    barometerConfig->baro_spi_csn = IO_TAG(BARO_CS_PIN);
+    barometerConfig->baro_i2c_device = I2C_DEV_TO_CFG(I2CINVALID);
+    barometerConfig->baro_i2c_address = 0;
+#elif defined(DEFAULT_BARO_MS5611) || defined(DEFAULT_BARO_BMP388) || defined(DEFAULT_BARO_BMP280) || defined(DEFAULT_BARO_BMP085) || defined(DEFAULT_BARO_QMP6988) || defined(DEFAULT_BARO_DPS310) || defined(DEFAULT_BARO_2SMBP_02B) || defined(USE_BARO_LPS22DF) || defined(DEFAULT_BARO_BMP580) || defined(DEFAULT_BARO_BMP581)
+    // All I2C devices shares a default config with address = 0 (per device default)
+    barometerConfig->baro_busType = BUS_TYPE_I2C;
+    barometerConfig->baro_i2c_device = I2C_DEV_TO_CFG(BARO_I2C_INSTANCE);
+    barometerConfig->baro_i2c_address = DEFAULT_BARO_I2C_ADDRESS;
+    barometerConfig->baro_spi_device = SPI_DEV_TO_CFG(SPIINVALID);
+    barometerConfig->baro_spi_csn = IO_TAG_NONE;
+#else
+    barometerConfig->baro_hardware = BARO_NONE;
+    barometerConfig->baro_busType = BUS_TYPE_NONE;
+    barometerConfig->baro_i2c_device = I2C_DEV_TO_CFG(I2CINVALID);
+    barometerConfig->baro_i2c_address = 0;
+    barometerConfig->baro_spi_device = SPI_DEV_TO_CFG(SPIINVALID);
+    barometerConfig->baro_spi_csn = IO_TAG_NONE;
+#endif
+
+#ifndef BARO_EOC_PIN
+#define BARO_EOC_PIN NONE
+#endif
+
+    barometerConfig->baro_eoc_tag = IO_TAG(BARO_EOC_PIN);
+    barometerConfig->baro_xclr_tag = IO_TAG(BARO_XCLR_PIN);
 }
 
 #define NUM_CALIBRATION_CYCLES   100        // 10 seconds init_delay + 100 * 25 ms = 12.5 seconds before valid baro altitude
@@ -98,16 +177,216 @@ static float baroGroundAltitude = 0.0f;
 static bool baroCalibrated = false;
 static bool baroReady = false;
 
-void Baro_Init(void)
+void baroPreInit(void)
 {
+#ifdef USE_SPI
+    if (barometerConfig()->baro_busType == BUS_TYPE_SPI) {
+        ioPreinitByTag(barometerConfig()->baro_spi_csn, IOCFG_IPU, PREINIT_PIN_STATE_HIGH);
+    }
+#endif
+}
 
-	dps310Detect(&baro.dev);
+static bool baroDetect(baroDev_t *baroDev, baroSensor_e baroHardwareToUse)
+{
+    extDevice_t *dev = &baroDev->dev;
 
-	sensorsSet(SENSOR_BARO);
+    // Detect what pressure sensors are available. baro->update() is set to sensor-specific update function
 
-  	#ifdef _USE_HW_CLI
-		cliAdd("dps310", cliDps310);
-	#endif
+    baroSensor_e baroHardware = baroHardwareToUse;
+
+#if !defined(USE_BARO_BMP085) && !defined(USE_BARO_MS5611) && !defined(USE_BARO_SPI_MS5611) && !defined(USE_BARO_BMP388) && !defined(USE_BARO_SPI_BMP388) && !defined(USE_BARO_BMP280) && !defined(USE_BARO_SPI_BMP280) && !defined(USE_BARO_QMP6988) && !defined(USE_BARO_SPI_QMP6988) && !defined(USE_BARO_DPS310) && !defined(USE_BARO_SPI_DPS310) && !defined(DEFAULT_BARO_SPI_2SMBP_02B) && !defined(DEFAULT_BARO_2SMBP_02B) && !defined(USE_BARO_LPS22DF) && !defined(USE_BARO_BMP580) && !defined(USE_BARO_SPI_BMP580) && !defined(USE_BARO_BMP581) && !defined(USE_BARO_SPI_BMP581)
+    UNUSED(dev);
+#endif
+
+#ifndef USE_VIRTUAL_BARO
+    switch (barometerConfig()->baro_busType) {
+#ifdef USE_I2C
+    case BUS_TYPE_I2C:
+        if (!i2cBusSetInstance(dev, barometerConfig()->baro_i2c_device)) {
+            return false;
+        }
+        dev->busType_u.i2c.address = barometerConfig()->baro_i2c_address;
+        break;
+#endif
+
+#ifdef USE_SPI
+    case BUS_TYPE_SPI:
+        {
+            if (!spiSetBusInstance(dev, barometerConfig()->baro_spi_device)) {
+                return false;
+            }
+
+            dev->busType_u.spi.csnPin = IOGetByTag(barometerConfig()->baro_spi_csn);
+        }
+        break;
+#endif
+    default:
+        return false;
+    }
+#endif // USE_VIRTUAL_BARO
+
+    switch (baroHardware) {
+    case BARO_DEFAULT:
+        FALLTHROUGH;
+
+    case BARO_BMP085:
+#ifdef USE_BARO_BMP085
+        {
+            const bmp085Config_t defaultBMP085Config = {
+                .xclrTag = barometerConfig()->baro_xclr_tag,
+                .eocTag = barometerConfig()->baro_eoc_tag
+            };
+            if (bmp085Detect(&defaultBMP085Config, baroDev)) {
+                baroHardware = BARO_BMP085;
+                break;
+            }
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_MS5611:
+#if defined(USE_BARO_MS5611) || defined(USE_BARO_SPI_MS5611)
+        if (ms5611Detect(baroDev)) {
+            baroHardware = BARO_MS5611;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_LPS:
+#if defined(USE_BARO_SPI_LPS)
+        if (lpsDetect(baroDev)) {
+            baroHardware = BARO_LPS;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_DPS310:
+    case BARO_SPA06_003:
+#if defined(USE_BARO_DPS310) || defined(USE_BARO_SPI_DPS310)
+        {
+            if (baroDPS310Detect(baroDev)) {
+                baroHardware = BARO_DPS310;
+#ifdef USE_BARO_SPA06_003
+                if (baroDPS310IsSPL07_003()) {
+                    baroHardware = BARO_SPA06_003;
+                }
+#endif
+                break;
+            }
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_BMP388:
+#if defined(USE_BARO_BMP388) || defined(USE_BARO_SPI_BMP388)
+        {
+            const bmp388Config_t defaultBMP388Config = {
+                .eocTag = barometerConfig()->baro_eoc_tag,
+            };
+            if (bmp388Detect(&defaultBMP388Config, baroDev)) {
+                baroHardware = BARO_BMP388;
+                break;
+            }
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_BMP280:
+#if defined(USE_BARO_BMP280) || defined(USE_BARO_SPI_BMP280)
+        if (bmp280Detect(baroDev)) {
+            baroHardware = BARO_BMP280;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+     case BARO_QMP6988:
+#if defined(USE_BARO_QMP6988) || defined(USE_BARO_SPI_QMP6988)
+        if (qmp6988Detect(baroDev)) {
+            baroHardware = BARO_QMP6988;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+     case BARO_2SMPB_02B:
+#if defined(USE_BARO_2SMBP_02B) || defined(USE_BARO_SPI_2SMBP_02B)
+        if (baro2SMPB02BDetect(baroDev)) {
+            baroHardware = BARO_2SMPB_02B;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+     case BARO_LPS22DF:
+#if defined(USE_BARO_LPS22DF) || defined(USE_BARO_SPI_LPS22DF)
+        if (lps22dfDetect(baroDev)) {
+            baroHardware = BARO_LPS22DF;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_BMP580:
+    case BARO_BMP581:
+#if defined(USE_BARO_BMP580) || defined(USE_BARO_SPI_BMP580) || defined(USE_BARO_BMP581) || defined(USE_BARO_SPI_BMP581)
+        {
+            const bmp5xxConfig_t defaultBMP5XXConfig = {
+                .eocTag = barometerConfig()->baro_eoc_tag,
+            };
+            uint8_t detectedChip = 0;
+            if (bmp5xxDetect(&defaultBMP5XXConfig, baroDev, &detectedChip)) {
+                // Map chip ID to specific barometer type for status display
+                // BMP580 = 0x50, BMP581 = 0x51
+                if (detectedChip == 0x50) {
+                    baroHardware = BARO_BMP580;
+                } else if (detectedChip == 0x51) {
+                    baroHardware = BARO_BMP581;
+                } else {
+                    baroHardware = BARO_NONE;  // Unknown variant
+                }
+                break;
+            }
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_VIRTUAL:
+#ifdef USE_VIRTUAL_BARO
+        if (virtualBaroDetect(baroDev)) {
+            baroHardware = BARO_VIRTUAL;
+            break;
+        }
+#endif
+        FALLTHROUGH;
+
+    case BARO_NONE:
+        baroHardware = BARO_NONE;
+        break;
+
+    default:
+        baroHardware = BARO_NONE;
+        break;
+    }
+
+    if (baroHardware == BARO_NONE) {
+        return false;
+    }
+
+    detectedSensors[SENSOR_INDEX_BARO] = baroHardware;
+    sensorsSet(SENSOR_BARO);
+    return true;
+}
+
+void baroInit(void)
+{
+#ifndef USE_VIRTUAL_BARO
+    baroReady = baroDetect(&baro.dev, barometerConfig()->baro_hardware);
+#else
+    baroReady = baroDetect(&baro.dev, BARO_VIRTUAL);
+#endif
 }
 
 bool baroIsCalibrated(void)
@@ -159,24 +438,25 @@ static void performBaroCalibrationCycle(const float altitude);
 
 uint32_t baroUpdate(timeUs_t currentTimeUs)
 {
-  static timeUs_t baroStateDurationUs[BARO_STATE_COUNT];
+    static timeUs_t baroStateDurationUs[BARO_STATE_COUNT];
     static barometerState_e state = BARO_STATE_PRESSURE_START;
     static timeUs_t cycleStartUs = 0;
     barometerState_e oldState = state;
     timeUs_t executeTimeUs;
     timeUs_t sleepTime = 1000; // Wait 1ms between states
 
+    DEBUG_SET(DEBUG_BARO, 0, state);
 
-    if (busBusy()){
+    if (busBusy(&baro.dev.dev, NULL)) {
         // If the bus is busy, simply return to have another go later
-      schedulerIgnoreTaskStateTime();
-      return sleepTime;
+        schedulerIgnoreTaskStateTime();
+        return sleepTime;
     }
 
     switch (state) {
         default:
         case BARO_STATE_TEMPERATURE_START:
-        		cycleStartUs = currentTimeUs;
+            cycleStartUs = currentTimeUs;
             baro.dev.start_ut(&baro.dev);
             state = BARO_STATE_TEMPERATURE_READ;
             sleepTime = baro.dev.ut_delay;
@@ -298,57 +578,5 @@ static void performBaroCalibrationCycle(const float altitude)
         calibrationCycleCount = 0;
     }
 }
-
-#ifdef _USE_HW_CLI
-void cliDps310(cli_args_t *args)
-{
-  bool ret = false;
-
-if (args->argc == 1 && args->isStr(0, "baro_show") == true)
-{
-    uint32_t pre_time;
-    pre_time = millis();
-    while(cliKeepLoop())
-    {
-        if (millis()-pre_time >= 1000)
-        {
-            pre_time = millis();
-            // cliPrintf("acc x: %d, y: %d, z: %d\n\r", x, y, z);
-        }
-    }
-    ret = true;
-    }
-
-  if (args->argc == 3 && args->isStr(0, "mem_read") == true)
-  {
-    uint8_t ch;
-    uint8_t addr;
-
-    ch   = (uint8_t)args->getData(1);
-    addr = (uint8_t)args->getData(2);
-    addr |= 0x80;
-
-    ret = true;
-  }
-
-    if (args->argc == 4 && args->isStr(0, "mem_write") == true)
-  {
-    uint8_t ch;
-    uint8_t addr;
-
-    ch     = (uint8_t)args->getData(1);
-    addr   = (uint8_t)args->getData(2);
-
-    ret = true;
-  }
-
-  if (ret != true)
-  {
-    cliPrintf("dsp310 baro_show \n\r");
-    cliPrintf("dsp310 mem_read ch0:1, addr \n\r");
-    cliPrintf("dsp310 mem_write ch0:1, addr data \n\r");
-  }
-}
-#endif
 
 #endif /* BARO */

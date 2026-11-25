@@ -20,13 +20,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 #ifdef USE_SERIALRX_MAVLINK
 
 #include "common/utils.h"
 #include "common/maths.h"
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
 #include "rx/rx.h"
 #include "rx/mavlink.h"

@@ -24,7 +24,7 @@
  */
 
 #include <stdint.h>
-#include "hw.h"
+#include "platform.h"
 
 #include "drivers/persistent.h"
 #include "drivers/system.h"

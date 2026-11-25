@@ -21,7 +21,6 @@
 #pragma once
 
 #include "common/utils.h"
-#include "hw.h"
 
 // FIXME some of these are flight modes, some of these are general status indicators
 typedef enum {

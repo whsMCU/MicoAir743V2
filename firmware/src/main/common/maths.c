@@ -22,9 +22,9 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
-//#include "build/build_config.h"
+#include "build/build_config.h"
 
 #include "common/axis.h"
 
@@ -414,94 +414,4 @@ float smoothStepUpTransition(const float x, const float center, const float widt
         const float t = (x - left_limit) / width; // Normalize x within the range
         return cubicBlend(t);
     }
-}
-
-float bellCurve(const float x, const float curveWidth)
-{
-    return powf(M_EULERf, -sq(x) / (2.0f * sq(curveWidth)));
-}
-
-float fast_fsqrtf(const double value) {
-    float ret = 0.0f;
-#ifdef USE_ARM_MATH
-    arm_sqrt_f32(value, &ret);
-#else
-    ret = sqrtf(value);
-#endif
-    if (isnan(ret))
-    {
-        return 0.0f;
-    }
-    return ret;
-}
-
-// void buildRotationMatrix(fp_angles_t *delta, fp_rotationMatrix_t *rotation)
-// {
-//     float cosx, sinx, cosy, siny, cosz, sinz;
-//     float coszcosx, sinzcosx, coszsinx, sinzsinx;
-
-//     cosx = cos_approx(delta->angles.roll);
-//     sinx = sin_approx(delta->angles.roll);
-//     cosy = cos_approx(delta->angles.pitch);
-//     siny = sin_approx(delta->angles.pitch);
-//     cosz = cos_approx(delta->angles.yaw);
-//     sinz = sin_approx(delta->angles.yaw);
-
-//     coszcosx = cosz * cosx;
-//     sinzcosx = sinz * cosx;
-//     coszsinx = sinx * cosz;
-//     sinzsinx = sinx * sinz;
-
-//     rotation->m[0][X] = cosz * cosy;
-//     rotation->m[0][Y] = -cosy * sinz;
-//     rotation->m[0][Z] = siny;
-//     rotation->m[1][X] = sinzcosx + (coszsinx * siny);
-//     rotation->m[1][Y] = coszcosx - (sinzsinx * siny);
-//     rotation->m[1][Z] = -sinx * cosy;
-//     rotation->m[2][X] = (sinzsinx) - (coszcosx * siny);
-//     rotation->m[2][Y] = (coszsinx) + (sinzcosx * siny);
-//     rotation->m[2][Z] = cosy * cosx;
-// }
-
-// void applyMatrixRotation(float *v, fp_rotationMatrix_t *rotationMatrix)
-// {
-//     struct fp_vector *vDest = (struct fp_vector *)v;
-//     struct fp_vector vTmp = *vDest;
-
-//     vDest->X = (rotationMatrix->m[0][X] * vTmp.X + rotationMatrix->m[1][X] * vTmp.Y + rotationMatrix->m[2][X] * vTmp.Z);
-//     vDest->Y = (rotationMatrix->m[0][Y] * vTmp.X + rotationMatrix->m[1][Y] * vTmp.Y + rotationMatrix->m[2][Y] * vTmp.Z);
-//     vDest->Z = (rotationMatrix->m[0][Z] * vTmp.X + rotationMatrix->m[1][Z] * vTmp.Y + rotationMatrix->m[2][Z] * vTmp.Z);
-// }
-
-// function to calculate the normalization (pythagoras) of a 2-dimensional vector
-float calc_length_pythagorean_2D(const float firstElement, const float secondElement)
-{
-  return fast_fsqrtf(sq(firstElement) + sq(secondElement));
-}
-
-// function to calculate the normalization (pythagoras) of a 3-dimensional vector
-float calc_length_pythagorean_3D(const float firstElement, const float secondElement, const float thirdElement)
-{
-  return fast_fsqrtf(sq(firstElement) + sq(secondElement) + sq(thirdElement));
-}
-
-int32_t wrap_36000(int32_t angle)
-{
-    if (angle >= 36000)
-        angle -= 36000;
-    if (angle < 0)
-        angle += 36000;
-    return angle;
-}
-
-int32_t applyDeadbandRescaled(int32_t value, int32_t deadband, int32_t min, int32_t max)
-{
-    if (ABS(value) < deadband) {
-        value = 0;
-    } else if (value > 0) {
-        value = scaleRange(value - deadband, 0, max - deadband, 0, max);
-    } else if (value < 0) {
-        value = scaleRange(value + deadband, min + deadband, 0, min, 0);
-    }
-    return value;
 }

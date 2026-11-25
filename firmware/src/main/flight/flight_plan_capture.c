@@ -21,7 +21,7 @@
 
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if ENABLE_FLIGHT_PLAN && !defined(USE_WING)
 

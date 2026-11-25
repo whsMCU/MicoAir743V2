@@ -22,7 +22,7 @@
 
 #include "drivers/io_types.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 enum USB_DEV {
     DEFAULT,
@@ -31,11 +31,9 @@ enum USB_DEV {
 
 typedef struct usbDev_s {
     uint8_t type;
-    uint32_t mscButtonPin;
+    ioTag_t mscButtonPin;
     uint8_t mscButtonUsePullup;
-    uint32_t detectPin;
+    ioTag_t detectPin;
 } usbDev_t;
 
-extern usbDev_t usbDevConfig;
-
-void usbDevConfig_Init(void);
+PG_DECLARE(usbDev_t, usbDevConfig);

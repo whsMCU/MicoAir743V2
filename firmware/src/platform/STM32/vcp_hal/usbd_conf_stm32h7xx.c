@@ -56,8 +56,8 @@
 #include "usbd_cdc.h"
 #include "usbd_cdc_interface.h"
 
-#include "hw.h"
-//#include "pg/pg.h"
+#include "platform.h"
+#include "pg/pg.h"
 #include "pg/usb.h"
 
 #ifdef USE_USB_MSC
@@ -498,7 +498,7 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
 #endif
     hpcd.Init.dev_endpoints = 9;
     hpcd.Init.use_dedicated_ep1 = DISABLE;
-    hpcd.Init.ep0_mps = EP_MPS_64;
+    hpcd.Init.ep0_mps = DEP0CTL_MPS_64;
     hpcd.Init.low_power_enable = DISABLE;
     hpcd.Init.phy_itface = PCD_PHY_EMBEDDED;
     hpcd.Init.Sof_enable = DISABLE;
@@ -519,9 +519,9 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef * pdev)
 
 #ifdef USE_USB_CDC_HID
 #ifdef USE_USB_MSC
-  if (usbDevConfig.type == COMPOSITE && !mscCheckBootAndReset()) {
+  if (usbDevConfig()->type == COMPOSITE && !mscCheckBootAndReset()) {
 #else
-  if (usbDevConfig.type == COMPOSITE) {
+  if (usbDevConfig()->type == COMPOSITE) {
 #endif
     HAL_PCDEx_SetRxFiFo(&hpcd, 0x80);
     HAL_PCDEx_SetTxFiFo(&hpcd, 0, 0x20);

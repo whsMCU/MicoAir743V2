@@ -34,27 +34,14 @@
 // Use floating point M_PI instead explicitly.
 #define M_PIf       3.14159265358979323846f
 #define M_EULERf    2.71828182845904523536f
-#define M_LN2f      0.69314718055994530942f
 #define INV_PIO2    (2.0f / M_PIf)
 
 #define RAD    (M_PIf / 180.0f)
-
-#define DEGREES_TO_CENTIDEGREES(angle) ((angle) * 100)
-#define CENTIDEGREES_TO_DEGREES(angle) ((angle) / 100)
-
-#define CENTIDEGREES_TO_DECIDEGREES(angle) ((angle) / 10)
-#define DECIDEGREES_TO_CENTIDEGREES(angle) ((angle) * 10)
-
 #define DEGREES_TO_DECIDEGREES(angle) ((angle) * 10)
 #define DECIDEGREES_TO_DEGREES(angle) ((angle) / 10)
 #define DECIDEGREES_TO_RADIANS(angle) ((angle) / 10.0f * 0.0174532925f)
 #define DEGREES_TO_RADIANS(angle) ((angle) * RAD)
 #define RADIANS_TO_DEGREES(angle) ((angle) / RAD)
-//#define DECIDEGREES_TO_RADIANS(angle) (((angle) / 10.0f) * RAD)
-#define RADIANS_TO_DECIDEGREES(angle) (((angle) * 10.0f) / RAD)
-
-#define RADIANS_TO_CENTIDEGREES(angle) (((angle) * 100.0f) / RAD)
-#define CENTIDEGREES_TO_RADIANS(angle) (((angle) / 100.0f) * RAD)
 
 #define CM_S_TO_KM_H(centimetersPerSecond) ((centimetersPerSecond) * 36 / 1000)
 #define CM_S_TO_MPH(centimetersPerSecond) ((centimetersPerSecond) * 10000 / 5080 / 88)
@@ -202,41 +189,3 @@ static inline float constrainf(float amt, float low, float high)
     else
         return amt;
 }
-
-float bellCurve(const float x, const float curveWidth);
-float fast_fsqrtf(const double value);
-float calc_length_pythagorean_2D(const float firstElement, const float secondElement);
-float calc_length_pythagorean_3D(const float firstElement, const float secondElement, const float thirdElement);
-
-// Floating point 3 vector.
-typedef struct fp_vector {
-    float X;
-    float Y;
-    float Z;
-} t_fp_vector_def;
-
-typedef union u_fp_vector {
-    float A[3];
-    t_fp_vector_def V;
-} t_fp_vector;
-
-typedef struct fp_rotationMatrix_s {
-    float m[3][3];              // matrix
-} fp_rotationMatrix_t;
-// void buildRotationMatrix(fp_angles_t *delta, fp_rotationMatrix_t *rotation);
-// void applyMatrixRotation(float *v, fp_rotationMatrix_t *rotationMatrix);
-
-
-int32_t applyDeadbandRescaled(int32_t value, int32_t deadband, int32_t min, int32_t max);
-int32_t wrap_36000(int32_t angle);
-
-/*
- * The most significat byte is placed at the lowest address
- * in other words, the most significant byte is "first", on even indexes
- */
-#define int16_val_big_endian(v, idx) ((int16_t)(((uint8_t)v[2 * idx] << 8) | v[2 * idx + 1]))
-/*
- * The most significat byte is placed at the highest address
- * in other words, the most significant byte is "last", on odd indexes
- */
-#define int16_val_little_endian(v, idx) ((int16_t)(((uint8_t)v[2 * idx + 1] << 8) | v[2 * idx]))

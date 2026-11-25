@@ -29,13 +29,13 @@
 
 #include "common/unit.h"
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 #include "rx/rx.h"
 
-//#include "telemetry/ibus_shared.h"
+#include "telemetry/ibus_shared.h"
 
 typedef enum {
     FRSKY_FORMAT_DMS = 0,
@@ -82,6 +82,7 @@ typedef struct telemetryConfig_s {
     uint8_t hottAlarmSoundInterval;
     uint8_t pidValuesAsTelemetry;
     uint8_t report_cell_voltage;
+    uint8_t flysky_sensors[IBUS_SENSOR_COUNT];
     uint16_t mavlink_mah_as_heading_divisor;
     uint32_t disabledSensors; // bit flags
     uint8_t mavlink_min_txbuff; // The min TX buffer space value to send mavlink telemetry data 1...100%
@@ -94,18 +95,16 @@ typedef struct telemetryConfig_s {
     uint8_t crsf_tlm_accgyro;
 } telemetryConfig_t;
 
-extern telemetryConfig_t telemetryConfig;
+PG_DECLARE(telemetryConfig_t, telemetryConfig);
 
-//extern serialPort_t *telemetrySharedPort;
-
-void telemetryConfig_Init(void);
+extern serialPort_t *telemetrySharedPort;
 
 void telemetryInit(void);
-bool telemetryCheckRxPortShared(void);
+bool telemetryCheckRxPortShared(const serialPortConfig_t *portConfig, const SerialRXType serialrxProvider);
 
 void telemetryCheckState(void);
 void telemetryProcess(uint32_t currentTime);
 
-bool telemetryDetermineEnabledState(void);
+bool telemetryDetermineEnabledState(portSharing_e portSharing);
 
 bool telemetryIsSensorEnabled(sensor_e sensor);

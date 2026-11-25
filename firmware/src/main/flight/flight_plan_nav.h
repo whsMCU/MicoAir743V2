@@ -26,49 +26,7 @@
 
 #include "common/time.h"
 
-//#include "pg/flight_plan.h"
-
-#ifndef MAX_WAYPOINTS
-#define MAX_WAYPOINTS 30
-#endif
-
-//_Static_assert(MAX_WAYPOINTS <= 255, "MAX_WAYPOINTS exceeds uint8_t waypointCount range");
-
-typedef enum {
-    WAYPOINT_TYPE_FLYOVER = 0,
-    WAYPOINT_TYPE_FLYBY,
-    WAYPOINT_TYPE_HOLD,
-    WAYPOINT_TYPE_LAND,
-    WAYPOINT_TYPE_TAKEOFF,
-    // Modifier types — no positional dispatch; mutate executor state and the
-    // dispatch loop drains them onto the next positional waypoint.
-    WAYPOINT_TYPE_ALT_CHANGE,
-    WAYPOINT_TYPE_DELAY,
-    WAYPOINT_TYPE_YAW_RATE,
-    WAYPOINT_TYPE_COUNT
-} waypointType_e;
-
-typedef enum {
-    WAYPOINT_PATTERN_NONE = 0,      // station-keep at the hold point
-    WAYPOINT_PATTERN_ORBIT,
-    WAYPOINT_PATTERN_FIGURE8,
-    WAYPOINT_PATTERN_COUNT
-} waypointPattern_e;
-
-typedef struct {
-    int32_t latitude;       // Latitude in degrees * 10^7 (7 decimal places, ±90.0000000)
-    int32_t longitude;      // Longitude in degrees * 10^7 (7 decimal places, ±180.0000000)
-    int32_t altitude;       // Altitude in centimeters AMSL (above mean sea level, negative values permitted)
-    uint16_t speed;         // Speed in cm/s
-    uint16_t duration;      // Duration in deciseconds (0.1s)
-    uint8_t type;           // waypointType_e
-    uint8_t pattern;        // waypointPattern_e (for hold type)
-} waypoint_t;
-
-typedef struct {
-    uint8_t waypointCount;
-    waypoint_t waypoints[MAX_WAYPOINTS];
-} flightPlanConfig_t;
+#include "pg/flight_plan.h"
 
 typedef enum {
     FP_NAV_IDLE = 0,

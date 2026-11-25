@@ -23,7 +23,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_RC_STATS
 

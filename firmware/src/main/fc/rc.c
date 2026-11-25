@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/debug.h"
 
@@ -45,11 +45,11 @@
 #include "flight/imu.h"
 #include "flight/gps_rescue.h"
 #include "flight/pid.h"
-//#include "flight/pid_init.h"
+#include "flight/pid_init.h"
 
-//#include "pg/autopilot.h"
+#include "pg/autopilot.h"
 
-//#include "pg/rx.h"
+#include "pg/rx.h"
 
 #include "rx/rx.h"
 
@@ -64,7 +64,7 @@
 typedef float (applyRatesFn)(const int axis, float rcCommandf, const float rcCommandfAbs);
 // note that rcCommand[] is an external float
 
-float rawSetpoint[XYZ_AXIS_COUNT];
+STATIC_UNIT_TESTED float rawSetpoint[XYZ_AXIS_COUNT];
 
 static float setpointRate[3], rcDeflection[3], rcDeflectionAbs[3]; // deflection range -1 to 1
 static float maxRcDeflectionAbs;
@@ -120,7 +120,7 @@ static float rcDeflectionSmoothed[3];
 float getSetpointRate(int axis)
 {
 #ifdef USE_RC_SMOOTHING_FILTER
-    return rxConfig.rc_smoothing ? setpointRate[axis] : rawSetpoint[axis];
+    return rxConfig()->rc_smoothing ? setpointRate[axis] : rawSetpoint[axis];
 #else
     return rawSetpoint[axis];
 #endif
@@ -135,7 +135,7 @@ float getMaxRcRate(int axis)
 float getRcDeflection(int axis)
 {
 #ifdef USE_RC_SMOOTHING_FILTER
-    return rxConfig.rc_smoothing ? rcDeflectionSmoothed[axis] : rcDeflection[axis];
+    return rxConfig()->rc_smoothing ? rcDeflectionSmoothed[axis] : rcDeflection[axis];
 #else
     return rcDeflection[axis];
 #endif
@@ -183,7 +183,7 @@ static int16_t rcLookupThrottle(int32_t tmp)
 
 #define SETPOINT_RATE_LIMIT_MIN -1998.0f
 #define SETPOINT_RATE_LIMIT_MAX 1998.0f
-//STATIC_ASSERT(CONTROL_RATE_CONFIG_RATE_LIMIT_MAX <= (uint16_t)SETPOINT_RATE_LIMIT_MAX, CONTROL_RATE_CONFIG_RATE_LIMIT_MAX_too_large);
+STATIC_ASSERT(CONTROL_RATE_CONFIG_RATE_LIMIT_MAX <= (uint16_t)SETPOINT_RATE_LIMIT_MAX, CONTROL_RATE_CONFIG_RATE_LIMIT_MAX_too_large);
 
 #define RC_RATE_INCREMENTAL 14.54f
 
@@ -265,16 +265,16 @@ static float applyQuickRates(const int axis, float rcCommandf, const float rcCom
     return angleRate;
 }
 
-void scaleRawSetpointToFpvCamAngle(void)
+STATIC_UNIT_TESTED void scaleRawSetpointToFpvCamAngle(void)
 {
     //recalculate sin/cos only when rxConfig()->fpvCamAngleDegrees changed
     static int16_t lastFpvCamAngleDegrees = -1;
     static float cosFactor = 1.0f;
     static float sinFactor = 0.0f;
 
-    if (lastFpvCamAngleDegrees != rxConfig.fpvCamAngleDegrees) {
-        lastFpvCamAngleDegrees = rxConfig.fpvCamAngleDegrees;
-        sincosf_approx(DEGREES_TO_RADIANS(rxConfig.fpvCamAngleDegrees), &sinFactor, &cosFactor);
+    if (lastFpvCamAngleDegrees != rxConfig()->fpvCamAngleDegrees) {
+        lastFpvCamAngleDegrees = rxConfig()->fpvCamAngleDegrees;
+        sincosf_approx(DEGREES_TO_RADIANS(rxConfig()->fpvCamAngleDegrees), &sinFactor, &cosFactor);
     }
 
     float roll = rawSetpoint[ROLL];
@@ -392,7 +392,7 @@ static FAST_CODE_NOINLINE void updateFeedforwardFilters(const pidRuntime_t *pid)
     DEBUG_SET(DEBUG_FEEDFORWARD_LIMIT, 6, lrintf(pt1K * 1000.0f));
     DEBUG_SET(DEBUG_RC_SMOOTHING, 4, lrintf(pt1K * 1000.0f));
     DEBUG_SET(DEBUG_FEEDFORWARD_LIMIT, 7, lrintf(smoothedRxRateHz));
-    }
+}
 #endif
 
 static FAST_CODE void processRcSmoothingFilter(void)
@@ -411,7 +411,7 @@ static FAST_CODE void processRcSmoothingFilter(void)
 
     if (!rxConfig()->rc_smoothing) {
         return;
-}
+    }
 
     // Apply smoothing filters when RC smoothing is enabled
     for (int i = 0; i < PRIMARY_CHANNEL_COUNT; i++) {
@@ -517,7 +517,7 @@ static FAST_CODE_NOINLINE void calculateFeedforward(const pidRuntime_t *pid, fli
             const float limit = (maxRcRate[axis] - fabsf(setpoint)) * pid->feedforwardMaxRateLimit;
             feedforward = (limit > 0.0f) ? constrainf(feedforward, -limit, limit) : 0.0f;
         }
-        } else {
+    } else {
         feedforward *= jitterAttenuator;
         const float gain = pt1FilterGainFromDelay(pid->feedforwardYawHoldTime, rxInterval);
         pt1FilterUpdateCutoff(&feedforwardYawHoldLpf, gain);
@@ -577,7 +577,7 @@ bool shouldUpdateSmoothing(void)
             if (outlierCount == 0) {
                 prevOutlierSign = currentSign;
                 outlierCount++;
-                    } else {
+            } else {
                 if (currentSign != prevOutlierSign) {
                     // Reset outlier count if outlier sign reverses, as often happens at 1000Hz
                     // with a true change, all new packet delta will have the same sign.
@@ -616,7 +616,7 @@ bool shouldUpdateSmoothing(void)
         DEBUG_SET(DEBUG_RC_SMOOTHING, 7, validCount);
     }
     return false;
-                            }
+}
 
 FAST_CODE void processRcCommand(void)
 {
@@ -631,7 +631,7 @@ FAST_CODE void processRcCommand(void)
 #endif
 #ifdef USE_RC_SMOOTHING_FILTER
             if (rxConfig()->rc_smoothing) {
-                                    rcSmoothingSetFilterCutoffs(&rcSmoothingData);
+                rcSmoothingSetFilterCutoffs(&rcSmoothingData);
             }
 #endif
         }
@@ -656,7 +656,7 @@ FAST_CODE void processRcCommand(void)
             } else
 #endif
             if ((axis == FD_YAW) && FLIGHT_MODE(AUTOPILOT_MODE) && autopilotYawControlActive()
-                && fabsf(rcCommand[FD_YAW]) < (float)autopilotConfig.stickDeadband) {
+                && fabsf(rcCommand[FD_YAW]) < (float)autopilotConfig()->stickDeadband) {
                 // Mission yaw control, injected the same way as GPS rescue;
                 // a yaw stick deflection past the deadband hands yaw back to the pilot.
                 angleRate = autopilotGetYawRate();
@@ -691,7 +691,7 @@ FAST_CODE void processRcCommand(void)
             DEBUG_SET(DEBUG_RC_SMOOTHING_RATE, 2, lrintf(smoothedRxRateHz));
         }
         // adjust unfiltered setpoint steps to camera angle (mixing Roll and Yaw)
-        if (rxConfig.fpvCamAngleDegrees && IS_RC_MODE_ACTIVE(BOXFPVANGLEMIX) && !FLIGHT_MODE(HEADFREE_MODE)) {
+        if (rxConfig()->fpvCamAngleDegrees && IS_RC_MODE_ACTIVE(BOXFPVANGLEMIX) && !FLIGHT_MODE(HEADFREE_MODE)) {
             scaleRawSetpointToFpvCamAngle();
         }
     }
@@ -701,20 +701,20 @@ FAST_CODE void processRcCommand(void)
 #endif
 
     isRxDataNew = false;
-    }
+}
 
 FAST_CODE_NOINLINE void updateRcCommands(void)
 {
     isRxDataNew = true;
 
     for (int axis = 0; axis < 3; axis++) {
-        float rc = constrainf(rcData[axis] - rxConfig.midrc, -500.0f, 500.0f); // -500 to 500
+        float rc = constrainf(rcData[axis] - rxConfig()->midrc, -500.0f, 500.0f); // -500 to 500
         float rcDeadband = 0;
         if (axis == ROLL || axis == PITCH) {
-            rcDeadband = rcControlsConfig.deadband;
+            rcDeadband = rcControlsConfig()->deadband;
         } else {
-            rcDeadband  = rcControlsConfig.yaw_deadband;
-            rc *= -GET_DIRECTION(rcControlsConfig.yaw_control_reversed);
+            rcDeadband  = rcControlsConfig()->yaw_deadband;
+            rc *= -GET_DIRECTION(rcControlsConfig()->yaw_control_reversed);
         }
         rcCommand[axis] = fapplyDeadband(rc, rcDeadband);
     }
@@ -723,9 +723,9 @@ FAST_CODE_NOINLINE void updateRcCommands(void)
     if (featureIsEnabled(FEATURE_3D)) {
         tmp = constrain(rcData[THROTTLE], PWM_RANGE_MIN, PWM_RANGE_MAX);
         tmp = (uint32_t)(tmp - PWM_RANGE_MIN);
-        } else {
-        tmp = constrain(rcData[THROTTLE], rxConfig.mincheck, PWM_RANGE_MAX);
-        tmp = (uint32_t)(tmp - rxConfig.mincheck) * PWM_RANGE_MIN / (PWM_RANGE_MAX - rxConfig.mincheck);
+    } else {
+        tmp = constrain(rcData[THROTTLE], rxConfig()->mincheck, PWM_RANGE_MAX);
+        tmp = (uint32_t)(tmp - rxConfig()->mincheck) * PWM_RANGE_MIN / (PWM_RANGE_MAX - rxConfig()->mincheck);
     }
 
     if (getLowVoltageCutoff()->enabled) {
@@ -735,20 +735,20 @@ FAST_CODE_NOINLINE void updateRcCommands(void)
     rcCommand[THROTTLE] = rcLookupThrottle(tmp);
 
     if (featureIsEnabled(FEATURE_3D) && !failsafeIsActive()) {
-        if (!flight3DConfig.switched_mode3d) {
+        if (!flight3DConfig()->switched_mode3d) {
             if (IS_RC_MODE_ACTIVE(BOX3D)) {
                 fix12_t throttleScaler = qConstruct(rcCommand[THROTTLE] - 1000, 1000);
-                rcCommand[THROTTLE] = rxConfig.midrc + qMultiply(throttleScaler, PWM_RANGE_MAX - rxConfig.midrc);
+                rcCommand[THROTTLE] = rxConfig()->midrc + qMultiply(throttleScaler, PWM_RANGE_MAX - rxConfig()->midrc);
             }
         } else {
             if (IS_RC_MODE_ACTIVE(BOX3D)) {
                 reverseMotors = true;
                 fix12_t throttleScaler = qConstruct(rcCommand[THROTTLE] - 1000, 1000);
-                rcCommand[THROTTLE] = rxConfig.midrc + qMultiply(throttleScaler, PWM_RANGE_MIN - rxConfig.midrc);
+                rcCommand[THROTTLE] = rxConfig()->midrc + qMultiply(throttleScaler, PWM_RANGE_MIN - rxConfig()->midrc);
             } else {
                 reverseMotors = false;
                 fix12_t throttleScaler = qConstruct(rcCommand[THROTTLE] - 1000, 1000);
-                rcCommand[THROTTLE] = rxConfig.midrc + qMultiply(throttleScaler, PWM_RANGE_MAX - rxConfig.midrc);
+                rcCommand[THROTTLE] = rxConfig()->midrc + qMultiply(throttleScaler, PWM_RANGE_MAX - rxConfig()->midrc);
             }
         }
     }
@@ -828,8 +828,8 @@ static float quadraticBezier(float x, float p0x, float p1x, float p2x, float p0y
 
 void initRcProcessing(void)
 {
-    rcCommandDivider = 500.0f - rcControlsConfig.deadband;
-    rcCommandYawDivider = 500.0f - rcControlsConfig.yaw_deadband;
+    rcCommandDivider = 500.0f - rcControlsConfig()->deadband;
+    rcCommandYawDivider = 500.0f - rcControlsConfig()->yaw_deadband;
 
     float thrMid   = currentControlRateProfile->thrMid8   / 100.0f;  // normalized x coordinate for hover point
     float expo     = currentControlRateProfile->thrExpo8   / 100.0f;  // normalized expo (0.0 .. 1.0)

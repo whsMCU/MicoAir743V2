@@ -19,11 +19,11 @@
  */
 
 /* original work by Rav
- * 
+ *
  * 2018_07 updated by ctzsnooze to post filter, wider Q, different peak detection
  * coding assistance and advice from DieHertz, Rav, eTracer
  * test pilots icr4sh, UAV Tech, Flint723
- * 
+ *
  * 2021_02 updated by KarateBrot: switched FFT with SDFT, multiple notches per axis
  * test pilots: Sugar K, bizmar
  */
@@ -31,7 +31,7 @@
 #include <math.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_DYN_NOTCH_FILTER
 #include "build/debug.h"
@@ -123,22 +123,11 @@ typedef struct dynNotch_s {
 
     int maxCenterFreq;
     float centerFreq[XYZ_AXIS_COUNT][DYN_NOTCH_COUNT_MAX];
-    
+
     float dt;
     svfNotchFilter_t notch[XYZ_AXIS_COUNT][DYN_NOTCH_COUNT_MAX];
 
 } dynNotch_t;
-
-
-dynNotchConfig_t dynNotchConfig;
-
-void dynNotchConfig_Init(void)
-{
-	dynNotchConfig.dyn_notch_min_hz = 150;
-	dynNotchConfig.dyn_notch_max_hz = 600;
-	dynNotchConfig.dyn_notch_q = 300;
-	dynNotchConfig.dyn_notch_count = 3;
-}
 
 // dynamic notch instance (singleton)
 static FAST_DATA_ZERO_INIT dynNotch_t dynNotch;
@@ -234,7 +223,7 @@ FAST_CODE void dynNotchUpdate(void)
         for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
             sampleAvg[axis] = sampleAccumulator[axis] * sampleCountRcp;
             sampleAccumulator[axis] = 0;
-            if (axis == bmi270.gyro.gyroDebugAxis) {
+            if (axis == gyro.gyroDebugAxis) {
                 DEBUG_SET(DEBUG_FFT, 2, lrintf(sampleAvg[axis]));
             }
         }
@@ -264,18 +253,18 @@ FAST_CODE void dynNotchUpdate(void)
 static FAST_CODE_NOINLINE void dynNotchProcess(void)
 {
     uint32_t startTime = 0;
-     if (debugMode == DEBUG_FFT_TIME) {
-         startTime = micros();
-     }
+    if (debugMode == DEBUG_FFT_TIME) {
+        startTime = micros();
+    }
 
     DEBUG_SET(DEBUG_FFT_TIME, 0, state.step);
 
     switch (state.step) {
-    
+
         case STEP_WINDOW: // 4.1us (3-6us) @ F722
         {
             sdftWinSq(&sdft[state.axis], sdftData);
-            
+
             // Get total vibrational power in dyn notch range for noise floor estimate in STEP_CALC_FREQUENCIES
             sdftNoiseThreshold = 0.0f;
             for (int bin = sdftStartBin; bin <= sdftEndBin; bin++) {
@@ -369,7 +358,7 @@ static FAST_CODE_NOINLINE void dynNotchProcess(void)
                     // Convert bin to frequency: freq = bin * binResoultion (bin 0 is 0Hz)
                     const float centerFreq = constrainf(meanBin * sdftResolutionHz, dynNotch.minHz, dynNotch.maxHz);
 
-                    // PT1 style smoothing moves notch center freqs rapidly towards big peaks and slowly away, up to 10x faster 
+                    // PT1 style smoothing moves notch center freqs rapidly towards big peaks and slowly away, up to 10x faster
                     const float cutoffMult = constrainf(peaks[p].value / sdftNoiseThreshold, 1.0f, 10.0f);
                     const float gain = pt1FilterGain(DYN_NOTCH_SMOOTH_HZ * cutoffMult, pt1LooptimeS); // dynamic PT1 k value
 
@@ -384,13 +373,13 @@ static FAST_CODE_NOINLINE void dynNotchProcess(void)
                 }
             }
 
-             if (state.axis == bmi270.gyro.gyroDebugAxis) {
-                 for (int p = 0; p < dynNotch.count && p < DYN_NOTCH_COUNT_MAX; p++) {
-                     // debug channel 0 is reserved for pre DN gyro
-                     DEBUG_SET(DEBUG_FFT_FREQ, p + 1, lrintf(dynNotch.centerFreq[state.axis][p]));
-                 }
-                 DEBUG_SET(DEBUG_DYN_LPF, 1, lrintf(dynNotch.centerFreq[state.axis][0]));
-             }
+            if (state.axis == gyro.gyroDebugAxis) {
+                for (int p = 0; p < dynNotch.count && p < DYN_NOTCH_COUNT_MAX; p++) {
+                    // debug channel 0 is reserved for pre DN gyro
+                    DEBUG_SET(DEBUG_FFT_FREQ, p + 1, lrintf(dynNotch.centerFreq[state.axis][p]));
+                }
+                DEBUG_SET(DEBUG_DYN_LPF, 1, lrintf(dynNotch.centerFreq[state.axis][0]));
+            }
 
             DEBUG_SET(DEBUG_FFT_TIME, 1, micros() - startTime);
 

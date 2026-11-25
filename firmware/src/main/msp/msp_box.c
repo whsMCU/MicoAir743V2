@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/bitarray.h"
 #include "common/streambuf.h"
@@ -32,16 +32,15 @@
 
 #include "config/config.h"
 #include "fc/runtime_config.h"
-#include "fc/rc_controls.h"
 
-//#include "flight/mixer.h"
+#include "flight/mixer.h"
 #include "flight/pid.h"
 
 #include "sensors/sensors.h"
 
 #include "telemetry/telemetry.h"
 
-//#include "pg/piniobox.h"
+#include "pg/piniobox.h"
 
 #include "msp_box.h"
 
@@ -213,11 +212,11 @@ void initActiveBoxIds(void)
     }
 
     bool acceleratorGainsEnabled = false;
-//    for (unsigned i = 0; i < PID_PROFILE_COUNT; i++) {
-//        if (pidProfiles(i)->anti_gravity_gain != ITERM_ACCELERATOR_GAIN_OFF) {
-//            acceleratorGainsEnabled = true;
-//        }
-//    }
+    for (unsigned i = 0; i < PID_PROFILE_COUNT; i++) {
+        if (pidProfiles(i)->anti_gravity_gain != ITERM_ACCELERATOR_GAIN_OFF) {
+            acceleratorGainsEnabled = true;
+        }
+    }
     if (acceleratorGainsEnabled && !featureIsEnabled(FEATURE_ANTI_GRAVITY)) {
         BME(BOXANTIGRAVITY);
     }
@@ -251,7 +250,7 @@ void initActiveBoxIds(void)
 #ifdef USE_GPS
     if (featureIsEnabled(FEATURE_GPS)) {
 #ifdef USE_GPS_RESCUE
-        if (!featureIsEnabled(FEATURE_3D)) {// && !isFixedWing()
+        if (!featureIsEnabled(FEATURE_3D) && !isFixedWing()) {
             BME(BOXGPSRESCUE);
         }
 #endif
@@ -267,9 +266,9 @@ void initActiveBoxIds(void)
 
     BME(BOXFAILSAFE);
 
-//    if (mixerConfig()->mixerMode == MIXER_FLYING_WING || mixerConfig()->mixerMode == MIXER_AIRPLANE || mixerConfig()->mixerMode == MIXER_CUSTOM_AIRPLANE) {
-//        BME(BOXPASSTHRU);
-//    }
+    if (mixerConfig()->mixerMode == MIXER_FLYING_WING || mixerConfig()->mixerMode == MIXER_AIRPLANE || mixerConfig()->mixerMode == MIXER_CUSTOM_AIRPLANE) {
+        BME(BOXPASSTHRU);
+    }
 
     BME(BOXBEEPERON);
     BME(BOXBEEPERMUTE);
@@ -292,11 +291,11 @@ void initActiveBoxIds(void)
     }
 
 #ifdef USE_DSHOT
-//    bool configuredMotorProtocolDshot;
-//    checkMotorProtocolEnabled(&motorConfig()->dev, &configuredMotorProtocolDshot);
-//    if (configuredMotorProtocolDshot) {
-//        BME(BOXCRASHFLIP);
-//    }
+    bool configuredMotorProtocolDshot;
+    checkMotorProtocolEnabled(&motorConfig()->dev, &configuredMotorProtocolDshot);
+    if (configuredMotorProtocolDshot) {
+        BME(BOXCRASHFLIP);
+    }
 #endif
 
     if (featureIsEnabled(FEATURE_SERVO_TILT)) {
@@ -424,28 +423,4 @@ int packFlightModeFlags(boxBitmask_t *mspFlightModeFlags)
     }
     // return count of used bits
     return mspBoxIdx;
-}
-
-void MSP_SET_MODE_RANGE(uint32_t i, uint8_t boxId, uint8_t auxChannelIndex, uint32_t start, uint32_t end){
-	uint32_t start_value = CHANNEL_VALUE_TO_STEP(start);
-	uint32_t end_value = CHANNEL_VALUE_TO_STEP(end);
-	  //i = sbufReadU8(src);
-	  if (i < MAX_MODE_ACTIVATION_CONDITION_COUNT) {
-	      modeActivationCondition_t *mac = &modeActivationConditions[i];
-	      //i = sbufReadU8(src);
-	      const box_t *box = findBoxByPermanentId(boxId);
-	      if (box) {
-	          mac->modeId = box->boxId;
-	          mac->auxChannelIndex = auxChannelIndex;
-	          mac->range.startStep = (uint8_t)start_value;
-	          mac->range.endStep = (uint8_t)end_value;
-//	          if (sbufBytesRemaining(src) != 0) {
-//	              mac->modeLogic = sbufReadU8(src);
-//
-//	              i = sbufReadU8(src);
-//	              mac->linkedTo = findBoxByPermanentId(i)->boxId;
-//	          }
-	          rcControlsInit();
-	      }
-	  }
 }

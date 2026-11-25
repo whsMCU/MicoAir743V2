@@ -23,12 +23,12 @@
 #include <string.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/build_config.h"
 #include "common/maths.h"
 
-#include "common/typeconversion.h"
+#include "typeconversion.h"
 
 #ifdef REQUIRE_PRINTF_LONG_SUPPORT
 

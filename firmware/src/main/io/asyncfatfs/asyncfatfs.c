@@ -37,7 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef AFATFS_DEBUG
 #include <signal.h>

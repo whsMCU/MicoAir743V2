@@ -15,7 +15,7 @@
  * along with Betaflight. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "hw.h"
+#include "platform.h"
 
 #ifndef USE_WING
 
@@ -36,7 +36,7 @@
 #include "flight/position_estimator.h"
 #include "rx/rx.h"
 
-//#include "pg/pos_hold.h"
+#include "pg/pos_hold.h"
 #include "pos_hold.h"
 
 typedef struct posHoldState_s {
@@ -48,19 +48,9 @@ typedef struct posHoldState_s {
 
 static posHoldState_t posHold;
 
-posHoldConfig_t posHoldConfig;
-
-void posHoldConfig_Init(void)
-{
-	posHoldConfig.deadband = 5;
-	posHoldConfig.positionSource = POSHOLD_SOURCE_AUTO;
-	posHoldConfig.opticalflowQualityMin = 30;
-	posHoldConfig.opticalflowMaxRange = 400;
-}
-
 void posHoldInit(void)
 {
-    posHold.deadband = posHoldConfig.deadband * 0.01f;
+    posHold.deadband = posHoldConfig()->deadband * 0.01f;
 }
 
 static void posHoldCheckSticks(void)

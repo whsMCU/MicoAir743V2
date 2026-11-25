@@ -28,7 +28,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_SDCARD_SDIO
 
@@ -36,10 +36,10 @@
 
 #include "pg/sdio.h"
 
-//#include "drivers/io.h"
-//#include "drivers/io_impl.h"
+#include "drivers/io.h"
+#include "drivers/io_impl.h"
 #include "drivers/nvic.h"
-//#include "drivers/dma.h"
+#include "drivers/dma.h"
 #include "drivers/sdio.h"
 
 typedef struct SD_Handle_s
@@ -61,8 +61,8 @@ SD_CardType_t                      SD_CardType;
 SD_Handle_t                        SD_Handle;
 
 typedef struct sdioPin_s {
-	uint32_t pin;
-    GPIO_TypeDef *GPIOx;
+    ioTag_t pin;
+    uint8_t af;
 } sdioPin_t;
 
 #define SDIO_PIN_D0  0
@@ -78,27 +78,39 @@ typedef struct sdioPin_s {
 typedef struct sdioHardware_s {
     SDMMC_TypeDef *instance;
     IRQn_Type irqn;
-    sdioPin_t sdioPinCK;
-    sdioPin_t sdioPinCMD;
-    sdioPin_t sdioPinD0;
-    sdioPin_t sdioPinD1;
-    sdioPin_t sdioPinD2;
-    sdioPin_t sdioPinD3;
+    sdioPin_t sdioPinCK[SDIO_MAX_PINDEFS];
+    sdioPin_t sdioPinCMD[SDIO_MAX_PINDEFS];
+    sdioPin_t sdioPinD0[SDIO_MAX_PINDEFS];
+    sdioPin_t sdioPinD1[SDIO_MAX_PINDEFS];
+    sdioPin_t sdioPinD2[SDIO_MAX_PINDEFS];
+    sdioPin_t sdioPinD3[SDIO_MAX_PINDEFS];
 } sdioHardware_t;
 
 // Possible pin assignments
 
-//#define PINDEF(device, pin, afnum) { DEFIO_TAG_E(pin), GPIO_AF ## afnum ## _SDMMC ## device }
+#define PINDEF(device, pin, afnum) { DEFIO_TAG_E(pin), GPIO_AF ## afnum ## _SDMMC ## device }
 
-static const sdioHardware_t sdioPinHardware = {
+static const sdioHardware_t sdioPinHardware[SDIODEV_COUNT] = {
+    {
         .instance = SDMMC1,
         .irqn = SDMMC1_IRQn,
-        .sdioPinCK  = { GPIO_PIN_12, GPIOC },
-        .sdioPinCMD = { GPIO_PIN_2,  GPIOD },
-        .sdioPinD0  = { GPIO_PIN_8,  GPIOC },
-        .sdioPinD1  = { GPIO_PIN_9,  GPIOC },
-        .sdioPinD2  = { GPIO_PIN_10, GPIOC },
-        .sdioPinD3  = { GPIO_PIN_11, GPIOC },
+        .sdioPinCK  = { PINDEF(1, PC12, 12) },
+        .sdioPinCMD = { PINDEF(1, PD2,  12) },
+        .sdioPinD0  = { PINDEF(1, PC8,  12) },
+        .sdioPinD1  = { PINDEF(1, PC9,  12) },
+        .sdioPinD2  = { PINDEF(1, PC10, 12) },
+        .sdioPinD3  = { PINDEF(1, PC11, 12) },
+    },
+    {
+        .instance = SDMMC2,
+        .irqn = SDMMC2_IRQn,
+        .sdioPinCK  = { PINDEF(2, PC1,   9), PINDEF(2, PD6,  11) },
+        .sdioPinCMD = { PINDEF(2, PA0,   9), PINDEF(2, PD7,  11) },
+        .sdioPinD0  = { PINDEF(2, PB14,  9),                     },
+        .sdioPinD1  = { PINDEF(2, PB15,  9),                     },
+        .sdioPinD2  = { PINDEF(2, PB3,   9), PINDEF(2, PG11, 10) },
+        .sdioPinD3  = { PINDEF(2, PB4,   9),                     },
+    }
 };
 
 #undef PINDEF
@@ -118,34 +130,34 @@ static const sdioPin_t *sdioFindPinDef(const sdioPin_t *pindefs, ioTag_t pin)
     return NULL;
 }
 
-//#define SDIOFINDPIN(pinname)  { \
-//        const sdioPin_t *pindef;                                                                     \
-//        pindef = sdioFindPinDef(sdioHardware->sdioPin ## pinname, sdioPinConfig.pinname ## Pin);  \
-//        if (pindef) {                                                                                \
-//            sdioPin[SDIO_PIN_ ## pinname] = *pindef;                                           \
-//        }                                                                                            \
-//    } struct dummy
+#define SDIOFINDPIN(pinname)  { \
+        const sdioPin_t *pindef;                                                                     \
+        pindef = sdioFindPinDef(sdioHardware->sdioPin ## pinname, sdioPinConfig()->pinname ## Pin);  \
+        if (pindef) {                                                                                \
+            sdioPin[SDIO_PIN_ ## pinname] = *pindef;                                           \
+        }                                                                                            \
+    } struct dummy
 
-//void sdioPinConfigure(void)
-//{
-//    SDIODevice device = SDIO_CFG_TO_DEV(sdioConfig.device);
-//
-//    if (device == SDIOINVALID) {
-//        return;
-//    }
-//
-//    sdioHardware = &sdioPinHardware;
-//
-//    SDIOFINDPIN(CK);
-//    SDIOFINDPIN(CMD);
-//    SDIOFINDPIN(D0);
-//
-//    if (sdioConfig.use4BitWidth) {
-//        SDIOFINDPIN(D1);
-//        SDIOFINDPIN(D2);
-//        SDIOFINDPIN(D3);
-//    }
-//}
+void sdioPinConfigure(void)
+{
+    SDIODevice device = SDIO_CFG_TO_DEV(sdioConfig()->device);
+
+    if (device == SDIOINVALID) {
+        return;
+    }
+
+    sdioHardware = &sdioPinHardware[device];
+
+    SDIOFINDPIN(CK);
+    SDIOFINDPIN(CMD);
+    SDIOFINDPIN(D0);
+
+    if (sdioConfig()->use4BitWidth) {
+        SDIOFINDPIN(D1);
+        SDIOFINDPIN(D2);
+        SDIOFINDPIN(D3);
+    }
+}
 
 #undef SDIOFINDPIN
 
@@ -157,121 +169,96 @@ static const sdioPin_t *sdioFindPinDef(const sdioPin_t *pindefs, ioTag_t pin)
 
 void HAL_SD_MspInit(SD_HandleTypeDef* hsd)
 {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-  if(hsd->Instance==SDMMC1)
-  {
-  /* USER CODE BEGIN SDMMC1_MspInit 0 */
+    UNUSED(hsd);
 
-  /* USER CODE END SDMMC1_MspInit 0 */
-
-  /** Initializes the peripherals clock
-  */
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SDMMC;
-    PeriphClkInitStruct.PLL2.PLL2M = 5;
-    PeriphClkInitStruct.PLL2.PLL2N = 500;
-    PeriphClkInitStruct.PLL2.PLL2P = 2;
-    PeriphClkInitStruct.PLL2.PLL2Q = 3;
-    PeriphClkInitStruct.PLL2.PLL2R = 4;
-    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_0;
-    PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
-    PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
-    PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL2;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
-    {
-      Error_Handler();
+    if (!sdioHardware) {
+        return;
     }
 
-    /* SDMMC1 clock enable */
-    __HAL_RCC_SDMMC1_CLK_DISABLE();
-    __HAL_RCC_SDMMC1_FORCE_RESET();
-    __HAL_RCC_SDMMC1_RELEASE_RESET();
+    if (sdioHardware->instance == SDMMC1) {
+        __HAL_RCC_SDMMC1_CLK_DISABLE();
+        __HAL_RCC_SDMMC1_FORCE_RESET();
+        __HAL_RCC_SDMMC1_RELEASE_RESET();
+        __HAL_RCC_SDMMC1_CLK_ENABLE();
+    } else if (sdioHardware->instance == SDMMC2) {
+        __HAL_RCC_SDMMC2_CLK_DISABLE();
+        __HAL_RCC_SDMMC2_FORCE_RESET();
+        __HAL_RCC_SDMMC2_RELEASE_RESET();
+        __HAL_RCC_SDMMC2_CLK_ENABLE();
+    }
 
-    __HAL_RCC_SDMMC1_CLK_ENABLE();
+    uint8_t is4BitWidth = sdioConfig()->use4BitWidth;
 
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_GPIOD_CLK_ENABLE();
-    /**SDMMC1 GPIO Configuration
-    PC8     ------> SDMMC1_D0
-    PC9     ------> SDMMC1_D1
-    PC10     ------> SDMMC1_D2
-    PC11     ------> SDMMC1_D3
-    PC12     ------> SDMMC1_CK
-    PD2     ------> SDMMC1_CMD
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11
-                          |GPIO_PIN_12;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO1;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    const IO_t clk = IOGetByTag(sdioPin[SDIO_PIN_CK].pin);
+    const IO_t cmd = IOGetByTag(sdioPin[SDIO_PIN_CMD].pin);
+    const IO_t d0 = IOGetByTag(sdioPin[SDIO_PIN_D0].pin);
+    const IO_t d1 = IOGetByTag(sdioPin[SDIO_PIN_D1].pin);
+    const IO_t d2 = IOGetByTag(sdioPin[SDIO_PIN_D2].pin);
+    const IO_t d3 = IOGetByTag(sdioPin[SDIO_PIN_D3].pin);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_2;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-    GPIO_InitStruct.Alternate = GPIO_AF12_SDIO1;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    IOConfigGPIOAF(clk, IOCFG_SDMMC, sdioPin[SDIO_PIN_CK].af);
+    IOConfigGPIOAF(cmd, IOCFG_SDMMC, sdioPin[SDIO_PIN_CMD].af);
+    IOConfigGPIOAF(d0, IOCFG_SDMMC, sdioPin[SDIO_PIN_D0].af);
 
-    /* SDMMC1 interrupt Init */
-    HAL_NVIC_SetPriority(SDMMC1_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(SDMMC1_IRQn);
-  /* USER CODE BEGIN SDMMC1_MspInit 1 */
+    if(is4BitWidth) {
+        IOConfigGPIOAF(d1, IOCFG_SDMMC, sdioPin[SDIO_PIN_D1].af);
+        IOConfigGPIOAF(d2, IOCFG_SDMMC, sdioPin[SDIO_PIN_D2].af);
+        IOConfigGPIOAF(d3, IOCFG_SDMMC, sdioPin[SDIO_PIN_D3].af);
+    }
 
-  /* USER CODE END SDMMC1_MspInit 1 */
-  }
+    HAL_NVIC_SetPriority(sdioHardware->irqn, NVIC_PRIORITY_BASE(NVIC_PRIO_SDIO_DMA), NVIC_PRIORITY_SUB(NVIC_PRIO_SDIO_DMA));
+    HAL_NVIC_EnableIRQ(sdioHardware->irqn);
 }
 
-//void sdioInitialize(void)
-//{
-//    if (!sdioHardware) {
-//        return;
-//    }
-//
-//    uint8_t is4BitWidth = sdioConfig.use4BitWidth;
-//
-//    const IO_t clk = IOGetByTag(sdioPin[SDIO_PIN_CK].pin);
-//    const IO_t cmd = IOGetByTag(sdioPin[SDIO_PIN_CMD].pin);
-//    const IO_t d0 = IOGetByTag(sdioPin[SDIO_PIN_D0].pin);
-//    const IO_t d1 = IOGetByTag(sdioPin[SDIO_PIN_D1].pin);
-//    const IO_t d2 = IOGetByTag(sdioPin[SDIO_PIN_D2].pin);
-//    const IO_t d3 = IOGetByTag(sdioPin[SDIO_PIN_D3].pin);
-//
-//    IOInit(clk, OWNER_SDIO_CK, 0);
-//    IOInit(cmd, OWNER_SDIO_CMD, 0);
-//    IOInit(d0, OWNER_SDIO_D0, 0);
-//
-//    if (is4BitWidth) {
-//        IOInit(d1, OWNER_SDIO_D1, 0);
-//        IOInit(d2, OWNER_SDIO_D2, 0);
-//        IOInit(d3, OWNER_SDIO_D3, 0);
-//    }
-//
-//    //
-//    // Setting all the SDIO pins to high for a short time results in more robust initialisation.
-//    //
-//    IOHi(d0);
-//    IOConfigGPIO(d0, IOCFG_OUT_PP);
-//
-//    if(is4BitWidth) {
-//        IOHi(d1);
-//        IOHi(d2);
-//        IOHi(d3);
-//        IOConfigGPIO(d1, IOCFG_OUT_PP);
-//        IOConfigGPIO(d2, IOCFG_OUT_PP);
-//        IOConfigGPIO(d3, IOCFG_OUT_PP);
-//    }
-//
-//    IOHi(clk);
-//    IOHi(cmd);
-//    IOConfigGPIO(clk, IOCFG_OUT_PP);
-//    IOConfigGPIO(cmd, IOCFG_OUT_PP);
-//}
-
-bool SD_InitialiseHardware(void)
+void sdioInitialize(void)
 {
-    //UNUSED(dma);
+    if (!sdioHardware) {
+        return;
+    }
+
+    uint8_t is4BitWidth = sdioConfig()->use4BitWidth;
+
+    const IO_t clk = IOGetByTag(sdioPin[SDIO_PIN_CK].pin);
+    const IO_t cmd = IOGetByTag(sdioPin[SDIO_PIN_CMD].pin);
+    const IO_t d0 = IOGetByTag(sdioPin[SDIO_PIN_D0].pin);
+    const IO_t d1 = IOGetByTag(sdioPin[SDIO_PIN_D1].pin);
+    const IO_t d2 = IOGetByTag(sdioPin[SDIO_PIN_D2].pin);
+    const IO_t d3 = IOGetByTag(sdioPin[SDIO_PIN_D3].pin);
+
+    IOInit(clk, OWNER_SDIO_CK, 0);
+    IOInit(cmd, OWNER_SDIO_CMD, 0);
+    IOInit(d0, OWNER_SDIO_D0, 0);
+
+    if (is4BitWidth) {
+        IOInit(d1, OWNER_SDIO_D1, 0);
+        IOInit(d2, OWNER_SDIO_D2, 0);
+        IOInit(d3, OWNER_SDIO_D3, 0);
+    }
+
+    //
+    // Setting all the SDIO pins to high for a short time results in more robust initialisation.
+    //
+    IOHi(d0);
+    IOConfigGPIO(d0, IOCFG_OUT_PP);
+
+    if(is4BitWidth) {
+        IOHi(d1);
+        IOHi(d2);
+        IOHi(d3);
+        IOConfigGPIO(d1, IOCFG_OUT_PP);
+        IOConfigGPIO(d2, IOCFG_OUT_PP);
+        IOConfigGPIO(d3, IOCFG_OUT_PP);
+    }
+
+    IOHi(clk);
+    IOHi(cmd);
+    IOConfigGPIO(clk, IOCFG_OUT_PP);
+    IOConfigGPIO(cmd, IOCFG_OUT_PP);
+}
+
+bool SD_InitialiseHardware(dmaResource_t *dma)
+{
+    UNUSED(dma);
 
     return true;
 }
@@ -289,11 +276,11 @@ static SD_Error_t SD_DoInit(void)
 
     memset(&hsd1, 0, sizeof(hsd1));
 
-    hsd1.Instance = sdioPinHardware.instance;
+    hsd1.Instance = sdioHardware->instance;
 
     hsd1.Init.ClockEdge = SDMMC_CLOCK_EDGE_RISING;
     hsd1.Init.ClockPowerSave = SDMMC_CLOCK_POWER_SAVE_ENABLE;
-    if (sdioConfig.use4BitWidth) {
+    if (sdioConfig()->use4BitWidth) {
         hsd1.Init.BusWide = SDMMC_BUS_WIDE_4B;
     } else {
         hsd1.Init.BusWide = SDMMC_BUS_WIDE_1B; // FIXME untested
@@ -685,6 +672,11 @@ void HAL_SD_AbortCallback(SD_HandleTypeDef *hsd)
 }
 
 void SDMMC1_IRQHandler(void)
+{
+    HAL_SD_IRQHandler(&hsd1);
+}
+
+void SDMMC2_IRQHandler(void)
 {
     HAL_SD_IRQHandler(&hsd1);
 }

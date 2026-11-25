@@ -21,7 +21,7 @@
 #pragma once
 
 #include <stdbool.h>
-#include "hw.h"
+#include <stdint.h>
 
 struct filter_s;
 typedef struct filter_s filter_t;
@@ -166,52 +166,3 @@ int32_t simpleLPFilterUpdate(simpleLowpassFilter_t *filter, int32_t newVal);
 void meanAccumulatorInit(meanAccumulator_t *filter);
 void meanAccumulatorAdd(meanAccumulator_t *filter, const int8_t newVal);
 int8_t meanAccumulatorCalc(meanAccumulator_t *filter, const int8_t defaultValue);
-
-typedef struct pt1Filter_inav_s {
-    float state;
-    float RC;
-    float dT;
-    float alpha;
-} pt1Filter_inav_t;
-
-
-
-typedef struct pt1Filter3_s {
-    float state;
-    float RC;
-    float dT;
-    float alpha;
-} pt1Filter3_t;
-
-/* this holds the data required to update samples thru a filter */
-typedef struct biquadFilter_s {
-    float b0, b1, b2, a1, a2;
-    float x1, x2, y1, y2;
-    float weight;
-} biquadFilter_t;
-
-typedef enum {
-    FILTER_LPF,    // 2nd order Butterworth section
-    FILTER_NOTCH,
-    FILTER_BPF,
-} biquadFilterType_e;
-
-typedef float (*filterApplyFnPtr)(filter_t *filter, float input);
-
-void biquadFilterInitLPF(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate);
-void biquadFilterInit(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate, float Q, biquadFilterType_e filterType, float weight);
-void biquadFilterUpdate(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate, float Q, biquadFilterType_e filterType, float weight);
-void biquadFilterUpdateLPF(biquadFilter_t *filter, float filterFreq, uint32_t refreshRate);
-
-float biquadFilterApplyDF1(biquadFilter_t *filter, float input);
-float biquadFilterApplyDF1Weighted(biquadFilter_t *filter, float input);
-float biquadFilterApply(biquadFilter_t *filter, float input);
-float filterGetNotchQ(float centerFreq, float cutoffFreq);
-
-
-void pt1FilterInit3(pt1Filter3_t *filter, float f_cut, float dT);
-float pt1FilterApply3(pt1Filter3_t *filter, float input, float dT);
-float pt1FilterGetLastOutput(pt1Filter3_t *filter);
-
-float pt1FilterApply4(pt1Filter_inav_t *filter, float input, float f_cut, float dt);
-void pt1FilterReset(pt1Filter_inav_t *filter, float input);

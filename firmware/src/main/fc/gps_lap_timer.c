@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/maths.h"
 
@@ -44,23 +44,12 @@ static uint32_t minDistance = UINT32_MAX;
 static uint32_t minDistanceTime = 0;
 static bool wasInCircle = false;
 
-gpsLapTimerConfig_t gpsLapTimerConfig;
-
-void gpsLapTimerConfig_Init(void)
-{
-	gpsLapTimerConfig.gateLat = 0;
-	gpsLapTimerConfig.gateLon = 0;
-	gpsLapTimerConfig.minimumLapTimeSeconds = 10;
-	gpsLapTimerConfig.gateToleranceM = 9;
-}
-
-
 gpsLapTimerData_t gpsLapTimerData;
 
 void gpsLapTimerInit(void)
 {
-    gpsLapTimerData.gateLocation.lat = gpsLapTimerConfig.gateLat;
-    gpsLapTimerData.gateLocation.lon  = gpsLapTimerConfig.gateLon;
+    gpsLapTimerData.gateLocation.lat = gpsLapTimerConfig()->gateLat;
+    gpsLapTimerData.gateLocation.lon  = gpsLapTimerConfig()->gateLon;
     gpsLapTimerData.numberOfSetReadings = 0;
     gpsLapTimerData.bestLapTime = 0;
     gpsLapTimerData.best3Consec = 0;
@@ -94,8 +83,8 @@ static void gpsLapTimerProcessSettingGate(void)
 void gpsLapTimerEndSetGate(void)
 {
     settingGate = false;
-    gpsLapTimerConfig.gateLat = gpsLapTimerData.gateLocation.lat;
-    gpsLapTimerConfig.gateLon = gpsLapTimerData.gateLocation.lon;
+    gpsLapTimerConfigMutable()->gateLat = gpsLapTimerData.gateLocation.lat;
+    gpsLapTimerConfigMutable()->gateLon = gpsLapTimerData.gateLocation.lon;
 }
 
 void gpsLapTimerNewGpsData(void)
@@ -114,9 +103,9 @@ void gpsLapTimerNewGpsData(void)
     }
 
     // Current lap time is at least the min lap timer or timer not running, so we need to get ready to record a gate crossing
-    if (!gpsLapTimerData.timerRunning || gpsSol.time - gpsLapTimerData.timeOfLastLap > (gpsLapTimerConfig.minimumLapTimeSeconds * 1000)) {
+    if (!gpsLapTimerData.timerRunning || gpsSol.time - gpsLapTimerData.timeOfLastLap > (gpsLapTimerConfig()->minimumLapTimeSeconds * 1000)) {
         // Within radius of gate, record the closest point we get before leaving
-        if (gpsLapTimerData.distToPointCM < (gpsLapTimerConfig.gateToleranceM * 100)) {
+        if (gpsLapTimerData.distToPointCM < (gpsLapTimerConfig()->gateToleranceM * 100)) {
             // Either just entered the circle or were already in circle but are the closest we've been to the center this lap
             if (!wasInCircle || gpsLapTimerData.distToPointCM < minDistance) {
                 // Track the closest we've been to the center

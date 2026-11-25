@@ -24,16 +24,18 @@
 #include "common/filter.h"
 #include "common/time.h"
 #include "common/utils.h"
-#include "common/vector.h"
-
-#include "flight/dyn_notch_filter.h"
 
 #include "drivers/accgyro/accgyro.h"
+#include "drivers/bus.h"
 #include "drivers/sensor.h"
 
-#include "sensors/sensors.h"
+#ifdef USE_DYN_NOTCH_FILTER
+#include "flight/dyn_notch_filter.h"
+#endif
 
-//#include "flight/pid.h"
+#include "flight/pid.h"
+
+#include "pg/pg.h"
 
 #define LPF_MAX_HZ 1000 // so little filtering above 1000hz that if the user wants less delay, they must disable the filter
 #define DYN_LPF_MAX_HZ 1000
@@ -53,7 +55,7 @@
 
 typedef union gyroLowpassFilter_u {
     pt1Filter_t pt1FilterState;
-    biquadFilter_t biquadFilterState;
+    svfLowpassFilter_t svfLowpassFilterState;
     pt2Filter_t pt2FilterState;
     pt3Filter_t pt3FilterState;
 } gyroLowpassFilter_t;
@@ -64,42 +66,25 @@ typedef struct gyroCalibration_s {
     int32_t cyclesRemaining;
 } gyroCalibration_t;
 
-typedef struct rollAndPitchTrims_s {
-    int16_t roll;
-    int16_t pitch;
-} rollAndPitchTrims_t_def;
-
-typedef union rollAndPitchTrims_u {
-    int16_t raw[2];
-    rollAndPitchTrims_t_def values;
-} rollAndPitchTrims_t;
-
-typedef struct {
-    float min;
-    float max;
-} acc_extremes_t;
+typedef struct gyroSensor_s {
+    gyroDev_t gyroDev;
+    gyroCalibration_t calibration;
+} gyroSensor_t;
 
 typedef struct gyro_s {
     uint16_t sampleRateHz;
     uint32_t targetLooptime;
     uint32_t sampleLooptime;
     float scale;
-    vector3_t gyroADC;     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
+    float gyroADC[XYZ_AXIS_COUNT];     // aligned, calibrated, scaled, but unfiltered data from the sensor(s)
     float gyroADCf[XYZ_AXIS_COUNT];    // filtered gyro data
     uint8_t sampleCount;               // gyro sensor sample counter
     float sampleSum[XYZ_AXIS_COUNT];   // summed samples used for downsampling
     bool downsampleFilterEnabled;      // if true then downsample using gyro lowpass 2, otherwise use averaging
 
-    volatile bool dataReady;
+    gyroSensor_t gyroSensor[GYRO_COUNT];
 
-    int16_t gyroADCRaw[XYZ_AXIS_COUNT];                      // raw data from sensor
-    int32_t gyroADCRawPrevious[XYZ_AXIS_COUNT];
-
-    float gyro_accumulatedMeasurements[XYZ_AXIS_COUNT];
-    float gyroPrevious[XYZ_AXIS_COUNT];
-    int gyro_accumulatedMeasurementCount;
-
-    gyroCalibration_t calibration;
+    gyroDev_t *rawSensorDev;           // pointer to the sensor providing the raw data for DEBUG_GYRO_RAW
 
     // lowpass gyro soft filter
     filterApplyFnPtr lowpassFilterApplyFn;
@@ -110,20 +95,13 @@ typedef struct gyro_s {
     gyroLowpassFilter_t lowpass2Filter[XYZ_AXIS_COUNT];
 
     // notch filters
-    uint16_t gyro_soft_notch_hz_1;
-    uint16_t gyro_soft_notch_cutoff_1;
-    uint16_t gyro_soft_notch_hz_2;
-    uint16_t gyro_soft_notch_cutoff_2;
-
-    dynNotchConfig_t dynNotchConfig;
-
-    // notch filters
     filterApplyFnPtr notchFilter1ApplyFn;
-    biquadFilter_t notchFilter1[XYZ_AXIS_COUNT];
+    svfNotchFilter_t notchFilter1[XYZ_AXIS_COUNT];
 
     filterApplyFnPtr notchFilter2ApplyFn;
-    biquadFilter_t notchFilter2[XYZ_AXIS_COUNT];
+    svfNotchFilter_t notchFilter2[XYZ_AXIS_COUNT];
 
+    uint16_t accSampleRateHz;
     uint8_t gyroEnabledBitmask;
     uint8_t gyroDebugMode;
     bool gyroHasOverflowProtection;
@@ -140,93 +118,10 @@ typedef struct gyro_s {
 #ifdef USE_GYRO_OVERFLOW_CHECK
     uint8_t overflowAxisMask;
 #endif
-
     pt1Filter_t imuGyroFilter[XYZ_AXIS_COUNT];
-
-    float gyroZero[XYZ_AXIS_COUNT];
-    int16_t gyro_offset_yaw;
-    uint16_t gyroCalibrationDuration;   // Gyro calibration duration in 1/100 second
-
-    int16_t temperature;
-
-    uint8_t hardware_lpf;
-    bool gyro_high_fsr;
-
-    gyroRateKHz_e gyroRateKHz;
-    gyroModeSPI_e gyroModeSPI;
-
-    uint32_t detectedEXTI;
-    uint32_t gyroLastEXTI;
-    uint32_t gyroSyncEXTI;
-    int32_t gyroShortPeriod;
-    int32_t gyroDmaMaxDuration;
-    uint32_t exit_callback_dt;
-    uint32_t rx_callback_dt;
-
-    bool init_gyro_cal_enabled;
-
-    bool done_gyro_config;
 } gyro_t;
 
-typedef struct acc_s {
-  uint16_t sampleRateHz;
-
-  volatile bool dataReady;
-
-  float acc_1G_rec;
-  uint16_t acc_1G;
-
-  int16_t accADCRaw[XYZ_AXIS_COUNT];
-  vector3_t accADC;
-  float accADCf[XYZ_AXIS_COUNT];
-  float accPrevious[XYZ_AXIS_COUNT];
-
-  acc_extremes_t extremes[XYZ_AXIS_COUNT];
-  float maxG;
-
-  vector3_t jerk;
-  float accMagnitude;                     // in multiples of 1G
-  float jerkMagnitude;                    // in multiples of 1G/s (measure of collision strength)
-
-  uint16_t acc_lpf_hz;                    // cutoff frequency for the low pass filter used on the acc z-axis for althold in Hz
-  uint16_t accLpfCutHz;
-  pt2Filter_t accFilter[XYZ_AXIS_COUNT];
-
-  flightDynamicsTrims_t accelerationTrims;
-  rollAndPitchTrims_t rollAndPitchTrims;
-  int acc_accumulatedMeasurementCount;
-  float acc_accumulatedMeasurements[XYZ_AXIS_COUNT];
-  uint16_t calibratingA;      // the calibration is done is the main loop. Calibrating decreases at each cycle down to 0, then we enter in a normal mode.
-
-  bool isAccelUpdatedAtLeastOnce;
-  bool acc_high_fsr;
-
-  float gravity_cmss_cal;
-
-  uint32_t accClipCount;
-  bool isClipped;
-
-  uint32_t detectedEXTI;
-  uint32_t LastEXTI;
-  uint32_t SyncEXTI;
-  int32_t ShortPeriod;
-  int32_t DmaMaxDuration;
-  uint32_t exit_callback_dt;
-  uint32_t rx_callback_dt;
-
-  bool done_accel_config;
-} acc_t;
-
-typedef struct imu_s {
-    uint8_t *txBuf, *rxBuf;
-
-  	gyro_t gyro;
-
-  	acc_t acc;
-} imu_t;
-
-extern imu_t bmi270;
-extern imu_t bmi088;
+extern gyro_t gyro;
 extern uint8_t activePidLoopDenom;
 
 enum {
@@ -254,25 +149,65 @@ enum {
     FILTER_LPF2
 };
 
-void gyroUpdate(timeUs_t currentTimeUs);
+typedef struct gyroConfig_s {
+    uint8_t gyroMovementCalibrationThreshold; // people keep forgetting that moving model while init results in wrong gyro offsets. and then they never reset gyro. so this is now on by default.
+    uint8_t gyro_hardware_lpf;                // gyro DLPF setting
+    uint8_t gyro_high_fsr;
+
+    uint16_t gyro_lpf1_static_hz;
+    uint16_t gyro_lpf2_static_hz;
+
+    uint16_t gyro_soft_notch_hz_1;
+    uint16_t gyro_soft_notch_cutoff_1;
+    uint16_t gyro_soft_notch_hz_2;
+    uint16_t gyro_soft_notch_cutoff_2;
+    int16_t gyro_offset_yaw;
+    uint8_t checkOverflow;
+
+    // Lowpass primary/secondary
+    uint8_t gyro_lpf1_type;
+    uint8_t gyro_lpf2_type;
+
+    uint8_t yaw_spin_recovery;
+    int16_t yaw_spin_threshold;
+
+    uint16_t gyroCalibrationDuration;   // Gyro calibration duration in 1/100 second
+
+    uint16_t gyro_lpf1_dyn_min_hz;
+    uint16_t gyro_lpf1_dyn_max_hz;
+
+    uint8_t gyro_filter_debug_axis;
+
+    uint8_t gyrosDetected; // What gyros should be shown as part of the cli status command.
+    uint8_t gyro_lpf1_dyn_expo; // set the curve for dynamic gyro lowpass filter
+    uint8_t simplified_gyro_filter;
+    uint8_t simplified_gyro_filter_multiplier;
+
+    uint8_t gyro_enabled_bitmask;
+} gyroConfig_t;
+
+PG_DECLARE(gyroConfig_t, gyroConfig);
+
+void gyroUpdate(void);
 void gyroFiltering(timeUs_t currentTimeUs);
 float gyroGetFilteredDownsampled(int axis);
-bool gyroGetAccumulationAverage(float *accumulationAverage);
 void gyroStartCalibration(bool isFirstArmingCalibration);
 bool isFirstArmingGyroCalibrationRunning(void);
 bool gyroIsCalibrationComplete(void);
 void gyroReadTemperature(void);
-
-bool accIsCalibrationComplete(void);
-bool accHasBeenCalibrated(void);
-void accStartCalibration(void);
-void resetRollAndPitchTrims(rollAndPitchTrims_t *rollAndPitchTrims);
-void accUpdate(timeUs_t currentTimeUs);
-bool accGetAccumulationAverage(float *accumulation);
-
-void resetFlightDynamicsTrims(flightDynamicsTrims_t *accZero);
-void setAccelerationTrims(union flightDynamicsTrims_u *accelerationTrimsToUse);
-
-uint32_t accGetClipCount(void);
-bool accIsClipped(void);
-void updateAccExtremes(void);
+int16_t gyroGetTemperature(void);
+bool gyroOverflowDetected(void);
+bool gyroYawSpinDetected(void);
+uint16_t gyroAbsRateDps(int axis);
+#ifdef USE_DYN_LPF
+float dynThrottle(float throttle);
+void dynLpfGyroUpdate(float throttle);
+#endif
+#ifdef USE_YAW_SPIN_RECOVERY
+void initYawSpinRecovery(int maxYawRate);
+#endif
+#ifdef USE_CRSF_ACCGYRO_TELEMETRY
+bool gyroHasDownsampledData(void);
+float gyroGetDownsampled(int axis);
+bool gyroStartDownsampledCycle(void);
+#endif

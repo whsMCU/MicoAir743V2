@@ -22,10 +22,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "fc/runtime_config.h"
-//#include "io/beeper.h"
+#include "io/beeper.h"
 
 uint8_t armingFlags = 0;
 uint8_t stateFlags = 0;
@@ -67,7 +67,7 @@ const char *armingDisableFlagNames[]= {
     "AUTOPILOT_SW",
     "ARM_SWITCH",
 };
-//STATIC_ASSERT(ARRAYLEN(armingDisableFlagNames) == ARMING_DISABLE_FLAGS_COUNT, armingDisableFlagNames_size_mismatch);
+STATIC_ASSERT(ARRAYLEN(armingDisableFlagNames) == ARMING_DISABLE_FLAGS_COUNT, armingDisableFlagNames_size_mismatch);
 
 static armingDisableFlags_e armingDisableFlags = 0;
 
@@ -111,8 +111,8 @@ uint16_t enableFlightMode(flightModeFlags_e mask)
     uint16_t oldVal = flightModeFlags;
 
     flightModeFlags |= (mask);
-    //if (flightModeFlags != oldVal)
-        //beeperConfirmationBeeps(1);
+    if (flightModeFlags != oldVal)
+        beeperConfirmationBeeps(1);
     return flightModeFlags;
 }
 
@@ -125,8 +125,8 @@ uint16_t disableFlightMode(flightModeFlags_e mask)
     uint16_t oldVal = flightModeFlags;
 
     flightModeFlags &= ~(mask);
-    //if (flightModeFlags != oldVal)
-        //beeperConfirmationBeeps(1);
+    if (flightModeFlags != oldVal)
+        beeperConfirmationBeeps(1);
     return flightModeFlags;
 }
 

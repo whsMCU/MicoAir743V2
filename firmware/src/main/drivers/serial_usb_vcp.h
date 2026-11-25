@@ -20,10 +20,10 @@
 
 #pragma once
 
-//#include "drivers/serial.h"
+#include "drivers/serial.h"
 
 typedef struct {
-    uint8_t port;
+    serialPort_t port;
 
     // Buffer used during bulk writes.
     uint8_t txBuf[20];
@@ -33,7 +33,7 @@ typedef struct {
 } vcpPort_t;
 
 void usbVcpInit(void);
-uint8_t *usbVcpOpen(void);
+serialPort_t *usbVcpOpen(void);
 struct serialPort_s;
 uint32_t usbVcpGetBaudRate(struct serialPort_s *instance);
 

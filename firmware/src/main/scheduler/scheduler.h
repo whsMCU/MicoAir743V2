@@ -20,37 +20,9 @@
 
 #pragma once
 
-#include "hw.h"
-
 #include "common/time.h"
 #include "config/config.h"
-//#include "pg/scheduler.h"
-
-
-#define TASK_GYROPID_DESIRED_PERIOD     125 // 125us = 8kHz
-#define SCHEDULER_DELAY_LIMIT           10
-
-#ifndef SCHEDULER_RELAX_RX
-#define SCHEDULER_RELAX_RX  25
-#endif
-
-#ifndef SCHEDULER_RELAX_OSD
-#define SCHEDULER_RELAX_OSD 25
-#endif
-
-// Tenths of a % of tasks late
-#ifndef CPU_LOAD_LATE_LIMIT
-#define CPU_LOAD_LATE_LIMIT 10
-#endif
-
-typedef struct schedulerConfig_s {
-    uint16_t rxRelaxDeterminism;
-    uint16_t osdRelaxDeterminism;
-    uint16_t cpuLatePercentageLimit;
-    uint8_t debugTask;
-} schedulerConfig_t;
-
-extern schedulerConfig_t schedulerConfig;
+#include "pg/scheduler.h"
 
 #define TASK_PERIOD_HZ(hz) (1000000 / (hz))
 #define TASK_PERIOD_MS(ms) ((ms) * 1000)
@@ -86,8 +58,8 @@ extern schedulerConfig_t schedulerConfig;
 #define TASK_EXEC_TIME_CLAMP_US         0
 #endif
 
-#define TASK_AGE_EXPEDITE_RX            schedulerConfig.rxRelaxDeterminism  // Make RX tasks more schedulable if it's failed to be scheduled this many times
-#define TASK_AGE_EXPEDITE_OSD           schedulerConfig.osdRelaxDeterminism  // Make OSD tasks more schedulable if it's failed to be scheduled this many times
+#define TASK_AGE_EXPEDITE_RX            schedulerConfig()->rxRelaxDeterminism  // Make RX tasks more schedulable if it's failed to be scheduled this many times
+#define TASK_AGE_EXPEDITE_OSD           schedulerConfig()->osdRelaxDeterminism  // Make OSD tasks more schedulable if it's failed to be scheduled this many times
 #define TASK_AGE_EXPEDITE_COUNT         1    // Make aged tasks more schedulable
 #define TASK_AGE_EXPEDITE_SCALE         0.9f // By scaling their expected execution time
 
@@ -143,8 +115,6 @@ typedef enum {
     TASK_ATTITUDE,
     TASK_RX,
     TASK_SERIAL,
-    TASK_LED,
-    TASK_DEBUG,
     TASK_DISPATCH,
     TASK_BATTERY_VOLTAGE,
     TASK_BATTERY_CURRENT,
@@ -256,35 +226,34 @@ typedef struct {
 } task_attribute_t;
 
 typedef struct {
-  // Task static data
-  task_attribute_t *attribute;
+    // Task static data
+    task_attribute_t *attribute;
 
-  // Scheduling
-  uint16_t dynamicPriority;           // measurement of how old task was last executed, used to avoid task starvation
-  uint16_t taskAgePeriods;
-  timeDelta_t taskLatestDeltaTimeUs;
+    // Scheduling
+    uint16_t dynamicPriority;           // measurement of how old task was last executed, used to avoid task starvation
+    uint16_t taskAgePeriods;
+    timeDelta_t taskLatestDeltaTimeUs;
     timeUs_t lastExecutedAtUs;          // last time of invocation
     timeUs_t lastSignaledAtUs;          // time of invocation event for event-driven tasks
     timeUs_t lastDesiredAt;             // time of last desired execution
 
-  // Statistics
-  timeUs_t anticipatedExecutionTime;  // Fixed point expectation of next execution time
-  timeUs_t movingSumDeltaTime10thUs;  // moving sum over 64 samples
-  timeUs_t movingSumExecutionTime10thUs;
-  timeUs_t maxExecutionTimeUs;
-  timeUs_t totalExecutionTimeUs;      // total time consumed by task since boot
-  timeUs_t lastStatsAtUs;             // time of last stats gathering for rate calculation
+    // Statistics
+    timeUs_t anticipatedExecutionTime;  // Fixed point expectation of next execution time
+    timeUs_t movingSumDeltaTime10thUs;  // moving sum over 64 samples
+    timeUs_t movingSumExecutionTime10thUs;
+    timeUs_t maxExecutionTimeUs;
+    timeUs_t totalExecutionTimeUs;      // total time consumed by task since boot
+    timeUs_t lastStatsAtUs;             // time of last stats gathering for rate calculation
     uint32_t execTimeSinceStatesTime;
     uint32_t movingSumStatesExecTime10thUs;
     uint32_t maxStatesExecTimeUs;
 #if defined(USE_LATE_TASK_STATISTICS)
-  uint32_t runCount;
-  uint32_t lateCount;
-  timeUs_t execTime;
+    uint32_t runCount;
+    uint32_t lateCount;
+    timeUs_t execTime;
 #endif
 } task_t;
 
-void schedulerConfig_Init(void);
 void getCheckFuncInfo(cfCheckFuncInfo_t *checkFuncInfo);
 void getTaskInfo(taskId_e taskId, taskInfo_t *taskInfo);
 void rescheduleTask(taskId_e taskId, timeDelta_t newPeriodUs);

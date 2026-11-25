@@ -27,30 +27,9 @@
 #include "common/time.h"
 #include <common/vector.h>
 
-//#include "io/serial.h"
+#include "io/serial.h"
 
-//#include "pg/gps.h"
-
-#define NMEA_CUSTOM_COMMANDS_MAX_LENGTH 64
-
-typedef struct gpsConfig_s {
-    uint8_t provider;
-    uint8_t sbasMode;
-    uint8_t autoConfig;
-    uint8_t autoBaud;
-    uint8_t gps_ublox_acquire_model;
-    uint8_t gps_ublox_flight_model;
-    uint8_t gps_update_rate_hz;
-    bool gps_ublox_use_galileo;
-    bool gps_set_home_point_once;
-    bool gps_use_3d_speed;
-    bool sbas_integrity;
-    uint8_t gps_ublox_utc_standard;
-    bool gps_ublox_enable_ana;
-    char nmeaCustomCommands[NMEA_CUSTOM_COMMANDS_MAX_LENGTH + 1];
-} gpsConfig_t;
-
-void gpsConfig_Init(void);
+#include "pg/gps.h"
 
 #define GPS_DEGREES_DIVIDER 10000000L
 #define EARTH_ANGLE_TO_CM (111.3195f * 1000 * 100 / GPS_DEGREES_DIVIDER)  // latitude unit to cm at equator (111km/deg)
@@ -343,7 +322,6 @@ typedef struct gpsData_s {
     uint32_t lastNavSolTs;          // time stamp of last UBCX message.  Used to calculate message delta
     ubloxVersion_e platformVersion; // module platform version, mapped from reported hardware version
 #endif
-    uint8_t gps_baudrateIndex;
 } gpsData_t;
 
 extern gpsLocation_t GPS_home_llh;
@@ -432,7 +410,7 @@ void gpsUpdate(timeUs_t currentTimeUs);
 bool gpsNewFrame(uint8_t c);
 bool gpsIsHealthy(void); // Returns true when the gps state is RECEIVING_DATA
 struct serialPort_s;
-//bool gpsPassthrough(struct serialPort_s *gpsPassthroughPort);
+bool gpsPassthrough(struct serialPort_s *gpsPassthroughPort);
 void onGpsNewData(void);
 void GPS_reset_home_position(void);
 void GPS_calc_longitude_scaling(int32_t lat);
@@ -450,6 +428,3 @@ float getGpsCosLat(void);
 baudRate_e getGpsPortActualBaudRateIndex(void);
 uint32_t gpsDateTimeToEpoch(const gpsDateTime_t *dt);
 void gpsUnixSecondsToDateTime(gpsDateTime_t *dt, int64_t unixSeconds, uint16_t millis);
-
-int32_t wrap_18000(int32_t ang);
-bool isGPSHeadingValid(void);

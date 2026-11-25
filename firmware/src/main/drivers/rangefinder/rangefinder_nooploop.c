@@ -22,7 +22,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_RANGEFINDER_NOOPLOOP
 

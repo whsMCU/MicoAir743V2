@@ -52,7 +52,7 @@
 #include "platform.h"
 #include "build/version.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 #include "pg/usb.h"
 #ifdef USE_USB_MSC
 #include "drivers/usb_msc.h"
@@ -206,7 +206,7 @@ uint8_t *USBD_VCP_DeviceDescriptor(USBD_SpeedTypeDef speed, uint16_t *length)
   }
 #endif
 #ifdef USE_USB_CDC_HID
-  if (usbDevConfig.type == COMPOSITE) {
+  if (usbDevConfig()->type == COMPOSITE) {
     *length = sizeof(USBD_HID_CDC_DeviceDescriptor);
     return USBD_HID_CDC_DeviceDescriptor;
   }

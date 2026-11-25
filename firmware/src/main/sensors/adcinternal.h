@@ -20,9 +20,7 @@
 
 #pragma once
 
-#include "common/time.h"
-#include "common/utils.h"
-#include "hw.h"
+#include "drivers/time.h"
 
 void adcInternalInit(void);
 void adcInternalProcess(timeUs_t currentTimeUs);

@@ -24,9 +24,10 @@
 #include "common/sensor_alignment.h"
 #include "common/vector.h"
 
+#include "drivers/io_types.h"
 #include "drivers/sensor.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 #include "sensors/sensors.h"
 
@@ -58,16 +59,22 @@ typedef enum {
 
 typedef struct mag_s {
     bool isNewMagADCFlag;
-	vector3_t magADC;
+    vector3_t magADC;
 } mag_t;
 
 extern mag_t mag;
 
 typedef struct compassConfig_s {
-  uint8_t mag_alignment;                  // mag alignment
-  uint8_t mag_hardware;                   // Which mag hardware to use on boards with more than one device
-  flightDynamicsTrims_t magZero;
-  sensorAlignment_t mag_customAlignment;
+    uint8_t mag_alignment;                  // mag alignment
+    uint8_t mag_hardware;                   // Which mag hardware to use on boards with more than one device
+    uint8_t mag_busType;
+    uint8_t mag_i2c_device;
+    uint8_t mag_i2c_address;
+    uint8_t mag_spi_device;
+    ioTag_t mag_spi_csn;
+    ioTag_t interruptTag;
+    flightDynamicsTrims_t magZero;
+    sensorAlignment_t mag_customAlignment;
 } compassConfig_t;
 
 typedef struct compassBiasEstimator_s {
@@ -78,12 +85,12 @@ typedef struct compassBiasEstimator_s {
     float D[4];
 } compassBiasEstimator_t;
 
-extern compassConfig_t compassConfig;
+PG_DECLARE(compassConfig_t, compassConfig);
 
 bool compassEnabledAndCalibrated(void);
 uint32_t compassUpdate(timeUs_t currentTime);
 bool compassInit(void);
-void compassConfig_Init(void);
+void compassPreInit(void);
 void compassStartCalibration(void);
 bool compassIsCalibrationComplete(void);
 void compassBiasEstimatorInit(compassBiasEstimator_t *compassBiasEstimator, const float lambda_min, const float p0);

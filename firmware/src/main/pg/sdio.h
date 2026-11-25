@@ -20,9 +20,9 @@
 
 #pragma once
 
-//#include "drivers/dma_reqmap.h"
+#include "drivers/dma_reqmap.h"
 #include "drivers/io_types.h"
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef struct sdioConfig_s {
     uint8_t clockBypass;
@@ -32,9 +32,7 @@ typedef struct sdioConfig_s {
     uint8_t device;
 } sdioConfig_t;
 
-extern sdioConfig_t sdioConfig;
-
-void sdioConfig_Init(void);
+PG_DECLARE(sdioConfig_t, sdioConfig);
 
 typedef struct sdioPinConfig_s {
     ioTag_t CKPin;
@@ -45,6 +43,4 @@ typedef struct sdioPinConfig_s {
     ioTag_t D3Pin;
 } sdioPinConfig_t;
 
-extern sdioPinConfig_t sdioPinConfig;
-
-void sdioPinConfig_Init(void);
+PG_DECLARE(sdioPinConfig_t, sdioPinConfig);

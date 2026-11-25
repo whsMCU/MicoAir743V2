@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if defined(USE_MSP_OVER_TELEMETRY)
 
@@ -38,7 +38,7 @@
 
 #include "telemetry/crsf.h"
 #include "telemetry/msp_shared.h"
-//#include "telemetry/smartport.h"
+#include "telemetry/smartport.h"
 
 /*
 ---------------------------------------------------------------
@@ -153,7 +153,7 @@ static void processMspPacket(void)
         sbufWriteU8(&responsePacket.buf, TELEMETRY_MSP_ERROR);
     }
     if (mspPostProcessFn) {
-        mspPostProcessFn(0);
+        mspPostProcessFn(NULL);
     }
 
     sbufSwitchToReader(&responsePacket.buf, responseBuffer);

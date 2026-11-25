@@ -30,7 +30,7 @@ Stripped down for BF use
 #include <math.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/maths.h"
 

@@ -24,7 +24,7 @@
 
 #include "common/axis.h"
 #include "common/filter.h"
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef enum {
     ROLL = 0,
@@ -108,7 +108,7 @@ typedef struct rcControlsConfig_s {
     bool yaw_control_reversed;              // invert control direction of yaw
 } rcControlsConfig_t;
 
-extern rcControlsConfig_t rcControlsConfig;
+PG_DECLARE(rcControlsConfig_t, rcControlsConfig);
 
 typedef struct flight3DConfig_s {
     uint16_t deadband3d_low;                // min 3d value
@@ -120,7 +120,7 @@ typedef struct flight3DConfig_s {
     uint8_t switched_mode3d;                // enable '3D Switched Mode'
 } flight3DConfig_t;
 
-extern flight3DConfig_t flight3DConfig;
+PG_DECLARE(flight3DConfig_t, flight3DConfig);
 
 typedef struct armingConfig_s {
     uint8_t gyro_cal_on_first_arm;          // calibrate the gyro right before the first arm
@@ -128,11 +128,7 @@ typedef struct armingConfig_s {
     uint8_t prearm_allow_rearm;
 } armingConfig_t;
 
-extern armingConfig_t armingConfig;
-
-void rcControlsConfig_Init(void);
-void armingConfig_Init(void);
-void flight3DConfig_Init(void);
+PG_DECLARE(armingConfig_t, armingConfig);
 
 bool areUsingSticksToArm(void);
 

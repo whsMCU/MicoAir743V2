@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/build_config.h"
 #include "build/debug.h"
@@ -31,15 +31,16 @@
 #include "common/utils.h"
 #include "common/filter.h"
 
-//#include "drivers/adc.h"
+#include "drivers/adc.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "sensors/adcinternal.h"
 #include "sensors/battery.h"
-#include "sensors/current.h"
 #include "sensors/esc_sensor.h"
+
+#include "current.h"
 
 const char * const currentMeterSourceNames[CURRENT_METER_COUNT] = {
     "NONE", "ADC", "VIRTUAL", "ESC", "MSP"
@@ -90,26 +91,28 @@ void currentMeterReset(currentMeter_t *meter)
 static pt1Filter_t adciBatFilter;
 
 #ifndef DEFAULT_CURRENT_METER_SCALE
-#define DEFAULT_CURRENT_METER_SCALE 402 // for Allegro ACS758LCB-100U (40mV/A)
+#define DEFAULT_CURRENT_METER_SCALE 400 // for Allegro ACS758LCB-100U (40mV/A)
 #endif
 
 #ifndef DEFAULT_CURRENT_METER_OFFSET
 #define DEFAULT_CURRENT_METER_OFFSET 0
 #endif
 
+PG_REGISTER_WITH_RESET_TEMPLATE(currentSensorADCConfig_t, currentSensorADCConfig, PG_CURRENT_SENSOR_ADC_CONFIG, 0);
 
-currentSensorADCConfig_t currentSensorADCConfig;
+PG_RESET_TEMPLATE(currentSensorADCConfig_t, currentSensorADCConfig,
+    .scale = DEFAULT_CURRENT_METER_SCALE,
+    .offset = DEFAULT_CURRENT_METER_OFFSET,
+);
 
-void currentSensorADCConfig_Init(void)
-{
-	currentSensorADCConfig.scale = DEFAULT_CURRENT_METER_SCALE;
-	currentSensorADCConfig.offset = DEFAULT_CURRENT_METER_OFFSET;
-}
+#ifdef USE_VIRTUAL_CURRENT_METER
+PG_REGISTER(currentSensorVirtualConfig_t, currentSensorVirtualConfig, PG_CURRENT_SENSOR_VIRTUAL_CONFIG, 0);
+#endif
 
 static int32_t currentMeterADCToCentiamps(const uint16_t src)
 {
 
-    const currentSensorADCConfig_t *config = &currentSensorADCConfig;
+    const currentSensorADCConfig_t *config = currentSensorADCConfig();
 
     int32_t millivolts = ((uint32_t)src * getVrefMv()) / 4096;
     // y=x/m+b m is scale in (mV/10A) and b is offset in (mA)
@@ -138,7 +141,7 @@ currentMeterADCState_t currentMeterADCState;
 void currentMeterADCInit(void)
 {
     memset(&currentMeterADCState, 0, sizeof(currentMeterADCState_t));
-    pt1FilterInit(&adciBatFilter, pt1FilterGain(GET_BATTERY_LPF_FREQUENCY(batteryConfig.ibatLpfPeriod), HZ_TO_INTERVAL(50)));
+    pt1FilterInit(&adciBatFilter, pt1FilterGain(GET_BATTERY_LPF_FREQUENCY(batteryConfig()->ibatLpfPeriod), HZ_TO_INTERVAL(50)));
 }
 
 void currentMeterADCRefresh(int32_t lastUpdateAt)
@@ -220,8 +223,8 @@ void currentMeterESCRefresh(int32_t lastUpdateAt)
 
     escSensorData_t *escData = getEscSensorData(ESC_SENSOR_COMBINED);
     if (escData && escData->dataAge <= ESC_BATTERY_AGE_MAX) {
-        currentMeterESCState.amperage = escData->current + escSensorConfig.offset / 10;
-        currentMeterESCState.mAhDrawn = escData->consumption + escSensorConfig.offset * millis() / (1000.0f * 3600);
+        currentMeterESCState.amperage = escData->current + escSensorConfig()->offset / 10;
+        currentMeterESCState.mAhDrawn = escData->consumption + escSensorConfig()->offset * millis() / (1000.0f * 3600);
     } else {
         currentMeterESCState.amperage = 0;
         currentMeterESCState.mAhDrawn = 0;

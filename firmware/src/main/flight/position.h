@@ -40,10 +40,7 @@ typedef struct positionConfig_s {
     uint16_t rangefinder_max_range_cm;    // Maximum rangefinder range to trust (cm)
 } positionConfig_t;
 
-extern positionConfig_t positionConfig;
-
-void position_Init(void);
-void positionConfig_Init(void);
+PG_DECLARE(positionConfig_t, positionConfig);
 
 float getAltitudeCm(void);
 float getAltitudeDerivative(void);

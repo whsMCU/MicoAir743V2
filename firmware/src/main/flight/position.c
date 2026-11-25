@@ -24,7 +24,7 @@
 #include <math.h>
 #include <limits.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/debug.h"
 
@@ -38,7 +38,6 @@
 #include "flight/imu.h"
 #include "flight/pid.h"
 
-#include "rx/rx.h"
 #include "io/gps.h"
 
 #include "scheduler/scheduler.h"
@@ -47,8 +46,8 @@
 #include "sensors/barometer.h"
 #include "sensors/rangefinder.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 static float displayAltitudeCm = 0.0f;
 
@@ -71,11 +70,11 @@ static void positionResetAltitudeState(void)
 {
     const float sampleTimeS = HZ_TO_INTERVAL(TASK_ALTITUDE_RATE_HZ);
 
-    const float altitudeCutoffHz = positionConfig.altitude_lpf / 100.0f;
+    const float altitudeCutoffHz = positionConfig()->altitude_lpf / 100.0f;
     const float altitudeGain = pt2FilterGain(altitudeCutoffHz, sampleTimeS);
     pt2FilterInit(&altitudeLpf, altitudeGain);
 
-    const float altitudeDerivativeCutoffHz = positionConfig.altitude_d_lpf / 100.0f;
+    const float altitudeDerivativeCutoffHz = positionConfig()->altitude_d_lpf / 100.0f;
     const float altitudeDerivativeGain = pt2FilterGain(altitudeDerivativeCutoffHz, sampleTimeS);
     pt2FilterInit(&altitudeDerivativeLpf, altitudeDerivativeGain);
 
@@ -86,7 +85,7 @@ static void positionResetAltitudeState(void)
     controlAltitudeDerivative = 0.0f;
 }
 
-void position_Init(void)
+void positionInit(void)
 {
     positionResetAltitudeState();
 #if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
@@ -96,16 +95,15 @@ void position_Init(void)
     positionEstimatorInit();
 }
 
-positionConfig_t positionConfig;
+PG_REGISTER_WITH_RESET_TEMPLATE(positionConfig_t, positionConfig, PG_POSITION, 7);
 
-void positionConfig_Init(void)
-{
-  positionConfig.altitude_source = ALTITUDE_SOURCE_DEFAULT;
-  positionConfig.altitude_prefer_baro = 100;
-  positionConfig.altitude_lpf = 300;                // lowpass cutoff (value / 100) Hz for altitude smoothing
-  positionConfig.altitude_d_lpf = 300;              // lowpass for (value / 100) Hz for altitude derivative smoothing
-  positionConfig.rangefinder_max_range_cm = 400;    // Maximum rangefinder range to trust (cm)
-}
+PG_RESET_TEMPLATE(positionConfig_t, positionConfig,
+    .altitude_source = ALTITUDE_SOURCE_DEFAULT,
+    .altitude_prefer_baro = 100,
+    .altitude_lpf = 300,
+    .altitude_d_lpf = 300,
+    .rangefinder_max_range_cm = 400,
+);
 
 #if defined(USE_BARO) || defined(USE_GPS) || defined(USE_RANGEFINDER)
 void calculateEstimatedAltitude(void)
@@ -117,7 +115,7 @@ void calculateEstimatedAltitude(void)
         positionEstimatorResetZ();
         positionResetAltitudeState();
         wasArmed = isArmed;
-			}
+    }
 #endif
 
     // Run the Kalman filter estimator (prediction + all sensor measurement updates)

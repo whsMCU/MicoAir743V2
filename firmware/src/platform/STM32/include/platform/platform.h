@@ -62,7 +62,7 @@
 #include "stm32h7xx_ll_tim.h"
 #include "stm32h7xx_ll_i2c.h"
 #include "stm32h7xx_ll_system.h"
-//#include "stm32h7xx_ll_ex.h"
+#include "stm32h7xx_ll_ex.h"
 
 // Chip Unique ID on H7
 // M4 core cannot access system memory where UID is stored

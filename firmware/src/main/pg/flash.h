@@ -24,7 +24,7 @@
 
 #include "drivers/io_types.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef struct flashConfig_s {
     ioTag_t csTag;
@@ -33,4 +33,4 @@ typedef struct flashConfig_s {
     uint8_t octoSpiDevice;
 } flashConfig_t;
 
-extern flashConfig_t flashConfig;
+PG_DECLARE(flashConfig_t, flashConfig);

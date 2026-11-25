@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "dshot.h"
 
@@ -42,13 +42,13 @@
 #include "config/feature.h"
 
 #include "drivers/motor_types.h"
-//#include "drivers/timer.h"
+#include "drivers/timer.h"
 
 #include "drivers/dshot_command.h"
 #include "drivers/nvic.h"
 
 
-#include "flight/rpm_filter.h"
+#include "pg/rpm_filter.h"
 
 #include "rx/rx.h"
 
@@ -56,61 +56,69 @@
 
 FAST_DATA_ZERO_INIT uint8_t dshotMotorCount = 0;
 
-//void dshotInitEndpoints(const motorConfig_t *motorConfig, float outputLimit, float *outputLow, float *outputHigh, float *disarm, float *deadbandMotor3dHigh, float *deadbandMotor3dLow)
-//{
-//    float outputLimitOffset = DSHOT_RANGE * (1 - outputLimit);
-//    const float motorIdlePercent = CONVERT_PARAMETER_TO_PERCENT(motorConfig->motorIdle * 0.01f);
-//    *disarm = DSHOT_CMD_MOTOR_STOP;
-//    if (featureIsEnabled(FEATURE_3D)) {
-//        *outputLow = DSHOT_MIN_THROTTLE + motorIdlePercent * (DSHOT_3D_FORWARD_MIN_THROTTLE - 1 - DSHOT_MIN_THROTTLE);
-//        *outputHigh = DSHOT_MAX_THROTTLE - outputLimitOffset / 2;
-//        *deadbandMotor3dHigh = DSHOT_3D_FORWARD_MIN_THROTTLE + motorIdlePercent * (DSHOT_MAX_THROTTLE - DSHOT_3D_FORWARD_MIN_THROTTLE);
-//        *deadbandMotor3dLow = DSHOT_3D_FORWARD_MIN_THROTTLE - 1 - outputLimitOffset / 2;
-//    } else {
-//        *outputLow = DSHOT_MIN_THROTTLE + motorIdlePercent * DSHOT_RANGE;
-//        *outputHigh = DSHOT_MAX_THROTTLE - outputLimitOffset;
-//    }
-//}
+void dshotInitEndpoints(const motorConfig_t *motorConfig, float outputLimit, float *outputLow, float *outputHigh, float *disarm, float *deadbandMotor3dHigh, float *deadbandMotor3dLow)
+{
+    float outputLimitOffset = DSHOT_RANGE * (1 - outputLimit);
+    const float motorIdlePercent = CONVERT_PARAMETER_TO_PERCENT(motorConfig->motorIdle * 0.01f);
+    *disarm = DSHOT_CMD_MOTOR_STOP;
+    if (featureIsEnabled(FEATURE_3D)) {
+        *outputLow = DSHOT_MIN_THROTTLE + motorIdlePercent * (DSHOT_3D_FORWARD_MIN_THROTTLE - 1 - DSHOT_MIN_THROTTLE);
+        *outputHigh = DSHOT_MAX_THROTTLE - outputLimitOffset / 2;
+        *deadbandMotor3dHigh = DSHOT_3D_FORWARD_MIN_THROTTLE + motorIdlePercent * (DSHOT_MAX_THROTTLE - DSHOT_3D_FORWARD_MIN_THROTTLE);
+        *deadbandMotor3dLow = DSHOT_3D_FORWARD_MIN_THROTTLE - 1 - outputLimitOffset / 2;
+    } else {
+        *outputLow = DSHOT_MIN_THROTTLE + motorIdlePercent * DSHOT_RANGE;
+        *outputHigh = DSHOT_MAX_THROTTLE - outputLimitOffset;
+    }
+}
 
-//float dshotConvertFromExternal(uint16_t externalValue)
-//{
-//    float motorValue;
-//
-//    externalValue = constrain(externalValue, PWM_RANGE_MIN, PWM_RANGE_MAX);
-//
-//    if (featureIsEnabled(FEATURE_3D)) {
-//        if (externalValue == PWM_RANGE_MIDDLE) {
-//            motorValue = DSHOT_CMD_MOTOR_STOP;
-//        } else if (externalValue < PWM_RANGE_MIDDLE) {
-//            motorValue = scaleRangef(externalValue, PWM_RANGE_MIN, PWM_RANGE_MIDDLE - 1, DSHOT_3D_FORWARD_MIN_THROTTLE - 1, DSHOT_MIN_THROTTLE);
-//        } else {
-//            motorValue = scaleRangef(externalValue, PWM_RANGE_MIDDLE + 1, PWM_RANGE_MAX, DSHOT_3D_FORWARD_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-//        }
-//    } else {
-//        motorValue = (externalValue == PWM_RANGE_MIN) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(externalValue, PWM_RANGE_MIN + 1, PWM_RANGE_MAX, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-//    }
-//
-//    return motorValue;
-//}
+DEFINE_SCALE_FN(scaleRangeDshotFromExternal, PWM_RANGE_MIN + 1, PWM_RANGE_MAX, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE)
+DEFINE_SCALE_FN(scaleRangeDshotFromExternal3DNeg, PWM_RANGE_MIN, PWM_RANGE_MIDDLE - 1, DSHOT_3D_FORWARD_MIN_THROTTLE - 1, DSHOT_MIN_THROTTLE)
+DEFINE_SCALE_FN(scaleRangeDshotFromExternal3DPos, PWM_RANGE_MIDDLE + 1, PWM_RANGE_MAX, DSHOT_3D_FORWARD_MIN_THROTTLE, DSHOT_MAX_THROTTLE)
 
-//uint16_t dshotConvertToExternal(float motorValue)
-//{
-//    float externalValue;
-//
-//    if (featureIsEnabled(FEATURE_3D)) {
-//        if (motorValue == DSHOT_CMD_MOTOR_STOP || motorValue < DSHOT_MIN_THROTTLE) {
-//            externalValue = PWM_RANGE_MIDDLE;
-//        } else if (motorValue <= DSHOT_3D_FORWARD_MIN_THROTTLE - 1) {
-//            externalValue = scaleRangef(motorValue, DSHOT_MIN_THROTTLE, DSHOT_3D_FORWARD_MIN_THROTTLE - 1, PWM_RANGE_MIDDLE - 1, PWM_RANGE_MIN);
-//        } else {
-//            externalValue = scaleRangef(motorValue, DSHOT_3D_FORWARD_MIN_THROTTLE, DSHOT_MAX_THROTTLE, PWM_RANGE_MIDDLE + 1, PWM_RANGE_MAX);
-//        }
-//    } else {
-//        externalValue = (motorValue < DSHOT_MIN_THROTTLE) ? PWM_RANGE_MIN : scaleRangef(motorValue, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE, PWM_RANGE_MIN + 1, PWM_RANGE_MAX);
-//    }
-//
-//    return lrintf(externalValue);
-//}
+DEFINE_SCALE_FN(scaleRangeDshotToExternal, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE, PWM_RANGE_MIN + 1, PWM_RANGE_MAX)
+DEFINE_SCALE_FN(scaleRangeDshotToExternal3DNeg, DSHOT_MIN_THROTTLE, DSHOT_3D_FORWARD_MIN_THROTTLE - 1, PWM_RANGE_MIDDLE - 1, PWM_RANGE_MIN)
+DEFINE_SCALE_FN(scaleRangeDshotToExternal3DPos, DSHOT_3D_FORWARD_MIN_THROTTLE, DSHOT_MAX_THROTTLE, PWM_RANGE_MIDDLE + 1, PWM_RANGE_MAX)
+
+float dshotConvertFromExternal(uint16_t externalValue)
+{
+    float motorValue;
+
+    externalValue = constrain(externalValue, PWM_RANGE_MIN, PWM_RANGE_MAX);
+
+    if (featureIsEnabled(FEATURE_3D)) {
+        if (externalValue == PWM_RANGE_MIDDLE) {
+            motorValue = DSHOT_CMD_MOTOR_STOP;
+        } else if (externalValue < PWM_RANGE_MIDDLE) {
+            motorValue = scaleRangeDshotFromExternal3DNeg(externalValue);
+        } else {
+            motorValue = scaleRangeDshotFromExternal3DPos(externalValue);
+        }
+    } else {
+        motorValue = (externalValue == PWM_RANGE_MIN) ? DSHOT_CMD_MOTOR_STOP : scaleRangeDshotFromExternal(externalValue);
+    }
+
+    return motorValue;
+}
+
+uint16_t dshotConvertToExternal(float motorValue)
+{
+    float externalValue;
+
+    if (featureIsEnabled(FEATURE_3D)) {
+        if (motorValue == DSHOT_CMD_MOTOR_STOP || motorValue < DSHOT_MIN_THROTTLE) {
+            externalValue = PWM_RANGE_MIDDLE;
+        } else if (motorValue <= DSHOT_3D_FORWARD_MIN_THROTTLE - 1) {
+            externalValue = scaleRangeDshotToExternal3DNeg(motorValue);
+        } else {
+            externalValue = scaleRangeDshotToExternal3DPos(motorValue);
+        }
+    } else {
+        externalValue = (motorValue < DSHOT_MIN_THROTTLE) ? PWM_RANGE_MIN : scaleRangeDshotToExternal(motorValue);
+    }
+
+    return lrintf(externalValue);
+}
 
 FAST_CODE uint16_t prepareDshotPacket(dshotProtocolControl_t *pcb)
 {
@@ -175,19 +183,19 @@ static const dshotTelemetryType_t extendedTelemetryLookup[8] = {
 void initDshotTelemetry(const timeUs_t looptimeUs)
 {
     // if bidirectional DShot is not available
-    if (!motorConfig.useDshotTelemetry && !featureIsEnabled(FEATURE_ESC_SENSOR)) {
+    if (!motorConfig()->dev.useDshotTelemetry && !featureIsEnabled(FEATURE_ESC_SENSOR)) {
         return;
     }
 
     // erpmToHz is used by bidir dshot and ESC telemetry
-    erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE / (motorConfig.motorPoleCount / 2.0f);
-    edtAlwaysDecode = motorConfig.useDshotEdt == DSHOT_EDT_FORCE;
+    erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE / (motorConfig()->motorPoleCount / 2.0f);
+    edtAlwaysDecode = motorConfig()->dev.useDshotEdt == DSHOT_EDT_FORCE;
 
 #ifdef USE_RPM_FILTER
-    if (motorConfig.useDshotTelemetry) {
+    if (motorConfig()->dev.useDshotTelemetry) {
         // init LPFs for RPM data
         for (unsigned i = 0; i < dshotMotorCount; i++) {
-            pt1FilterInit(&motorFreqLpf[i], pt1FilterGain(rpmFilterConfig.rpm_filter_lpf_hz, looptimeUs * 1e-6f));
+            pt1FilterInit(&motorFreqLpf[i], pt1FilterGain(rpmFilterConfig()->rpm_filter_lpf_hz, looptimeUs * 1e-6f));
         }
     }
 #else

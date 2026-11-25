@@ -20,11 +20,13 @@
 
 #pragma once
 
-#include "hw.h"
-
 #include "common/time.h"
 #include "common/maths.h"
 
+#include "pg/pg.h"
+#include "pg/rx.h"
+
+#include "drivers/io_types.h"
 
 #define STICK_CHANNEL_COUNT 4
 
@@ -39,22 +41,6 @@
 #define RXFAIL_STEP_TO_CHANNEL_VALUE(step) (PWM_PULSE_MIN + 25 * step)
 #define CHANNEL_VALUE_TO_RXFAIL_STEP(channelValue) ((constrain(channelValue, PWM_PULSE_MIN, PWM_PULSE_MAX) - PWM_PULSE_MIN) / 25)
 #define MAX_RXFAIL_RANGE_STEP ((PWM_PULSE_MAX - PWM_PULSE_MIN) / 25)
-
-#define DEFAULT_SERVO_MIN 1000
-#define DEFAULT_SERVO_MIDDLE 1500
-#define DEFAULT_SERVO_MAX 2000
-
-#define GET_FRAME_ERR_LPF_FREQUENCY(period) (1 / (period / 10.0f))
-#define FRAME_ERR_RESAMPLE_US 100000
-
-#define RX_MAPPABLE_CHANNEL_COUNT 8
-#ifndef SERIALRX_PROVIDER
-#define SERIALRX_PROVIDER 0
-#endif
-
-#define RX_MIN_USEC 885
-#define RX_MAX_USEC 2115
-#define RX_MID_USEC 1500
 
 typedef enum {
     RX_FRAME_PENDING = 0,
@@ -83,49 +69,6 @@ typedef enum {
     SERIALRX_SPEKTRUM1024 = 15,
     SERIALRX_MAVLINK = 16,
 } SerialRXType;
-
-#define RX_MAPPABLE_CHANNEL_COUNT 8
-
-typedef struct rxConfig_s {
-    uint8_t rcmap[RX_MAPPABLE_CHANNEL_COUNT];  // mapping of radio channels to internal RPYTA+ order
-    uint8_t serialrx_provider;                 // type of UART-based receiver (0 = spek 10, 1 = spek 11, 2 = sbus). Must be enabled by FEATURE_RX_SERIAL first.
-    uint8_t serialrx_inverted;                 // invert the serial RX protocol compared to it's default setting
-    uint8_t halfDuplex;                        // allow rx to operate in half duplex mode on F4, ignored for F1 and F3.
-    //ioTag_t spektrum_bind_pin_override_ioTag;
-    //ioTag_t spektrum_bind_plug_ioTag;
-    uint8_t spektrum_sat_bind;                 // number of bind pulses for Spektrum satellite receivers
-    uint8_t spektrum_sat_bind_autoreset;       // whenever we will reset (exit) binding mode after hard reboot
-    uint8_t rssi_channel;
-    uint8_t rssi_scale;
-    uint8_t rssi_invert;
-    uint16_t midrc;                            // Some radios have not a neutral point centered on 1500. can be changed here
-    uint16_t mincheck;                         // minimum rc end
-    uint16_t maxcheck;                         // maximum rc end
-    uint8_t fpvCamAngleDegrees;                // Camera angle to be scaled into rc commands
-    uint8_t airModeActivateThreshold;          // Throttle setpoint percent where airmode gets activated
-    uint16_t rx_min_usec;
-    uint16_t rx_max_usec;
-    uint8_t max_aux_channel;
-    uint8_t rssi_src_frame_errors;             // true to use frame drop flags in the rx protocol
-    int8_t rssi_offset;                        // offset applied to the RSSI value before it is returned
-    uint8_t rc_smoothing;                      // Whether filter based rc smoothing is on or off
-    uint8_t rc_smoothing_setpoint_cutoff;      // Filter cutoff frequency for the setpoint filter (0 = auto)
-    uint8_t rc_smoothing_throttle_cutoff;      // Filter cutoff frequency for the setpoint filter (0 = auto)
-    uint8_t rc_smoothing_debug_axis;           // Axis to log as debug values when debug_mode = RC_SMOOTHING
-    uint8_t rc_smoothing_auto_factor_rpy;      // Used to adjust the "smoothness" determined by the auto cutoff calculations
-    uint8_t rc_smoothing_auto_factor_throttle; // Used to adjust the "smoothness" determined by the auto cutoff calculations
-    uint8_t rssi_src_frame_lpf_period;         // Period of the cutoff frequency for the source frame RSSI filter (in 0.1 s)
-    uint8_t rssi_smoothing;                    // Smoothing factor to reduce jumpiness of rssi, rssiDbm and rsnr
-    uint8_t srxl2_unit_id;                     // Spektrum SRXL2 RX unit id
-    uint8_t srxl2_baud_fast;                   // Select Spektrum SRXL2 fast baud rate
-    uint8_t sbus_baud_fast;                    // Select SBus fast baud rate
-    uint32_t msp_override_channels_mask;       // Channels to override when the MSP override mode is enabled
-    uint8_t msp_override_failsafe;             // if false then extra RC link is always required in msp_override mode, true - allows control via msp_override without extra RC link (autonomous use case)
-    uint8_t crsf_use_negotiated_baud;          // Use negotiated baud rate for CRSF V3
-} rxConfig_t;
-
-extern rxConfig_t rxConfig;
-extern bool isRXDataNew;
 
 #define MAX_SUPPORTED_RC_PPM_CHANNEL_COUNT          12
 #define MAX_SUPPORTED_RC_PARALLEL_PWM_CHANNEL_COUNT  8
@@ -170,10 +113,14 @@ typedef struct rxFailsafeChannelConfig_s {
     uint8_t step;
 } rxFailsafeChannelConfig_t;
 
+PG_DECLARE_ARRAY(rxFailsafeChannelConfig_t, MAX_SUPPORTED_RC_CHANNEL_COUNT, rxFailsafeChannelConfigs);
+
 typedef struct rxChannelRangeConfig_s {
     uint16_t min;
     uint16_t max;
 } rxChannelRangeConfig_t;
+
+PG_DECLARE_ARRAY(rxChannelRangeConfig_t, NON_AUX_CHANNEL_COUNT, rxChannelRangeConfigs);
 
 struct rxRuntimeState_s;
 typedef float (*rcReadRawDataFnPtr)(const struct rxRuntimeState_s *rxRuntimeState, uint8_t chan); // used by receiver driver to return channel data
@@ -188,6 +135,7 @@ typedef enum {
     RX_PROVIDER_SERIAL,
     RX_PROVIDER_MSP,
     RX_PROVIDER_SPI,
+    RX_PROVIDER_UDP,
 } rxProvider_t;
 
 typedef struct rxRuntimeState_s {
@@ -227,11 +175,10 @@ extern linkQualitySource_e linkQualitySource;
 
 extern rxRuntimeState_t rxRuntimeState; //!!TODO remove this extern, only needed once for channelCount
 
-void rxConfig_Init(void);
-void rxChannelRangeConfigs_Init(void);
-void rxFailsafeChannelConfigs_Init(void);
-
 void rxInit(void);
+#if ENABLE_RX_UDP
+void rxUpdateUdpChannels(const uint16_t *channels, uint8_t channelCount);
+#endif
 void rxProcessPending(bool state);
 bool rxUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs);
 void rxFrameCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs);

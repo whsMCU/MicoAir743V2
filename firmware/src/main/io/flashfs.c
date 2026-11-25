@@ -36,7 +36,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #if defined(USE_FLASHFS)
 

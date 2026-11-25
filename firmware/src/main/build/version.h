@@ -54,8 +54,8 @@
 
 extern const char* const targetName;
 
-//#define GIT_SHORT_REVISION_LENGTH   7 // lower case hexadecimal digits.
-//extern const char* const shortGitRevision;
+#define GIT_SHORT_REVISION_LENGTH   7 // lower case hexadecimal digits.
+extern const char* const shortGitRevision;
 
 #define GIT_SHORT_CONFIG_REVISION_LENGTH   7 // lower case hexadecimal digits.
 extern const char* const shortConfigGitRevision;
@@ -71,13 +71,7 @@ extern const char* const buildTime;  // "HH:MM:SS"
 extern const char* const buildKey;
 extern const char* const releaseName;
 
-#define MAX_NAME_LENGTH 16u
-
-typedef struct pilotConfig_s {
-    char name[MAX_NAME_LENGTH + 1];
-    char displayName[MAX_NAME_LENGTH + 1];
-} pilotConfig_t;
-
-extern pilotConfig_t pilotConfig;
-
-void pilotConfig_Init(void);
+STATIC_ASSERT(FC_VERSION_YEAR >= FC_CALVER_BASE_YEAR && FC_VERSION_YEAR <= FC_CALVER_BASE_YEAR + 255, FC_VERSION_YEAR_range);
+STATIC_ASSERT(FC_VERSION_MONTH >= 1 && FC_VERSION_MONTH <= 12, FC_VERSION_MONTH_range);
+STATIC_ASSERT(FC_VERSION_PATCH_LEVEL >= 0 && FC_VERSION_PATCH_LEVEL <= 255, FC_VERSION_PATCH_LEVEL_range);
+STATIC_ASSERT(sizeof(FC_VERSION_STRING) - 1 <= 255, FC_VERSION_STRING_too_long);

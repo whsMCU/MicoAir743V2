@@ -21,13 +21,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_DSHOT
 
 #include "common/time.h"
 
-//#include "drivers/io.h"
+#include "drivers/io.h"
 #include "drivers/motor.h"
 #include "drivers/time.h"
 

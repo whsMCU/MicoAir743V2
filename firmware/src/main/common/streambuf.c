@@ -21,7 +21,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "streambuf.h"
 #include "common/maths.h"
@@ -101,7 +101,7 @@ void sbufWriteStringWithZeroTerminator(sbuf_t *dst, const char *string)
 NOINLINE uint8_t sbufReadU8(sbuf_t *src)
 {
     if (src->ptr < src->end) {
-    return *src->ptr++;
+        return *src->ptr++;
     }
     return 0;
 }
@@ -160,7 +160,7 @@ void sbufAdvance(sbuf_t *buf, int size)
     if (size > 0 && size > (int)(buf->end - buf->ptr)) {
         buf->ptr = buf->end;
     } else {
-    buf->ptr += size;
+        buf->ptr += size;
     }
 }
 

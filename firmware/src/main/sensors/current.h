@@ -22,7 +22,6 @@
 
 #include "common/time.h"
 #include "current_ids.h"
-#include "hw.h"
 
 typedef enum {
     CURRENT_METER_NONE = 0,
@@ -77,7 +76,23 @@ typedef struct currentSensorADCConfig_s {
     int16_t offset;             // offset of the current sensor in mA
 } currentSensorADCConfig_t;
 
-extern currentSensorADCConfig_t currentSensorADCConfig;
+PG_DECLARE(currentSensorADCConfig_t, currentSensorADCConfig);
+
+//
+// Virtual
+//
+
+typedef struct currentMeterVirtualState_s {
+    currentMeterMAhDrawnState_t mahDrawnState;
+    int32_t amperage;           // current read by current sensor in centiamperes (1/100th A)
+} currentSensorVirtualState_t;
+
+typedef struct currentSensorVirtualConfig_s {
+    int16_t scale;              // scale the throttle to centiamperes, using a hardcoded thrust linearization function (see Battery.md)
+    uint16_t offset;            // offset of the current sensor in centiamperes (1/100th A)
+} currentSensorVirtualConfig_t;
+
+PG_DECLARE(currentSensorVirtualConfig_t, currentSensorVirtualConfig);
 
 //
 // ESC
@@ -100,7 +115,6 @@ typedef struct currentMeterMSPState_s {
 //
 // Current Meter API
 //
-void currentSensorADCConfig_Init(void);
 
 void currentMeterReset(currentMeter_t *meter);
 

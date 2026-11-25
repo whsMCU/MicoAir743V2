@@ -22,25 +22,25 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/build_config.h"
 
 #include "common/bitarray.h"
 #include "common/maths.h"
 
-#include "common/time.h"
+#include "drivers/time.h"
 
 #include "config/config.h"
 #include "config/feature.h"
 
 #include "fc/rc_controls.h"
 
-//#include "io/piniobox.h"
+#include "io/piniobox.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
-//#include "pg/rx.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
+#include "pg/rx.h"
 
 #include "rx/rx.h"
 
@@ -56,17 +56,10 @@ static uint8_t activeMacArray[MAX_MODE_ACTIVATION_CONDITION_COUNT];
 static int activeLinkedMacCount = 0;
 static uint8_t activeLinkedMacArray[MAX_MODE_ACTIVATION_CONDITION_COUNT];
 
-modeActivationCondition_t modeActivationConditions[MAX_MODE_ACTIVATION_CONDITION_COUNT];
+PG_REGISTER_ARRAY(modeActivationCondition_t, MAX_MODE_ACTIVATION_CONDITION_COUNT, modeActivationConditions, PG_MODE_ACTIVATION_PROFILE, 5);
 
 #if defined(USE_CUSTOM_BOX_NAMES)
-PG_REGISTER_WITH_RESET_TEMPLATE(modeActivationConfig_t, modeActivationConfig, PG_MODE_ACTIVATION_CONFIG, 0);
-
-PG_RESET_TEMPLATE(modeActivationConfig_t, modeActivationConfig,
-    .box_user_1_name = { 0 },
-    .box_user_2_name = { 0 },
-    .box_user_3_name = { 0 },
-    .box_user_4_name = { 0 },
-);
+PG_REGISTER(modeActivationConfig_t, modeActivationConfig, PG_MODE_ACTIVATION_CONFIG, 0);
 #endif
 
 bool IS_RC_MODE_ACTIVE(boxId_e boxId)
@@ -133,13 +126,13 @@ static void updateMasksForStickyModes(const modeActivationCondition_t *mac, boxB
         return;
     }
 
-        bool bActive = isRangeActive(mac->auxChannelIndex, &mac->range);
+    bool bActive = isRangeActive(mac->auxChannelIndex, &mac->range);
 
-        if (bitArrayGet(&stickyModesEverDisabled, mac->modeId)) {
-            updateMasksForMac(mac, andMask, newMask, bActive);
-        } else {
-            if (micros() >= STICKY_MODE_BOOT_DELAY_US && !bActive) {
-                bitArraySet(&stickyModesEverDisabled, mac->modeId);
+    if (bitArrayGet(&stickyModesEverDisabled, mac->modeId)) {
+        updateMasksForMac(mac, andMask, newMask, bActive);
+    } else {
+        if (micros() >= STICKY_MODE_BOOT_DELAY_US && !bActive) {
+            bitArraySet(&stickyModesEverDisabled, mac->modeId);
         }
     }
 }
@@ -157,7 +150,7 @@ void updateActivatedModes(void)
 
     // determine which conditions set/clear the mode
     for (int i = 0; i < activeMacCount; i++) {
-        const modeActivationCondition_t *mac = &modeActivationConditions[activeMacArray[i]];
+        const modeActivationCondition_t *mac = modeActivationConditions(activeMacArray[i]);
 
         if (bitArrayGet(&stickyModes, mac->modeId)) {
             updateMasksForStickyModes(mac, &andMask, &newMask, bitArrayGet(&latchModes, mac->modeId));
@@ -169,7 +162,7 @@ void updateActivatedModes(void)
 
     // Update linked modes
     for (int i = 0; i < activeLinkedMacCount; i++) {
-        const modeActivationCondition_t *mac = &modeActivationConditions[activeLinkedMacArray[i]];
+        const modeActivationCondition_t *mac = modeActivationConditions(activeLinkedMacArray[i]);
         bool bActive = bitArrayGet(&andMask, mac->linkedTo) != bitArrayGet(&newMask, mac->linkedTo);
 
         updateMasksForMac(mac, &andMask, &newMask, bActive);
@@ -185,7 +178,7 @@ void updateActivatedModes(void)
 bool isModeActivationConditionPresent(boxId_e modeId)
 {
     for (int i = 0; i < MAX_MODE_ACTIVATION_CONDITION_COUNT; i++) {
-        const modeActivationCondition_t *mac = &modeActivationConditions[i];
+        const modeActivationCondition_t *mac = modeActivationConditions(i);
 
         if (mac->modeId == modeId && (IS_RANGE_USABLE(&mac->range) || mac->linkedTo)) {
             return true;
@@ -198,7 +191,7 @@ bool isModeActivationConditionPresent(boxId_e modeId)
 bool isModeActivationConditionLinked(boxId_e modeId)
 {
     for (int i = 0; i < MAX_MODE_ACTIVATION_CONDITION_COUNT; i++) {
-        const modeActivationCondition_t *mac = &modeActivationConditions[i];
+        const modeActivationCondition_t *mac = modeActivationConditions(i);
 
         if (mac->modeId == modeId && mac->linkedTo != 0) {
             return true;
@@ -212,19 +205,19 @@ void removeModeActivationCondition(const boxId_e modeId)
 {
     unsigned offset = 0;
     for (unsigned i = 0; i < MAX_MODE_ACTIVATION_CONDITION_COUNT; i++) {
-        modeActivationCondition_t *mac = &modeActivationConditions[i];
+        modeActivationCondition_t *mac = modeActivationConditionsMutable(i);
 
         if (mac->modeId == modeId && !offset) {
             offset++;
         }
 
         if (offset) {
-            while (i + offset < MAX_MODE_ACTIVATION_CONDITION_COUNT && modeActivationConditions[i + offset].modeId == modeId) {
+            while (i + offset < MAX_MODE_ACTIVATION_CONDITION_COUNT && modeActivationConditions(i + offset)->modeId == modeId) {
                 offset++;
             }
 
             if (i + offset < MAX_MODE_ACTIVATION_CONDITION_COUNT) {
-                memcpy(mac, &modeActivationConditions[i + offset], sizeof(modeActivationCondition_t));
+                memcpy(mac, modeActivationConditions(i + offset), sizeof(modeActivationCondition_t));
             } else {
                 memset(mac, 0, sizeof(modeActivationCondition_t));
             }
@@ -252,7 +245,7 @@ void analyzeModeActivationConditions(void)
     activeLinkedMacCount = 0;
 
     for (uint8_t i = 0; i < MAX_MODE_ACTIVATION_CONDITION_COUNT; i++) {
-        const modeActivationCondition_t *mac = &modeActivationConditions[i];
+        const modeActivationCondition_t *mac = modeActivationConditions(i);
         if (mac->linkedTo) {
             activeLinkedMacArray[activeLinkedMacCount++] = i;
         } else if (isModeActivationConditionConfigured(mac, &emptyMac)) {

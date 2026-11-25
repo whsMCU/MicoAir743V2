@@ -18,4 +18,4 @@
 #pragma once
 
 #include "flight/pos_hold_multirotor.h"
-//#include "flight/pos_hold_wing.h"
+#include "flight/pos_hold_wing.h"

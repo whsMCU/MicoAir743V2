@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 // positionNav is multirotor-only; flight plan execution follows suit.
 #if ENABLE_FLIGHT_PLAN && !defined(USE_WING)

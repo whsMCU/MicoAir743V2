@@ -56,7 +56,8 @@ typedef struct mspPacket_s {
 
 typedef int mspDescriptor_t;
 
-typedef void (*mspPostProcessFnPtr)(uint8_t ch); // msp post process function, used for gracefully handling reboots, etc.
+struct serialPort_s;
+typedef void (*mspPostProcessFnPtr)(struct serialPort_s *port); // msp post process function, used for gracefully handling reboots, etc.
 typedef mspResult_e (*mspProcessCommandFnPtr)(mspDescriptor_t srcDesc, mspPacket_t *cmd, mspPacket_t *reply, mspPostProcessFnPtr *mspPostProcessFn);
 typedef void (*mspProcessReplyFnPtr)(mspPacket_t *cmd);
 

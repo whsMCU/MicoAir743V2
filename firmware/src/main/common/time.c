@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "common/maths.h"
 #include "common/printf.h"
@@ -35,7 +35,7 @@
 
 #include "drivers/persistent.h"
 
-//#include "pg/pg_ids.h"
+#include "pg/pg_ids.h"
 
 #include "drivers/time.h"
 
@@ -60,12 +60,11 @@ static const uint16_t days[4][12] =
     {1096,  1127,   1155,   1186,   1216,   1247,   1277,   1308,   1339,   1369,   1400,   1430},
 };
 
-timeConfig_t timeConfig;
+PG_REGISTER_WITH_RESET_TEMPLATE(timeConfig_t, timeConfig, PG_TIME_CONFIG, 0);
 
-void timeConfig_Init(void)
-{
-	timeConfig.tz_offsetMinutes = 0;
-}
+PG_RESET_TEMPLATE(timeConfig_t, timeConfig,
+    .tz_offsetMinutes = 0,
+);
 
 static rtcTime_t dateTimeToRtcTime(dateTime_t *dt)
 {
@@ -202,18 +201,18 @@ bool dateTimeFormatUTC(char *buf, dateTime_t *dt)
 
 bool dateTimeFormatLocal(char *buf, dateTime_t *dt)
 {
-    const int16_t timezoneOffset = rtcIsDateTimeValid(dt) ? timeConfig.tz_offsetMinutes : 0;
+    const int16_t timezoneOffset = rtcIsDateTimeValid(dt) ? timeConfig()->tz_offsetMinutes : 0;
     return dateTimeFormat(buf, dt, timezoneOffset, false);
 }
 
 bool dateTimeFormatLocalShort(char *buf, dateTime_t *dt)
 {
-    return dateTimeFormat(buf, dt, timeConfig.tz_offsetMinutes, true);
+    return dateTimeFormat(buf, dt, timeConfig()->tz_offsetMinutes, true);
 }
 
 void dateTimeUTCToLocal(dateTime_t *utcDateTime, dateTime_t *localDateTime)
 {
-    dateTimeWithOffset(localDateTime, utcDateTime, timeConfig.tz_offsetMinutes);
+    dateTimeWithOffset(localDateTime, utcDateTime, timeConfig()->tz_offsetMinutes);
 }
 
 bool dateTimeSplitFormatted(char *formatted, char **date, char **time)

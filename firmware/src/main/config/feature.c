@@ -22,19 +22,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "config/feature.h"
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
-featureConfig_t featureConfig;
+PG_REGISTER_WITH_RESET_TEMPLATE(featureConfig_t, featureConfig, PG_FEATURE_CONFIG, 1);
 
-void featureConfig_Init(void)
-{
-	featureConfig.enabledFeatures = DEFAULT_FEATURES | DEFAULT_RX_FEATURE | FEATURE_ANTI_GRAVITY | FEATURE_AIRMODE | FEATURE_GPS
-																| FEATURE_TELEMETRY | FEATURE_LED_STRIP | FEATURE_RANGEFINDER | FEATURE_OPTICALFLOW;
-}
+PG_RESET_TEMPLATE(featureConfig_t, featureConfig,
+    .enabledFeatures = DEFAULT_FEATURES | DEFAULT_RX_FEATURE | FEATURE_ANTI_GRAVITY | FEATURE_AIRMODE,
+);
 
 // bitmask of features that are supported in current build configuration
 uint32_t featuresSupportedByBuild =
@@ -107,7 +105,7 @@ static uint32_t runtimeFeatureMask;
 
 void featureInit(void)
 {
-    runtimeFeatureMask = featureConfig.enabledFeatures;
+    runtimeFeatureMask = featureConfig()->enabledFeatures;
 }
 
 static void featureSet(const uint32_t mask, uint32_t *features)
@@ -133,14 +131,14 @@ bool featureIsEnabled(const uint32_t mask)
 // performed at startup and when writing to EEPROM.
 bool featureIsConfigured(const uint32_t mask)
 {
-    return featureConfig.enabledFeatures & mask;
+    return featureConfig()->enabledFeatures & mask;
 }
 
 // Updates the configuration *AND* runtime state of a feature.
 // Used *ONLY* by the config check process that runs at startup and EEPROM save.
 void featureEnableImmediate(const uint32_t mask)
 {
-    featureSet(mask, &featureConfig.enabledFeatures);
+    featureSet(mask, &featureConfigMutable()->enabledFeatures);
     featureSet(mask, &runtimeFeatureMask);
 }
 
@@ -148,7 +146,7 @@ void featureEnableImmediate(const uint32_t mask)
 // Used *ONLY* by the config check process that runs at startup and EEPROM save.
 void featureDisableImmediate(const uint32_t mask)
 {
-    featureClear(mask, &featureConfig.enabledFeatures);
+    featureClear(mask, &featureConfigMutable()->enabledFeatures);
     featureClear(mask, &runtimeFeatureMask);
 }
 
@@ -157,7 +155,7 @@ void featureDisableImmediate(const uint32_t mask)
 // enable a feature that will be active after save/reboot.
 void featureConfigSet(const uint32_t mask)
 {
-    featureSet(mask, &featureConfig.enabledFeatures);
+    featureSet(mask, &featureConfigMutable()->enabledFeatures);
 }
 
 // Sets the configuration state of the feature and *DOES NOT* change the runtime state.
@@ -165,12 +163,12 @@ void featureConfigSet(const uint32_t mask)
 // disable a feature after a save/reboot.
 void featureConfigClear(const uint32_t mask)
 {
-    featureClear(mask, &featureConfig.enabledFeatures);
+    featureClear(mask, &featureConfigMutable()->enabledFeatures);
 }
 
 // Sets the configuration state of all features and *DOES NOT* change the runtime state.
 // For example, used by MSP to update all the configured features in one go.
 void featureConfigReplace(const uint32_t mask)
 {
-    featureConfig.enabledFeatures = mask;
+    featureConfigMutable()->enabledFeatures = mask;
 }

@@ -20,7 +20,7 @@
 
 #include <ctype.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "fat_standard.h"
 

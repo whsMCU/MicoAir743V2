@@ -24,7 +24,7 @@
 
 #include "drivers/rangefinder/rangefinder.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef enum {
     RANGEFINDER_NONE        = 0,
@@ -50,7 +50,7 @@ typedef struct rangefinderConfig_s {
     uint8_t rangefinder_hardware;
 } rangefinderConfig_t;
 
-extern rangefinderConfig_t rangefinderConfig;
+PG_DECLARE(rangefinderConfig_t, rangefinderConfig);
 
 typedef struct rangefinder_s {
     rangefinderDev_t dev;
@@ -64,10 +64,7 @@ typedef struct rangefinder_s {
     int16_t snr;
 } rangefinder_t;
 
-extern rangefinder_t rangefinder;
-
-void rangefinder_Init(void);
-
+void rangefinderResetDynamicThreshold(void);
 bool rangefinderInit(void);
 
 int32_t rangefinderGetLatestAltitude(void);

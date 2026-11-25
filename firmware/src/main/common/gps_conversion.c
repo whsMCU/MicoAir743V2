@@ -23,6 +23,11 @@
 #include <ctype.h>
 #include <string.h>
 
+#include "platform.h"
+
+#include "gps_conversion.h"
+
+#ifdef USE_GPS
 
 #define DIGIT_TO_VAL(_x)    (_x - '0')
 uint32_t GPS_coord_to_degrees(const char* coordinateString)
@@ -64,3 +69,4 @@ uint32_t GPS_coord_to_degrees(const char* coordinateString)
     }
     return degrees * 10000000UL + (minutes * 1000000UL + fractionalMinutes * 100UL) / 6;
 }
+#endif

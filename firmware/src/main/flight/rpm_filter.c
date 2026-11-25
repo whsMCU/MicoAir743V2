@@ -20,7 +20,7 @@
 
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_RPM_FILTER
 
@@ -31,10 +31,10 @@
 
 #include "drivers/dshot.h"
 
-//#include "flight/mixer.h"
+#include "flight/mixer.h"
 #include "flight/pid.h"
 
-//#include "pg/motor.h"
+#include "pg/motor.h"
 
 #include "scheduler/scheduler.h"
 
@@ -65,20 +65,6 @@ typedef struct rpmFilter_s {
 // Singleton
 FAST_DATA_ZERO_INIT static rpmFilter_t rpmFilter;
 
-rpmFilterConfig_t rpmFilterConfig;
-
-void rpmFilterConfig_Init(void)
-{
-  rpmFilterConfig = (rpmFilterConfig_t){
-      .rpm_filter_harmonics = 3,
-      .rpm_filter_weights = {100, 100, 100},
-      .rpm_filter_min_hz = 100,
-      .rpm_filter_fade_range_hz = 50,
-      .rpm_filter_q = 500,
-      .rpm_filter_lpf_hz = 150
-  };
-}
-
 void rpmFilterInit(const rpmFilterConfig_t *config, const timeUs_t looptimeUs)
 {
     rpmFilter.motorIndex = 0;
@@ -86,7 +72,7 @@ void rpmFilterInit(const rpmFilterConfig_t *config, const timeUs_t looptimeUs)
     rpmFilter.numHarmonics = 0; // disable RPM Filtering
 
     // if bidirectional DShot is not available
-    if (!motorConfig.useDshotTelemetry) {
+    if (!useDshotTelemetry) {
         return;
     }
 
@@ -107,8 +93,8 @@ void rpmFilterInit(const rpmFilterConfig_t *config, const timeUs_t looptimeUs)
         rpmFilter.weights[n] = constrainf(config->rpm_filter_weights[n] / 100.0f, 0.0f, 1.0f);
     }
 
-        for (int motor = 0; motor < getMotorCount(); motor++) {
-            for (int i = 0; i < rpmFilter.numHarmonics; i++) {
+    for (int motor = 0; motor < getMotorCount(); motor++) {
+        for (int i = 0; i < rpmFilter.numHarmonics; i++) {
             rpmNotchInit(&rpmFilter.notch[motor][i], rpmFilter.minHz * (i + 1), rpmFilter.dt, rpmFilter.q, 0.0f);
         }
     }

@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_USB_CDC_HID
 
@@ -86,6 +86,6 @@ void sendRcDataToHid(void)
 
 bool cdcDeviceIsMayBeActive(void)
 {
-    return usbDevConfig.type == COMPOSITE && usbIsConnected() && (getBatteryState() == BATTERY_NOT_PRESENT || batteryConfig.voltageMeterSource == VOLTAGE_METER_NONE);
+    return usbDevConfig()->type == COMPOSITE && usbIsConnected() && (getBatteryState() == BATTERY_NOT_PRESENT || batteryConfig()->voltageMeterSource == VOLTAGE_METER_NONE);
 }
 #endif

@@ -19,20 +19,14 @@
 
 #ifndef USE_WING
 
-//#include "pg/alt_hold.h"
+#include "pg/alt_hold.h"
 
 #ifdef USE_ALTITUDE_HOLD
 #include "common/time.h"
 
-typedef struct altHoldConfig_s {
-    uint8_t climbRate;
-    uint8_t deadband;
-} altHoldConfig_t;
-
 #define ALTHOLD_TASK_RATE_HZ 100         // hz
 
 void altHoldInit(void);
-void altHoldConfig_Init(void);
 void updateAltHold(timeUs_t currentTimeUs);
 bool isAltHoldActive(void);
 

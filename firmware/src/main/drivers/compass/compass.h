@@ -21,23 +21,21 @@
 #pragma once
 
 #include "common/sensor_alignment.h"
-
-#include "hw.h"
-#include "drivers/sensor.h"
-#include "common/maths.h"
 #include "common/vector.h"
-//#include "drivers/exti.h"
+
+#include "drivers/bus.h"
+#include "drivers/sensor.h"
+#include "drivers/exti.h"
 
 typedef struct magDev_s {
     sensorMagInitFuncPtr init;                              // initialize function
     sensorMagReadFuncPtr read;                              // read 3 axis data function
-    //extiCallbackRec_t exti;
-    //extDevice_t dev;
-    //busDevice_t bus; // For MPU slave bus instance
-    uint8_t ch;
-    uint8_t address;
+    extiCallbackRec_t exti;
+    extDevice_t dev;
+    busDevice_t bus; // For MPU slave bus instance
     sensor_align_e magAlignment;
     matrix33_t rotationMatrix;
-    //ioTag_t magIntExtiTag;
+    ioTag_t magIntExtiTag;
     int16_t magGain[3];
+    uint16_t magOdrHz;
 } magDev_t;

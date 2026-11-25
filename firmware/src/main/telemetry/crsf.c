@@ -24,7 +24,7 @@
 #include <math.h>
 #include <limits.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_TELEMETRY_CRSF
 
@@ -32,7 +32,7 @@
 #include "build/build_config.h"
 #include "build/version.h"
 
-//#include "cms/cms.h"
+#include "cms/cms.h"
 
 #include "config/config.h"
 #include "config/feature.h"
@@ -45,7 +45,7 @@
 #include "common/utils.h"
 
 #include "drivers/nvic.h"
-//#include "drivers/persistent.h"
+#include "drivers/persistent.h"
 
 #include "fc/rc_modes.h"
 #include "fc/runtime_config.h"
@@ -56,12 +56,12 @@
 #include "flight/pid.h"
 #include "flight/position.h"
 
-//#include "io/displayport_crsf.h"
+#include "io/displayport_crsf.h"
 #include "io/gps.h"
-//#include "io/serial.h"
+#include "io/serial.h"
 
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
 
 #include "rx/crsf.h"
 #include "rx/crsf_protocol.h"
@@ -70,7 +70,7 @@
 #include "sensors/barometer.h"
 #include "sensors/compass.h"
 #include "sensors/sensors.h"
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/gyro.h"
 
 #include "telemetry/telemetry.h"
@@ -452,7 +452,7 @@ static void crsfFrameBatterySensor(sbuf_t *dst)
     // use sbufWrite since CRC does not include frame length
     sbufWriteU8(dst, CRSF_FRAME_BATTERY_SENSOR_PAYLOAD_SIZE + CRSF_FRAME_LENGTH_TYPE_CRC);
     sbufWriteU8(dst, CRSF_FRAMETYPE_BATTERY_SENSOR);
-    if (telemetryConfig.report_cell_voltage) {
+    if (telemetryConfig()->report_cell_voltage) {
         sbufWriteU16BigEndian(dst, (getBatteryAverageCellVoltage() + 5) / 10); // vbat is in units of 0.01V
     } else {
         sbufWriteU16BigEndian(dst, getLegacyBatteryVoltage());
@@ -633,10 +633,9 @@ static void crsfFrameFlightMode(sbuf_t *dst)
         flightMode = "HOR";
     } else if (FLIGHT_MODE(CHIRP_MODE)) {
         flightMode = "CHIR";
+    } else if (isAirmodeEnabled()) {
+        flightMode = "AIR";
     }
-//    else if (isAirmodeEnabled()) {
-//        flightMode = "AIR";
-//    }
 
     sbufWriteString(dst, flightMode);
 
@@ -646,7 +645,7 @@ static void crsfFrameFlightMode(sbuf_t *dst)
         // ? = GPS rescue disabled
         bool isGpsRescueDisabled = false;
 #ifdef USE_GPS
-        isGpsRescueDisabled = featureIsEnabled(FEATURE_GPS) && gpsRescueIsConfigured() && gpsSol.numSat < gpsRescueConfig.minSats && !STATE(GPS_FIX);
+        isGpsRescueDisabled = featureIsEnabled(FEATURE_GPS) && gpsRescueIsConfigured() && gpsSol.numSat < gpsRescueConfig()->minSats && !STATE(GPS_FIX);
 #endif
         sbufWriteU8(dst, isArmingDisabled() ? '!' : isGpsRescueDisabled ? '?' : '*');
     }
@@ -674,8 +673,8 @@ static void crsfFrameDeviceInfo(sbuf_t *dst)
     // The version string is deliberately left out: with calver plus an optional suffix
     // (e.g. "2026.12.0-alpha") the name no longer fits, and it is of little use in the
     // transmitter's device list anyway.
-    char buff[sizeof(FC_FIRMWARE_NAME ": ") + sizeof(systemConfig.boardIdentifier)];
-    tfp_sprintf(buff, "%s: %s", FC_FIRMWARE_NAME, systemConfig.boardIdentifier);
+    char buff[sizeof(FC_FIRMWARE_NAME ": ") + sizeof(systemConfig()->boardIdentifier)];
+    tfp_sprintf(buff, "%s: %s", FC_FIRMWARE_NAME, systemConfig()->boardIdentifier);
 
     uint8_t *lengthPtr = sbufPtr(dst);
     sbufWriteU8(dst, 0);

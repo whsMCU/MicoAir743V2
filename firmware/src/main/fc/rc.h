@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "common/time.h"
+#include "drivers/time.h"
 
 #include "fc/rc_controls.h"
 

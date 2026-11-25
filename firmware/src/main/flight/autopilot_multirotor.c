@@ -20,7 +20,7 @@
 #include <stdbool.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifndef USE_WING
 
@@ -39,17 +39,14 @@
 #include "rx/rx.h"
 #include "scheduler/scheduler.h"
 #include "sensors/gyro.h"
-#include "sensors/gyro_init.h"
 
-//#include "pg/autopilot.h"
+#include "pg/autopilot.h"
 #include "autopilot.h"
 #include "flight/position_nav.h"
 
 #ifdef USE_POSITION_HOLD
 #include "flight/pos_hold.h"
 #endif
-
-#include "flight/pid.h"
 
 // DEBUG_AUTOPILOT_PID each parameter on the axis set by gyro_filter_debug_axis
 // 0 - VelocityError cm/s
@@ -216,96 +213,9 @@ static autopilotState_t ap = {
     .wasSticksActive = false,
 };
 
-autopilotConfig_t autopilotConfig;
-
-void autopilotConfig_Init(void)
-{
-		autopilotConfig.landingAltitudeM = 4;
-		autopilotConfig.hoverThrottle = 1275;
-		autopilotConfig.throttleMin = 1100;
-		autopilotConfig.throttleMax = 1900;
-		autopilotConfig.altitudeP = 30;
-		autopilotConfig.altitudeI = 30;
-		autopilotConfig.altitudeD = 30;
-		autopilotConfig.altitudeF = 30;
-		autopilotConfig.positionP = 30;
-		autopilotConfig.positionI = 30;
-		autopilotConfig.positionD = 30;
-		autopilotConfig.positionA = 30;
-		autopilotConfig.positionF = 30;
-		autopilotConfig.positionCutoff = 30;
-		autopilotConfig.stopThreshold = 10;
-		autopilotConfig.maxAngle = 50;
-
-    // Velocity-based position control with drag compensation
-		autopilotConfig.velocityDragCoeff = 50;          // 5 deg at 5 m/s, half the nominal maximum
-		autopilotConfig.maxVelocity = 500;               // 5 m/s max velocity setpoint at full stick
-
-    // Waypoint navigation parameters
-		autopilotConfig.waypointArrivalRadius = 500;     // 5m for FLYOVER/FLYBY
-		autopilotConfig.waypointHoldRadius = 200;        // 2m for HOLD/LAND
-		autopilotConfig.stickDeadband = 50;              // RC units
-		autopilotConfig.throttleDeadband = 50;           // RC units
-
-    // Leg-line carrot path tracking and turn-angle cornering
-		autopilotConfig.navCornerSpeed = 220;            // 2.2 m/s corner-speed floor
-		autopilotConfig.navCornerDeltaV = 440;           // 4.4 m/s per-corner delta-v budget
-		autopilotConfig.navDecel = 250;                  // 2.5 m/s^2 approach deceleration; with the chase-lag
-																		// compensated profile this stays trackable through the
-																		// pursuit dynamics (brake authority grows with the gap
-																		// and with drag, both rising with speed), and long legs
-																		// no longer begin braking hundreds of metres out
-		autopilotConfig.navAccel = 250;                  // 2.5 m/s^2 carrot slew
-		autopilotConfig.navCarrotLeadTime = 12;          // 1.2 s carrot lead
-		autopilotConfig.navCarrotLeadMax = 2500;         // 25 m maximum carrot lead
-		autopilotConfig.navPreturnDist = 1500;           // 15 m pre-turn blend zone
-
-    // Yaw control parameters
-		autopilotConfig.yawMode = YAW_MODE_VELOCITY;     // Default: follow velocity
-		autopilotConfig.yawP = 50;                       // 0.5 P gain
-		autopilotConfig.yawD = 10;                       // 0.1 D gain
-		autopilotConfig.maxYawRate = 30;                 // 30 deg/s max
-		autopilotConfig.minForwardVelocity = 300;        // 3.0 m/s minimum forward velocity (GPS course reliability / stall prevention)
-
-    // Velocity buildup (acceleration from stationary)
-		autopilotConfig.velocityBuildupMaxPitch = 8;     // 8° max pitch bias for acceleration
-
-    // Turn rate and holding patterns
-		autopilotConfig.maxTurnRate = 3;                 // 3 deg/s = rate-1 turn (360° in 2 minutes)
-		autopilotConfig.holdOrbitRadius = 1000;          // 10m orbit radius
-		autopilotConfig.holdFigure8Width = 2000;         // 20m figure-8 width
-
-    // Landing sequence
-		autopilotConfig.landingDescentRate = 50;         // 50 cm/s = 0.5 m/s descent rate
-		autopilotConfig.landingDetectionTime = 10;       // 1 second below landing altitude for touchdown
-		autopilotConfig.landingSpiralEnable = 1;         // Spiral descent enabled (avoid vortex ring state)
-		autopilotConfig.landingSpiralRadius = 200;       // 2m spiral radius
-		autopilotConfig.landingSpiralRate = 10;          // 10 deg/s rotation rate
-		autopilotConfig.landingVelocityThreshold = 50;   // 0.5 m/s max velocity for touchdown
-		autopilotConfig.landingThrottleThreshold = 100;  // 100 RC units throttle deviation
-
-    // L1 Nonlinear Guidance
-		autopilotConfig.l1Enable = 1;                    // L1 guidance enabled by default
-		autopilotConfig.l1Period = 20;                   // 2.0s damping period
-		autopilotConfig.l1MinLookahead = 1000;           // 10m minimum lookahead
-		autopilotConfig.l1MaxLookahead = 10000;          // 100m maximum lookahead
-		autopilotConfig.l1MaxCrossTrackError = 10000;    // 100m max XTE before fallback
-		autopilotConfig.l1TurnRate = 8;                  // 8 deg/s arc transition rate between waypoints
-
-    // Vertical track
-		autopilotConfig.minNavAltitudeM = 5;                 // 5m AGL before horizontal navigation begins
-
-    // Safety: RX loss policy
-		autopilotConfig.rxLossPolicy = AP_RX_LOSS_DISABLE;  // Disable autopilot on RX loss (use standard failsafe)
-
-    // Safety: Geofence
-		autopilotConfig.maxDistanceFromHomeM = 0;            // Disabled by default
-		autopilotConfig.geofenceAction = AP_GEOFENCE_LAND;   // Land at current position
-}
-
 static void initPidLpfs(void)
 {
-    const autopilotConfig_t *cfg = &autopilotConfig;
+    const autopilotConfig_t *cfg = autopilotConfig();
     const float cutoffHz = fmaxf(cfg->positionCutoff * 0.1f, 0.1f); // default of 30 is 3Hz, range 1 to 5Hz
     const float k = pt3FilterGain(cutoffHz, HZ_TO_INTERVAL(POSHOLD_TASK_RATE_HZ));
     for (unsigned i = 0; i < EF_AXIS_COUNT; i++) {
@@ -315,23 +225,23 @@ static void initPidLpfs(void)
 
 void autopilotInit(void)
 {
-    const autopilotConfig_t *cfg = &autopilotConfig;
+    const autopilotConfig_t *cfg = autopilotConfig();
     initPidLpfs();
 
     ap.maxAngle = cfg->maxAngle;
-    ap.debugAxis = (gyroConfig.gyro_filter_debug_axis == FD_PITCH) ? 1 : 0; // 1 for Pitch / North, 0 for Roll / East
+    ap.debugAxis = (gyroConfig()->gyro_filter_debug_axis == FD_PITCH) ? 1 : 0; // 1 for Pitch / North, 0 for Roll / East
 
     altitudeKp = cfg->altitudeP * ALTITUDE_P_SCALE;
     altitudeKi = cfg->altitudeI * ALTITUDE_I_SCALE;
     altitudeKd = cfg->altitudeD * ALTITUDE_D_SCALE;
     altitudeKf = cfg->altitudeF * ALTITUDE_F_SCALE;
 
-//    xyPid.Kp = cfg->positionP * XY_DISTANCE_SCALE;
-//    xyPid.Ki = cfg->positionI * XY_DISTANCE_I_SCALE;
-//    xyPid.Kd = cfg->positionD * XY_VELOCITY_SCALE;
-//    xyPid.Ka = cfg->positionA * XY_ACCEL_SCALE;
-//    xyPid.Kf = cfg->positionF * XY_F_SCALE;
-//    xyKDrag  = fminf(cfg->velocityDragCoeff * XY_DRAG_SCALE, 0.5f * xyPid.Kd); // keep drag a fraction of D so it can never reverse net damping
+    xyPid.Kp = cfg->positionP * XY_DISTANCE_SCALE;
+    xyPid.Ki = cfg->positionI * XY_DISTANCE_I_SCALE;
+    xyPid.Kd = cfg->positionD * XY_VELOCITY_SCALE;
+    xyPid.Ka = cfg->positionA * XY_ACCEL_SCALE;
+    xyPid.Kf = cfg->positionF * XY_F_SCALE;
+    xyKDrag  = fminf(cfg->velocityDragCoeff * XY_DRAG_SCALE, 0.5f * xyPid.Kd); // keep drag a fraction of D so it can never reverse net damping
 
     ap.sticksActive = false;
     ap.wasSticksActive = false;
@@ -357,7 +267,7 @@ void resetAltitudeControl(void)
 
 uint16_t autopilotGetEffectiveHoverThrottlePwm(void)
 {
-    const uint16_t cfgHover = autopilotConfig.hoverThrottle;
+    const uint16_t cfgHover = autopilotConfig()->hoverThrottle;
     if (cfgHover != 0) {
         return cfgHover;
     }
@@ -369,7 +279,7 @@ uint16_t autopilotGetEffectiveHoverThrottlePwm(void)
 
 void autopilotCaptureHoverThrottleForAltHold(void)
 {
-    if (autopilotConfig.hoverThrottle != 0) {
+    if (autopilotConfig()->hoverThrottle != 0) {
         altHoldCapturedHoverPwm = 0;
         return;
     }
@@ -420,9 +330,9 @@ void altitudeControl(float targetAltitudeCm, float taskIntervalS, float targetAl
     throttleOffset *= tiltMultiplier;
 
     float newThrottle = PWM_RANGE_MIN + throttleOffset;
-    newThrottle = constrainf(newThrottle, autopilotConfig.throttleMin, autopilotConfig.throttleMax);
+    newThrottle = constrainf(newThrottle, autopilotConfig()->throttleMin, autopilotConfig()->throttleMax);
 
-    throttleOut = scaleRangef(newThrottle, MAX(rxConfig.mincheck, PWM_RANGE_MIN), PWM_RANGE_MAX, 0.0f, 1.0f);
+    throttleOut = scaleRangef(newThrottle, MAX(rxConfig()->mincheck, PWM_RANGE_MIN), PWM_RANGE_MAX, 0.0f, 1.0f);
     throttleOut = constrainf(throttleOut, 0.0f, 1.0f);
 
     DEBUG_SET(DEBUG_AUTOPILOT_ALTITUDE, 0, lrintf(newThrottle));
@@ -610,8 +520,8 @@ static bool sanityViolationExpired(void)
 void sticksSetTargetVelocity(void)
 {
     // full stick maps to maxVelocity; the rates can change between flights, so scale per loop
-    const float velocityGainPitch = autopilotConfig.maxVelocity / getMaxRcRate(PITCH);
-    const float velocityGainRoll  = autopilotConfig.maxVelocity / getMaxRcRate(ROLL);
+    const float velocityGainPitch = autopilotConfig()->maxVelocity / getMaxRcRate(PITCH);
+    const float velocityGainRoll  = autopilotConfig()->maxVelocity / getMaxRcRate(ROLL);
 
     const float stickPitch = getSetpointRate(PITCH) * velocityGainPitch;
     const float stickRoll  = getSetpointRate(ROLL)  * velocityGainRoll;
@@ -658,7 +568,7 @@ static bool courseHeadingDeg(const positionEstimate3d_t *est, float *headingDeg)
     const vector2_t *velocity = (const vector2_t *)&est->velocity.v;
     // Hysteresis so speed noise around the gate doesn't repeatedly drop the
     // controller (and restart its engage ramp): release at 75% of engage.
-    const float engageCmS = (float)autopilotConfig.minForwardVelocity;
+    const float engageCmS = (float)autopilotConfig()->minForwardVelocity;
     const float gateCmS = apYawCourseValid ? engageCmS * 0.75f : engageCmS;
     apYawCourseValid = vector2Norm(velocity) >= gateCmS;
     if (!apYawCourseValid) {
@@ -692,7 +602,7 @@ static bool bearingToTargetDeg(const positionEstimate3d_t *est, float *headingDe
 // resulting rate as the yaw setpoint, exactly as GPS rescue injects its own.
 static void updateYawControl(float dt, const positionEstimate3d_t *est)
 {
-    const autopilotConfig_t *cfg = &autopilotConfig;
+    const autopilotConfig_t *cfg = autopilotConfig();
 
     if (!FLIGHT_MODE(AUTOPILOT_MODE) || !ap.navActive) {
         disableYawControl();
@@ -737,7 +647,7 @@ static void updateYawControl(float dt, const positionEstimate3d_t *est)
     errorDeg = fmodf(errorDeg + 540.0f, 360.0f) - 180.0f;
 
     float yawRateDps = errorDeg * cfg->yawP * AP_YAW_P_SCALE
-                     - bmi270.gyro.gyroADCf[FD_YAW] * cfg->yawD * AP_YAW_D_SCALE;
+                     - gyro.gyroADCf[FD_YAW] * cfg->yawD * AP_YAW_D_SCALE;
     yawRateDps *= apYawAttenuator;
 
     float maxRateDps = (float)cfg->maxYawRate;
@@ -746,7 +656,7 @@ static void updateYawControl(float dt, const positionEstimate3d_t *est)
     }
     yawRateDps = constrainf(yawRateDps, -maxRateDps, maxRateDps);
 
-    apYawRateDps = yawRateDps * GET_DIRECTION(rcControlsConfig.yaw_control_reversed);
+    apYawRateDps = yawRateDps * GET_DIRECTION(rcControlsConfig()->yaw_control_reversed);
     apYawActive = true;
 }
 
@@ -869,7 +779,7 @@ bool positionControl(void)
                 const float velocityDot = (velocity.v[EF_NORTH] * previousVelocity.v[EF_NORTH])
                                         + (velocity.v[EF_EAST]  * previousVelocity.v[EF_EAST]);
                 const bool reversed = velocityDot < -POSHOLD_VELOCITY_REVERSAL_THRESHOLD;
-                const bool stopped  = ap.speedXY < (float)autopilotConfig.stopThreshold;
+                const bool stopped  = ap.speedXY < (float)autopilotConfig()->stopThreshold;
                 const bool timedOut = ap.brakingTimer >= (unsigned)POSHOLD_TASK_RATE_HZ;
                 if (stopped || timedOut || reversed) {
                     updatePositionHoldTarget(); // capture the stopped point as the hold target
@@ -1010,14 +920,14 @@ bool positionControl(void)
 
         const float brakeBoost = ap.isPosHoldBraking ? (1.0f + fabsf(velocity.v[axis]) * 0.0005f) : 1.0f; // ~2x at 20 m/s
 
-//        pidP.v[axis] = distanceError.v[axis] * xyPid.Kp;
-//        pidI.v[axis] = distanceErrorIntegral.v[axis] * xyPid.Ki;
-//        pidD.v[axis] = -velocity.v[axis] * xyPid.Kd * brakeBoost + velocity.v[axis] * xyKDrag; // damping, minus drag at speed
-//        pidA.v[axis] = acceleration * xyPid.Ka;
+        pidP.v[axis] = distanceError.v[axis] * xyPid.Kp;
+        pidI.v[axis] = distanceErrorIntegral.v[axis] * xyPid.Ki;
+        pidD.v[axis] = -velocity.v[axis] * xyPid.Kd * brakeBoost + velocity.v[axis] * xyKDrag; // damping, minus drag at speed
+        pidA.v[axis] = acceleration * xyPid.Ka;
         // F: Kd on the steady target velocity balances D so the pair cancels at
         // the target speed (reconstructing D-from-error); Kf on the delta is the
         // tunable acceleration feedforward.
-//        pidF.v[axis] = targetVelocity.v[axis] * xyPid.Kd + targetVelDelta * xyPid.Kf;
+        pidF.v[axis] = targetVelocity.v[axis] * xyPid.Kd + targetVelDelta * xyPid.Kf;
     } // End for loop
     ap.derivativeStale = false;
 
@@ -1028,7 +938,7 @@ bool positionControl(void)
     // must stay free to track and brake velocity, so the clamp is skipped.
     bool buildupClamped = false;
     if (ap.navActive && ap.anchor == ANCHOR_OFF) {
-        const float buildupMaxDeg = autopilotConfig.velocityBuildupMaxPitch;
+        const float buildupMaxDeg = autopilotConfig()->velocityBuildupMaxPitch;
         vector2_t drive = { { pidD.v[EF_EAST] + pidF.v[EF_EAST], pidD.v[EF_NORTH] + pidF.v[EF_NORTH] } };
         const float driveMag = vector2Norm(&drive);
         if (driveMag > buildupMaxDeg && driveMag > 0.001f) {
@@ -1075,7 +985,7 @@ bool positionControl(void)
     if (ap.sticksActive)    statusValue += 5;
     DEBUG_SET(DEBUG_AUTOPILOT_PID, 0, lrintf(velocityError.v[ap.debugAxis])); // velocity error
     DEBUG_SET(DEBUG_AUTOPILOT_PID, 1, lrintf(distanceError.v[ap.debugAxis])); // distance error
-    DEBUG_SET(DEBUG_AUTOPILOT_PID, 2, lrintf(pidP.v[ap.debugAxis] * 10));
+    DEBUG_SET(DEBUG_AUTOPILOT_PID, 2, lrintf(pidP.v[ap.debugAxis] * 10));   
     DEBUG_SET(DEBUG_AUTOPILOT_PID, 3, lrintf(pidI.v[ap.debugAxis] * 10));
     DEBUG_SET(DEBUG_AUTOPILOT_PID, 4, lrintf(pidD.v[ap.debugAxis] * 10));
     DEBUG_SET(DEBUG_AUTOPILOT_PID, 5, lrintf(pidA.v[ap.debugAxis] * 10));
@@ -1105,7 +1015,7 @@ bool positionControl(void)
 
 bool isBelowLandingAltitude(void)
 {
-    return getAltitudeCmControl() < 100.0f * autopilotConfig.landingAltitudeM;
+    return getAltitudeCmControl() < 100.0f * autopilotConfig()->landingAltitudeM;
 }
 
 float getAutopilotThrottle(void)

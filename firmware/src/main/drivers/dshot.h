@@ -25,10 +25,10 @@
 
 #include "common/time.h"
 
-#include "drivers/motor.h"
+#include "pg/motor.h"
 #include "drivers/motor_types.h"
 // TODO: move bitbang as implementation detail of dshot (i.e. dshot should be the interface)
-//#include "drivers/dshot_bitbang.h"
+#include "drivers/dshot_bitbang.h"
 #include "sensors/esc_sensor.h"
 
 #define DSHOT_MIN_THROTTLE              (48)
@@ -96,7 +96,7 @@ uint16_t prepareDshotPacket(dshotProtocolControl_t *pcb);
 extern bool useDshotTelemetry;
 extern uint8_t dshotMotorCount;
 
-bool dshotPwmDevInit(motorDevice_t *device, const motorConfig_t *motorConfig);
+bool dshotPwmDevInit(motorDevice_t *device, const motorDevConfig_t *motorConfig);
 
 #ifdef USE_DSHOT_TELEMETRY
 
@@ -137,7 +137,7 @@ void updateDshotTelemetryQuality(dshotTelemetryQuality_t *qualityStats, bool pac
 void initDshotTelemetry(const timeUs_t looptimeUs);
 void updateDshotTelemetry(void);
 
-//bool isDshotBitbangActive(const motorDevConfig_t *motorDevConfig);
+bool isDshotBitbangActive(const motorDevConfig_t *motorDevConfig);
 
 uint16_t getDshotErpm(uint8_t motorIndex);
 float getDshotRpm(uint8_t motorIndex);

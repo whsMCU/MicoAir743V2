@@ -27,7 +27,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_OSD_NAV_MAP
 

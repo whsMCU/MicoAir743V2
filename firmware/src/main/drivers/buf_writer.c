@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "buf_writer.h"
 

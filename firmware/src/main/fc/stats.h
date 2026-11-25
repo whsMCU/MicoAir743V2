@@ -20,21 +20,6 @@
 
 #pragma once
 
-#define STATS_OFF (-1)
-
-typedef struct statsConfig_s {
-  uint32_t stats_total_flights;
-  uint32_t stats_total_time_s;
-  uint32_t stats_total_dist_m;
-  int8_t stats_min_armed_time_s;
-  uint32_t stats_mah_used;
-  uint8_t statsSaveMoveLimit; // gyro rate limit for saving stats upon disarm
-} statsConfig_t;
-
-extern statsConfig_t statsConfig;
-
-extern void statsConfig_Init(void);
-
 void statsInit(void);
 
 void statsOnArm(void);

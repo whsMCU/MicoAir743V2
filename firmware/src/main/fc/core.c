@@ -1,8 +1,21 @@
 /*
- * core.c
+ * This file is part of Cleanflight and Betaflight.
  *
- *  Created on: 2026. 10. 12.
- *      Author: 왕학승
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
+ *
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stdbool.h>
@@ -11,16 +24,16 @@
 #include <string.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
-//#include "blackbox/blackbox.h"
-//#include "blackbox/blackbox_fielddefs.h"
+#include "blackbox/blackbox.h"
+#include "blackbox/blackbox_fielddefs.h"
 
 #include "build/debug.h"
 
-//#include "cli/cli.h"
+#include "cli/cli.h"
 
-//#include "cms/cms.h"
+#include "cms/cms.h"
 
 #include "common/axis.h"
 #include "common/filter.h"
@@ -32,12 +45,12 @@
 
 #include "drivers/dshot.h"
 #include "drivers/dshot_command.h"
-//#include "drivers/light_led.h"
+#include "drivers/light_led.h"
 #include "drivers/motor.h"
-//#include "drivers/sound_beeper.h"
-//#include "drivers/system.h"
-//#include "drivers/time.h"
-//#include "drivers/transponder_ir.h"
+#include "drivers/sound_beeper.h"
+#include "drivers/system.h"
+#include "drivers/time.h"
+#include "drivers/transponder_ir.h"
 
 #include "fc/controlrate_profile.h"
 #include "fc/rc.h"
@@ -65,36 +78,36 @@
 #endif
 
 #include "flight/imu.h"
-//#include "flight/mixer.h"
+#include "flight/mixer.h"
 #include "flight/pid.h"
 #include "flight/position.h"
 #include "flight/rpm_filter.h"
-//#include "flight/servos.h"
+#include "flight/servos.h"
 
-//#include "io/beeper.h"
+#include "io/beeper.h"
 #include "io/gps.h"
-//#include "io/pidaudio.h"
-//#include "io/serial.h"
-//#include "io/statusindicator.h"
-//#include "io/transponder_ir.h"
-//#include "io/vtx_control.h"
-//#include "io/vtx_rtc6705.h"
+#include "io/pidaudio.h"
+#include "io/serial.h"
+#include "io/statusindicator.h"
+#include "io/transponder_ir.h"
+#include "io/vtx_control.h"
+#include "io/vtx_rtc6705.h"
 
 #include "msp/msp_serial.h"
 
 #include "osd/osd.h"
 
-//#include "pg/motor.h"
-//#include "pg/pg.h"
-//#include "pg/pg_ids.h"
-//#include "pg/rx.h"
+#include "pg/motor.h"
+#include "pg/pg.h"
+#include "pg/pg_ids.h"
+#include "pg/rx.h"
 
 #include "rx/rc_stats.h"
 #include "rx/rx.h"
 
 #include "scheduler/scheduler.h"
 
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/barometer.h"
 #include "sensors/battery.h"
 #include "sensors/boardalignment.h"
@@ -168,13 +181,12 @@ const char * const osdLaunchControlModeNames[] = {
 };
 #endif
 
-throttleCorrectionConfig_t throttleCorrectionConfig;
+PG_REGISTER_WITH_RESET_TEMPLATE(throttleCorrectionConfig_t, throttleCorrectionConfig, PG_THROTTLE_CORRECTION_CONFIG, 0);
 
-void throttleCorrectionConfig_Init(void)
-{
-	throttleCorrectionConfig.throttle_correction_value = 0;      // could 10 with althold or 40 for fpv
-	throttleCorrectionConfig.throttle_correction_angle = 800;     // could be 80.0 deg with atlhold or 45.0 for fpv
-}
+PG_RESET_TEMPLATE(throttleCorrectionConfig_t, throttleCorrectionConfig,
+    .throttle_correction_value = 0,      // could 10 with althold or 40 for fpv
+    .throttle_correction_angle = 800     // could be 80.0 deg with atlhold or 45.0 for fpv
+);
 
 static bool isCalibrating(void)
 {
@@ -248,9 +260,9 @@ static bool accNeedsCalibration(void)
         }
 
         // Launch Control only requires the ACC if a angle limit is set
-//        if (isModeActivationConditionPresent(BOXLAUNCHCONTROL) && currentPidProfile->launchControlAngleLimit) {
-//            return true;
-//        }
+        if (isModeActivationConditionPresent(BOXLAUNCHCONTROL) && currentPidProfile->launchControlAngleLimit) {
+            return true;
+        }
 
 #ifdef USE_OSD
         // Check for any enabled OSD elements that need the ACC
@@ -263,7 +275,7 @@ static bool accNeedsCalibration(void)
 
 #ifdef USE_GPS_RESCUE
         // Check if failsafe will use GPS Rescue
-        if (failsafeConfig.failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE) {
+        if (failsafeConfig()->failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE) {
             return true;
         }
 #endif
@@ -281,23 +293,23 @@ void updateArmingStatus(void)
 
 #ifdef USE_DSHOT
 // --- handle crashFlip behaviours while armed ---
-//if (crashFlipModeActive) {
-//    if (!IS_RC_MODE_ACTIVE(BOXCRASHFLIP)) {
-//        // Pilot has reverted the crash flip switch while crashflip is active and craft is  armed
-//        if (!mixerConfig()->crashflip_auto_rearm) {
-//            // we are in manual re-arm mode:  block arming until manual re-arm:
-//            setArmingDisabled(ARMING_DISABLED_CRASHFLIP); // block tryArm() until user disarms manually
-//            clearWasLastDisarmUserRequested();
-//            // tell disarm() that this was not a user generated disarm
-//            // also clear the flag in rc_controls so that it will only be true when the pilot makes a new user manual disarm
-//            disarm(DISARM_REASON_CRASHFLIP); // stop the motors, revert crashflipMode and set motor direction normal
-//        } else {
-//            // we are in auto re-arm mode, terminate crashflip mode and set motor direction normal
-//            setMotorSpinDirection(DSHOT_CMD_SPIN_DIRECTION_NORMAL);
-//            crashFlipModeActive = false;
-//        }
-//    }
-//}
+if (crashFlipModeActive) {
+    if (!IS_RC_MODE_ACTIVE(BOXCRASHFLIP)) {
+        // Pilot has reverted the crash flip switch while crashflip is active and craft is  armed
+        if (!mixerConfig()->crashflip_auto_rearm) {
+            // we are in manual re-arm mode:  block arming until manual re-arm:
+            setArmingDisabled(ARMING_DISABLED_CRASHFLIP); // block tryArm() until user disarms manually
+            clearWasLastDisarmUserRequested();
+            // tell disarm() that this was not a user generated disarm
+            // also clear the flag in rc_controls so that it will only be true when the pilot makes a new user manual disarm
+            disarm(DISARM_REASON_CRASHFLIP); // stop the motors, revert crashflipMode and set motor direction normal
+        } else {
+            // we are in auto re-arm mode, terminate crashflip mode and set motor direction normal
+            setMotorSpinDirection(DSHOT_CMD_SPIN_DIRECTION_NORMAL);
+            crashFlipModeActive = false;
+        }
+    }
+}
 #endif // USE_DSHOT
     } else {
         // arming switch on, but not yet armed; currently DISARMED
@@ -306,7 +318,7 @@ void updateArmingStatus(void)
         // Check if the power-on arming grace time has elapsed
         bool graceTimeElapsed =
             (getArmingDisableFlags() & ARMING_DISABLED_BOOT_GRACE_TIME)
-            && (millis() >= systemConfig.powerOnArmingGraceTime * 1000);
+            && (millis() >= systemConfig()->powerOnArmingGraceTime * 1000);
 
 #ifdef USE_DSHOT
         // With DSHOT, we also require DSHOT to be ready
@@ -381,7 +393,7 @@ void updateArmingStatus(void)
         }
 
 #if defined(USE_LATE_TASK_STATISTICS)
-        if ((getCpuPercentageLate() > schedulerConfig.cpuLatePercentageLimit)) {
+        if ((getCpuPercentageLate() > schedulerConfig()->cpuLatePercentageLimit)) {
             setArmingDisabled(ARMING_DISABLED_LOAD);
         } else {
             unsetArmingDisabled(ARMING_DISABLED_LOAD);
@@ -395,7 +407,7 @@ void updateArmingStatus(void)
         }
 
         if (isModeActivationConditionPresent(BOXPREARM)) {
-            if (IS_RC_MODE_ACTIVE(BOXPREARM) && (!ARMING_FLAG(WAS_ARMED_WITH_PREARM) || armingConfig.prearm_allow_rearm) ) {
+            if (IS_RC_MODE_ACTIVE(BOXPREARM) && (!ARMING_FLAG(WAS_ARMED_WITH_PREARM) || armingConfig()->prearm_allow_rearm) ) {
                 unsetArmingDisabled(ARMING_DISABLED_NOPREARM);
             } else {
                 setArmingDisabled(ARMING_DISABLED_NOPREARM);
@@ -404,7 +416,7 @@ void updateArmingStatus(void)
 
 #ifdef USE_GPS_RESCUE
         if (gpsRescueIsConfigured()) {
-            if (gpsRescueConfig.allowArmingWithoutFix || (STATE(GPS_FIX) && (gpsSol.numSat >= gpsRescueConfig.minSats)) ||
+            if (gpsRescueConfig()->allowArmingWithoutFix || (STATE(GPS_FIX) && (gpsSol.numSat >= gpsRescueConfig()->minSats)) ||
             ARMING_FLAG(WAS_EVER_ARMED) || IS_RC_MODE_ACTIVE(BOXCRASHFLIP)) {
                 unsetArmingDisabled(ARMING_DISABLED_GPS);
             } else {
@@ -440,11 +452,11 @@ void updateArmingStatus(void)
         }
 
 #ifdef USE_ACC
-//        if (accNeedsCalibration()) {
-//            setArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
-//        } else {
-//            unsetArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
-//        }
+        if (accNeedsCalibration()) {
+            setArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
+        } else {
+            unsetArmingDisabled(ARMING_DISABLED_ACC_CALIBRATION);
+        }
 #endif
 
         if (!isMotorProtocolEnabled()) {
@@ -460,13 +472,13 @@ void updateArmingStatus(void)
             }
 
             /* Ignore ARMING_DISABLED_CALIBRATING if we are going to calibrate gyro on first arm */
-            bool ignoreGyro = armingConfig.gyro_cal_on_first_arm
+            bool ignoreGyro = armingConfig()->gyro_cal_on_first_arm
                 && !(getArmingDisableFlags() & ~(ARMING_DISABLED_ARM_SWITCH | ARMING_DISABLED_CALIBRATING));
 
             /* Ignore ARMING_DISABLED_THROTTLE (once arm switch is on) if we are in 3D mode */
             bool ignoreThrottle = featureIsEnabled(FEATURE_3D)
                  && !IS_RC_MODE_ACTIVE(BOX3D)
-                 && !flight3DConfig.switched_mode3d
+                 && !flight3DConfig()->switched_mode3d
                  && !(getArmingDisableFlags() & ~(ARMING_DISABLED_ARM_SWITCH | ARMING_DISABLED_THROTTLE));
 
             // If arming is disabled and the ARM switch is on
@@ -480,13 +492,13 @@ void updateArmingStatus(void)
             }
         }
 
-//        if (isArmingDisabled()) {
-//            warningLedFlash();
-//        } else {
-//            warningLedDisable();
-//        }
-//
-//        warningLedUpdate();
+        if (isArmingDisabled()) {
+            warningLedFlash();
+        } else {
+            warningLedDisable();
+        }
+
+        warningLedUpdate();
     }
 }
 
@@ -523,7 +535,7 @@ void disarm(flightLogDisarmReason_e reason)
         UNUSED(reason);
 #endif
 
-        //BEEP_OFF;
+        BEEP_OFF;
 
 #ifdef USE_PERSISTENT_STATS
         if (!crashFlipModeActive) {
@@ -541,15 +553,15 @@ void disarm(flightLogDisarmReason_e reason)
 #endif
 
         // make disarming beeps, but not if ARMING_DISABLED (RUNAWAY_TAKEOFF or CRASH_DETECTED)
-//        if (!(getArmingDisableFlags() & (ARMING_DISABLED_RUNAWAY_TAKEOFF | ARMING_DISABLED_CRASH_DETECTED))) {
-//            beeper(BEEPER_DISARMING);
-//        }
+        if (!(getArmingDisableFlags() & (ARMING_DISABLED_RUNAWAY_TAKEOFF | ARMING_DISABLED_CRASH_DETECTED))) {
+            beeper(BEEPER_DISARMING);
+        }
     }
 }
 
 void tryArm(void)
 {
-    if (armingConfig.gyro_cal_on_first_arm) {
+    if (armingConfig()->gyro_cal_on_first_arm) {
         gyroStartCalibration(true);
     }
 
@@ -565,7 +577,7 @@ void tryArm(void)
         }
         const timeUs_t currentTimeUs = micros();
 
-#ifdef USE_DSHOT_
+#ifdef USE_DSHOT
 // Handle DShot factors that should delay arming
 timeDelta_t beaconTimeDiff = cmpTimeUs(currentTimeUs, getLastDshotBeaconCommandTimeUs());
 if (beaconTimeDiff < DSHOT_BEACON_GUARD_DELAY_US && beaconTimeDiff >= 0) {
@@ -633,7 +645,7 @@ if (isMotorProtocolDshot()) {
         resetMaxFFT();
 #endif
 
-        disarmAt = currentTimeUs + armingConfig.auto_disarm_delay * 1000 * 1000;   // start disarm timeout, will be extended when throttle is nonzero
+        disarmAt = currentTimeUs + armingConfig()->auto_disarm_delay * 1000 * 1000;   // start disarm timeout, will be extended when throttle is nonzero
 
         lastArmingDisabledReason = 0;
 
@@ -642,13 +654,13 @@ if (isMotorProtocolDshot()) {
         if (featureIsEnabled(FEATURE_GPS)) {
             GPS_reset_home_position();
             canUseGPSHeading = false; // block use of GPS Heading in position hold after each arm, until quad can set IMU to GPS COG
-            if (STATE(GPS_FIX) && gpsSol.numSat >= gpsRescueConfig.minSats) {
-                //beeper(BEEPER_ARMING_GPS_FIX);
+            if (STATE(GPS_FIX) && gpsSol.numSat >= gpsRescueConfig()->minSats) {
+                beeper(BEEPER_ARMING_GPS_FIX);
             } else {
-                //beeper(BEEPER_ARMING_GPS_NO_FIX);
+                beeper(BEEPER_ARMING_GPS_NO_FIX);
             }
         } else {
-            //beeper(BEEPER_ARMING);
+            beeper(BEEPER_ARMING);
         }
 #else
         beeper(BEEPER_ARMING);
@@ -670,7 +682,7 @@ if (isMotorProtocolDshot()) {
             if (lastArmingDisabledReason != armingDisabledReason) {
                 lastArmingDisabledReason = armingDisabledReason;
 
-                //beeperWarningBeeps(armingDisabledReason);
+                beeperWarningBeeps(armingDisabledReason);
             }
         }
     }
@@ -692,16 +704,16 @@ void handleInflightCalibrationStickPosition(void)
     } else {
         AccInflightCalibrationArmed = !AccInflightCalibrationArmed;
         if (AccInflightCalibrationArmed) {
-            //beeper(BEEPER_ACC_CALIBRATION);
+            beeper(BEEPER_ACC_CALIBRATION);
         } else {
-            //beeper(BEEPER_ACC_CALIBRATION_FAIL);
+            beeper(BEEPER_ACC_CALIBRATION_FAIL);
         }
     }
 }
 
 static void updateInflightCalibrationState(void)
 {
-    if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig.mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {   // Copter is airborne and you are turning it off via boxarm : start measurement
+    if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {   // Copter is airborne and you are turning it off via boxarm : start measurement
         InflightcalibratingA = 50;
         AccInflightCalibrationArmed = false;
     }
@@ -724,9 +736,9 @@ static void updateMagHold(void)
             dif += 360;
         if (dif >= +180)
             dif -= 360;
-        dif *= -GET_DIRECTION(rcControlsConfig.yaw_control_reversed);
+        dif *= -GET_DIRECTION(rcControlsConfig()->yaw_control_reversed);
         if (isUpright()) {
-            //rcCommand[YAW] -= dif * currentPidProfile->pid[PID_MAG].P / 30;    // 18 deg
+            rcCommand[YAW] -= dif * currentPidProfile->pid[PID_MAG].P / 30;    // 18 deg
         }
     } else
         magHold = DECIDEGREES_TO_DEGREES(attitude.values.yaw);
@@ -774,18 +786,18 @@ int8_t calculateThrottlePercent(void)
 
     if (featureIsEnabled(FEATURE_3D)
         && !IS_RC_MODE_ACTIVE(BOX3D)
-        && !flight3DConfig.switched_mode3d) {
+        && !flight3DConfig()->switched_mode3d) {
 
-        if (channelData > (rxConfig.midrc + flight3DConfig.deadband3d_throttle)) {
-            ret = ((channelData - rxConfig.midrc - flight3DConfig.deadband3d_throttle) * 100) / (PWM_RANGE_MAX - rxConfig.midrc - flight3DConfig.deadband3d_throttle);
-        } else if (channelData < (rxConfig.midrc - flight3DConfig.deadband3d_throttle)) {
-            ret = -((rxConfig.midrc - flight3DConfig.deadband3d_throttle - channelData) * 100) / (rxConfig.midrc - flight3DConfig.deadband3d_throttle - PWM_RANGE_MIN);
+        if (channelData > (rxConfig()->midrc + flight3DConfig()->deadband3d_throttle)) {
+            ret = ((channelData - rxConfig()->midrc - flight3DConfig()->deadband3d_throttle) * 100) / (PWM_RANGE_MAX - rxConfig()->midrc - flight3DConfig()->deadband3d_throttle);
+        } else if (channelData < (rxConfig()->midrc - flight3DConfig()->deadband3d_throttle)) {
+            ret = -((rxConfig()->midrc - flight3DConfig()->deadband3d_throttle - channelData) * 100) / (rxConfig()->midrc - flight3DConfig()->deadband3d_throttle - PWM_RANGE_MIN);
         }
     } else {
-        ret = constrain(((channelData - rxConfig.mincheck) * 100) / (PWM_RANGE_MAX - rxConfig.mincheck), 0, 100);
+        ret = constrain(((channelData - rxConfig()->mincheck) * 100) / (PWM_RANGE_MAX - rxConfig()->mincheck), 0, 100);
         if (featureIsEnabled(FEATURE_3D)
             && IS_RC_MODE_ACTIVE(BOX3D)
-            && flight3DConfig.switched_mode3d) {
+            && flight3DConfig()->switched_mode3d) {
 
             ret = -ret;  // 3D on a switch is active
         }
@@ -833,7 +845,7 @@ bool processRx(timeUs_t currentTimeUs)
     static bool isAirmodeActive;
 
     if (ARMING_FLAG(ARMED)) {
-        if (throttlePercent >= rxConfig.airModeActivateThreshold) {
+        if (throttlePercent >= rxConfig()->airModeActivateThreshold) {
             throttleRaised = true; // Latch true until disarm
         }
         if (isAirmodeEnabled() && !launchControlActive) {
@@ -846,13 +858,13 @@ bool processRx(timeUs_t currentTimeUs)
 
     // Note: If Airmode is enabled, on arming, iTerm and PIDs will be off until throttle exceeds the threshold (OFF while disarmed)
     // If not, iTerm will be off at low throttle, with pidStabilisationState determining whether PIDs will be active
-//    if (ARMING_FLAG(ARMED) && (isAirmodeActive || throttleActive || launchControlActive || isFixedWing())) {
-//        pidSetItermReset(false);
-//        pidStabilisationState(PID_STABILISATION_ON);
-//    } else {
-//        pidSetItermReset(true);
-//        pidStabilisationState(currentPidProfile->pidAtMinThrottle ? PID_STABILISATION_ON : PID_STABILISATION_OFF);
-//    }
+    if (ARMING_FLAG(ARMED) && (isAirmodeActive || throttleActive || launchControlActive || isFixedWing())) {
+        pidSetItermReset(false);
+        pidStabilisationState(PID_STABILISATION_ON);
+    } else {
+        pidSetItermReset(true);
+        pidStabilisationState(currentPidProfile->pidAtMinThrottle ? PID_STABILISATION_ON : PID_STABILISATION_OFF);
+    }
 
 #ifdef USE_RUNAWAY_TAKEOFF
     // If runaway_takeoff_prevention is enabled, accumulate the amount of time that throttle
@@ -959,10 +971,10 @@ void processRxModes(timeUs_t currentTimeUs)
     // When armed and motors aren't spinning, do beeps and then disarm
     // board after delay so users without buzzer won't lose fingers.
     // mixTable constrains motor commands, so checking  throttleStatus is enough
-    const timeUs_t autoDisarmDelayUs = armingConfig.auto_disarm_delay * 1e6f;
+    const timeUs_t autoDisarmDelayUs = armingConfig()->auto_disarm_delay * 1e6f;
     if (ARMING_FLAG(ARMED)
         && featureIsEnabled(FEATURE_MOTOR_STOP) // enable auto-disarm if motor_stop is enabled
-        //&& !isFixedWing()
+        && !isFixedWing()
         && !featureIsEnabled(FEATURE_3D)
         && !isAirmodeEnabled()
         && !FLIGHT_MODE(GPS_RESCUE_MODE)  // disable auto-disarm when GPS Rescue is active
@@ -977,7 +989,7 @@ void processRxModes(timeUs_t currentTimeUs)
                     armedBeeperOn = false;
                 } else {
                     // still armed; do warning beeps while armed
-                    //beeper(BEEPER_ARMED);
+                    beeper(BEEPER_ARMED);
                     armedBeeperOn = true;
                 }
             } else {
@@ -985,17 +997,17 @@ void processRxModes(timeUs_t currentTimeUs)
                 disarmAt = currentTimeUs + autoDisarmDelayUs;
 
                 if (armedBeeperOn) {
-                    //beeperSilence();
+                    beeperSilence();
                     armedBeeperOn = false;
                 }
             }
         } else {
             // arming is via AUX switch; beep while throttle low
             if (throttleStatus == THROTTLE_LOW) {
-                //beeper(BEEPER_ARMED);
+                beeper(BEEPER_ARMED);
                 armedBeeperOn = true;
             } else if (armedBeeperOn) {
-                //beeperSilence();
+                beeperSilence();
                 armedBeeperOn = false;
             }
         }
@@ -1019,13 +1031,13 @@ void processRxModes(timeUs_t currentTimeUs)
 
 #ifdef USE_DSHOT
     if (crashFlipModeActive) {
-        //beeper(BEEPER_CRASHFLIP_MODE);
+        beeper(BEEPER_CRASHFLIP_MODE);
     }
 #endif
 
-//    if (!cliMode && !(IS_RC_MODE_ACTIVE(BOXPARALYZE) && !ARMING_FLAG(ARMED))) {
-//        processRcAdjustments(currentControlRateProfile);
-//    }
+    if (!cliMode && !(IS_RC_MODE_ACTIVE(BOXPARALYZE) && !ARMING_FLAG(ARMED))) {
+        processRcAdjustments(currentControlRateProfile);
+    }
 
     bool canUseHorizonMode = true;
     if ((IS_RC_MODE_ACTIVE(BOXANGLE)
@@ -1052,7 +1064,7 @@ void processRxModes(timeUs_t currentTimeUs)
     // GPS_RESCUE_MODE controller. (With ENABLE_RESCUE_PLAN both are flown as an
     // autopilot rescue mission instead - staged below and in failsafe.c.)
     if (ARMING_FLAG(ARMED) && (IS_RC_MODE_ACTIVE(BOXGPSRESCUE)
-        || (failsafeIsActive() && failsafeConfig.failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE))) {
+        || (failsafeIsActive() && failsafeConfig()->failsafe_procedure == FAILSAFE_PROCEDURE_GPS_RESCUE))) {
         if (!FLIGHT_MODE(GPS_RESCUE_MODE)) {
             ENABLE_FLIGHT_MODE(GPS_RESCUE_MODE);
         }
@@ -1214,7 +1226,7 @@ void processRxModes(timeUs_t currentTimeUs)
     if (FLIGHT_MODE(ANGLE_MODE | ALT_HOLD_MODE | POS_HOLD_MODE | HORIZON_MODE)) {
         LED1_ON;
         // increase frequency of attitude task to reduce drift when in angle or horizon mode
-        rescheduleTask(TASK_ATTITUDE, TASK_PERIOD_HZ(bmi270.acc.sampleRateHz / (float)imuConfig.imu_process_denom));
+        rescheduleTask(TASK_ATTITUDE, TASK_PERIOD_HZ(acc.sampleRateHz / (float)imuConfig()->imu_process_denom));
     } else {
         LED1_OFF;
         rescheduleTask(TASK_ATTITUDE, TASK_PERIOD_HZ(100));
@@ -1245,7 +1257,7 @@ void processRxModes(timeUs_t currentTimeUs)
         }
         if (IS_RC_MODE_ACTIVE(BOXHEADADJ) && !FLIGHT_MODE(GPS_RESCUE_MODE)) {
             if (imuQuaternionHeadfreeOffsetSet()) {
-               //beeper(BEEPER_RX_SET);
+               beeper(BEEPER_RX_SET);
             }
         }
     }
@@ -1257,9 +1269,9 @@ void processRxModes(timeUs_t currentTimeUs)
         DISABLE_FLIGHT_MODE(PASSTHRU_MODE);
     }
 
-//    if (mixerConfig()->mixerMode == MIXER_FLYING_WING || mixerConfig()->mixerMode == MIXER_AIRPLANE) {
-//        DISABLE_FLIGHT_MODE(HEADFREE_MODE);
-//    }
+    if (mixerConfig()->mixerMode == MIXER_FLYING_WING || mixerConfig()->mixerMode == MIXER_AIRPLANE) {
+        DISABLE_FLIGHT_MODE(HEADFREE_MODE);
+    }
 
 #ifdef USE_TELEMETRY
     if (featureIsEnabled(FEATURE_TELEMETRY)) {
@@ -1291,7 +1303,61 @@ void processRxModes(timeUs_t currentTimeUs)
     pidSetAcroTrainerState(IS_RC_MODE_ACTIVE(BOXACROTRAINER) && sensors(SENSOR_ACC));
 #endif // USE_ACRO_TRAINER
 
-    //pidSetAntiGravityState(IS_RC_MODE_ACTIVE(BOXANTIGRAVITY) || featureIsEnabled(FEATURE_ANTI_GRAVITY));
+    pidSetAntiGravityState(IS_RC_MODE_ACTIVE(BOXANTIGRAVITY) || featureIsEnabled(FEATURE_ANTI_GRAVITY));
+}
+
+static FAST_CODE_NOINLINE void subTaskPidController(timeUs_t currentTimeUs)
+{
+    uint32_t startTime = 0;
+    if (debugMode == DEBUG_PIDLOOP) {startTime = micros();}
+    // PID - note this is function pointer set by setPIDController()
+    pidController(currentPidProfile, currentTimeUs);
+    DEBUG_SET(DEBUG_PIDLOOP, 1, micros() - startTime);
+
+#ifdef USE_RUNAWAY_TAKEOFF
+    // Check to see if runaway takeoff detection is active (anti-taz), the pidSum is over the threshold,
+    // and gyro rate for any axis is above the limit for at least the activate delay period.
+    // If so, disarm for safety
+    if (ARMING_FLAG(ARMED)
+        && !isFixedWing()
+        && pidConfig()->runaway_takeoff_prevention
+        && !runawayTakeoffCheckDisabled
+        && !crashFlipModeActive
+        && !runawayTakeoffTemporarilyDisabled
+        && !FLIGHT_MODE(GPS_RESCUE_MODE)   // disable Runaway Takeoff triggering if GPS Rescue is active
+        // check that motors are running
+        && (!featureIsEnabled(FEATURE_MOTOR_STOP) || isAirmodeEnabled() || (calculateThrottleStatus() != THROTTLE_LOW))) {
+
+        if (((fabsf(pidData[FD_PITCH].Sum) >= RUNAWAY_TAKEOFF_PIDSUM_THRESHOLD)
+            || (fabsf(pidData[FD_ROLL].Sum) >= RUNAWAY_TAKEOFF_PIDSUM_THRESHOLD)
+            || (fabsf(pidData[FD_YAW].Sum) >= RUNAWAY_TAKEOFF_PIDSUM_THRESHOLD))
+            && ((gyroAbsRateDps(FD_PITCH) > RUNAWAY_TAKEOFF_GYRO_LIMIT_RP)
+                || (gyroAbsRateDps(FD_ROLL) > RUNAWAY_TAKEOFF_GYRO_LIMIT_RP)
+                || (gyroAbsRateDps(FD_YAW) > RUNAWAY_TAKEOFF_GYRO_LIMIT_YAW))) {
+
+            if (runawayTakeoffTriggerUs == 0) {
+                runawayTakeoffTriggerUs = currentTimeUs + RUNAWAY_TAKEOFF_ACTIVATE_DELAY;
+            } else if (currentTimeUs > runawayTakeoffTriggerUs) {
+                setArmingDisabled(ARMING_DISABLED_RUNAWAY_TAKEOFF);
+                disarm(DISARM_REASON_RUNAWAY_TAKEOFF);
+            }
+        } else {
+            runawayTakeoffTriggerUs = 0;
+        }
+        DEBUG_SET(DEBUG_RUNAWAY_TAKEOFF, DEBUG_RUNAWAY_TAKEOFF_ENABLED_STATE, DEBUG_RUNAWAY_TAKEOFF_TRUE);
+        DEBUG_SET(DEBUG_RUNAWAY_TAKEOFF, DEBUG_RUNAWAY_TAKEOFF_ACTIVATING_DELAY, runawayTakeoffTriggerUs == 0 ? DEBUG_RUNAWAY_TAKEOFF_FALSE : DEBUG_RUNAWAY_TAKEOFF_TRUE);
+    } else {
+        runawayTakeoffTriggerUs = 0;
+        DEBUG_SET(DEBUG_RUNAWAY_TAKEOFF, DEBUG_RUNAWAY_TAKEOFF_ENABLED_STATE, DEBUG_RUNAWAY_TAKEOFF_FALSE);
+        DEBUG_SET(DEBUG_RUNAWAY_TAKEOFF, DEBUG_RUNAWAY_TAKEOFF_ACTIVATING_DELAY, DEBUG_RUNAWAY_TAKEOFF_FALSE);
+    }
+#endif
+
+#ifdef USE_PID_AUDIO
+    if (isModeActivationConditionPresent(BOXPIDAUDIO)) {
+        pidAudioUpdate();
+    }
+#endif
 }
 
 static FAST_CODE_NOINLINE void subTaskPidSubprocesses(timeUs_t currentTimeUs)
@@ -1318,16 +1384,55 @@ static FAST_CODE_NOINLINE void subTaskPidSubprocesses(timeUs_t currentTimeUs)
     DEBUG_SET(DEBUG_PIDLOOP, 3, micros() - startTime);
 }
 
-#define GYRO_TEMP_READ_DELAY_US 3e6    // Only read the gyro temp every 3 seconds
+#ifdef USE_TELEMETRY
+#define GYRO_TEMP_READ_DELAY_US (3 * 1000 * 1000)    // Only read the gyro temp every 3 seconds
 void subTaskTelemetryPollSensors(timeUs_t currentTimeUs)
 {
     static timeUs_t lastGyroTempTimeUs = 0;
 
     if (cmpTimeUs(currentTimeUs, lastGyroTempTimeUs) >= GYRO_TEMP_READ_DELAY_US) {
         // Read out gyro temperature if used for telemmetry
-        //gyroReadTemperature();
+        gyroReadTemperature();
         lastGyroTempTimeUs = currentTimeUs;
     }
+}
+#endif
+
+static FAST_CODE void subTaskMotorUpdate(timeUs_t currentTimeUs)
+{
+    uint32_t startTime = 0;
+    if (debugMode == DEBUG_CYCLETIME) {
+        startTime = micros();
+        static uint32_t previousMotorUpdateTime;
+        const uint32_t currentDeltaTime = startTime - previousMotorUpdateTime;
+        debug[2] = currentDeltaTime;
+        debug[3] = currentDeltaTime - targetPidLooptime;
+        previousMotorUpdateTime = startTime;
+    } else if (debugMode == DEBUG_PIDLOOP) {
+        startTime = micros();
+    }
+
+    mixTable(currentTimeUs);
+
+#ifdef USE_SERVOS
+    // motor outputs are used as sources for servo mixing, so motors must be calculated using mixTable() before servos.
+    if (isMixerUsingServos()) {
+        writeServos();
+    }
+#endif
+
+    writeMotors();
+
+#ifdef USE_DSHOT_TELEMETRY_STATS
+    if (debugMode == DEBUG_DSHOT_RPM_ERRORS && useDshotTelemetry) {
+        const uint8_t motorCount = MIN(getMotorCount(), 4);
+        for (uint8_t i = 0; i < motorCount; i++) {
+            debug[i] = getDshotTelemetryMotorInvalidPercent(i);
+        }
+    }
+#endif
+
+    DEBUG_SET(DEBUG_PIDLOOP, 2, micros() - startTime);
 }
 
 static FAST_CODE_NOINLINE void subTaskRcCommand(timeUs_t currentTimeUs)
@@ -1338,13 +1443,13 @@ static FAST_CODE_NOINLINE void subTaskRcCommand(timeUs_t currentTimeUs)
     // sticks, do not process yaw input from the rx.  We do this so the
     // motors do not spin up while we are trying to arm or disarm.
     // Allow yaw control for tricopters if the user wants the servo to move even when unarmed.
-    if (isUsingSticksForArming() && rcData[THROTTLE] <= rxConfig.mincheck
+    if (isUsingSticksForArming() && rcData[THROTTLE] <= rxConfig()->mincheck
 #ifndef USE_QUAD_MIXER_ONLY
 #ifdef USE_SERVOS
-                && !((mixerConfig.mixerMode == MIXER_TRI || mixerConfig.mixerMode == MIXER_CUSTOM_TRI) && servoConfig()->tri_unarmed_servo)
+                && !((mixerConfig()->mixerMode == MIXER_TRI || mixerConfig()->mixerMode == MIXER_CUSTOM_TRI) && servoConfig()->tri_unarmed_servo)
 #endif
-//                && mixerConfig.mixerMode != MIXER_AIRPLANE
-//                && mixerConfig.mixerMode != MIXER_FLYING_WING
+                && mixerConfig()->mixerMode != MIXER_AIRPLANE
+                && mixerConfig()->mixerMode != MIXER_FLYING_WING
 #endif
     ) {
         resetYawAxis();
@@ -1356,7 +1461,7 @@ static FAST_CODE_NOINLINE void subTaskRcCommand(timeUs_t currentTimeUs)
 FAST_CODE void taskGyroSample(timeUs_t currentTimeUs)
 {
     UNUSED(currentTimeUs);
-    gyroUpdate(currentTimeUs);
+    gyroUpdate();
     if (pidUpdateCounter % activePidLoopDenom == 0) {
         pidUpdateCounter = 0;
     }
@@ -1382,29 +1487,34 @@ FAST_CODE bool pidLoopReady(void)
 
 FAST_CODE void taskFiltering(timeUs_t currentTimeUs)
 {
-		#ifdef USE_DSHOT_TELEMETRY
-				updateDshotTelemetry();  // decode and update Dshot telemetry
-		#endif
+#ifdef USE_DSHOT_TELEMETRY
+    updateDshotTelemetry();  // decode and update Dshot telemetry
+#endif
     gyroFiltering(currentTimeUs);
 }
 
 // Function for loop trigger
 FAST_CODE void taskMainPidLoop(timeUs_t currentTimeUs)
 {
-	// DEBUG_PIDLOOP, timings for:
-	// 0 - gyroUpdate()
-	// 1 - subTaskPidController()
-	// 2 - subTaskMotorUpdate()
-	// 3 - subTaskPidSubprocesses()
-	DEBUG_SET(DEBUG_PIDLOOP, 0, micros() - currentTimeUs);
 
-  subTaskRcCommand(currentTimeUs);
-	subTaskPidController(currentTimeUs);
-	//subTaskMotorUpdate(currentTimeUs);
-	//subTaskPidSubprocesses(currentTimeUs);
+#if ENABLE_SIMULATOR_GYROPID_SYNC
+    if (lockMainPID() != 0) return;
+#endif
 
-	DEBUG_SET(DEBUG_CYCLETIME, 0, getTaskDeltaTimeUs(TASK_SELF));
-	DEBUG_SET(DEBUG_CYCLETIME, 1, getAverageSystemLoadPercent());
+    // DEBUG_PIDLOOP, timings for:
+    // 0 - gyroUpdate()
+    // 1 - subTaskPidController()
+    // 2 - subTaskMotorUpdate()
+    // 3 - subTaskPidSubprocesses()
+    DEBUG_SET(DEBUG_PIDLOOP, 0, micros() - currentTimeUs);
+
+    subTaskRcCommand(currentTimeUs);
+    subTaskPidController(currentTimeUs);
+    subTaskMotorUpdate(currentTimeUs);
+    subTaskPidSubprocesses(currentTimeUs);
+
+    DEBUG_SET(DEBUG_CYCLETIME, 0, getTaskDeltaTimeUs(TASK_SELF));
+    DEBUG_SET(DEBUG_CYCLETIME, 1, getAverageSystemLoadPercent());
 }
 
 bool isCrashFlipModeActive(void)

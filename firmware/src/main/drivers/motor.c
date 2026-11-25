@@ -24,61 +24,260 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "hw.h"
+#include "platform.h"
+
+#ifdef USE_MOTOR
 
 #include "common/maths.h"
 
-#include "flight/failsafe.h"
-#include "flight/pid.h"
-
-#include "fc/runtime_config.h"
-#include "fc/rc_controls.h"
+#include "config/feature.h"
 
 #include "drivers/dshot.h"
-#include "drivers/motor.h"
-#include "drivers/dshot_command.h"
+#include "drivers/dshot_bitbang.h" // TODO: bitbang should be behind the veil of dshot (it is an implementation)
+#include "drivers/pwm_output.h"
 
-#include "rx/rx.h"
+#include "drivers/time.h"
 
-motorConfig_t motorConfig;
+#include "fc/rc_controls.h" // for flight3DConfig_t
 
-float FAST_DATA_ZERO_INIT motor[MAX_SUPPORTED_MOTORS];
+#include "sensors/battery.h"
+
+#if ENABLE_DRONECAN_ESC
+#include "io/dronecan/dronecan_esc.h"
+#endif
+
+#include "motor.h"
 
 static FAST_DATA_ZERO_INIT motorDevice_t motorDevice;
 
 static bool motorProtocolEnabled = false;
 static bool motorProtocolDshot = false;
 
-unsigned short LF, LR, RR, RF;
-
-//TIM4->CCR1 // RR
-//TIM4->CCR2 // RF
-//TIM4->CCR3 // LR
-//TIM4->CCR4 // LF
-
-//ROLL
-//angle : +, gyro : +, rx : +
-
-//PITCH
-//angle : +, gyro : +, rx : +
-
-//YAW
-//angle : +, gyro : -, rx : +  //gyro mul negative sign
-
-void motorConfig_Init(void)
+void motorShutdown(void)
 {
-  motorConfig.motorProtocol = MOTOR_PROTOCOL_DSHOT600;
-  motorConfig.minthrottle = 1050;
-  motorConfig.maxthrottle = 2000;
-  motorConfig.mincommand = 1000;
-  motorConfig.digitalIdleOffsetValue = 550;
-  motorConfig.motorPoleCount = 14;   // Most brushes motors that we use are 14 poles
-  motorConfig.motorCount = 4;
-  motorConfig.useDshotTelemetry = true;
-  motorConfig.useDshotEdt = DSHOT_EDT_FORCE;
-  motorProtocolEnabled = true;
+    uint32_t shutdownDelayUs = 1500;
+    motorDevice.vTable->shutdown();
+    motorDevice.enabled = false;
+    motorDevice.motorEnableTimeMs = 0;
+    motorDevice.initialized = false;
+
+    switch (motorConfig()->dev.motorProtocol) {
+    case MOTOR_PROTOCOL_PWM :
+    case MOTOR_PROTOCOL_ONESHOT125:
+    case MOTOR_PROTOCOL_ONESHOT42:
+    case MOTOR_PROTOCOL_MULTISHOT:
+        // Delay 500ms will disarm esc which can prevent motor spin while reboot
+        shutdownDelayUs += 500 * 1000;
+        break;
+    default:
+        break;
+    }
+
+    delayMicroseconds(shutdownDelayUs);
 }
 
+void motorWriteAll(float *values)
+{
+#ifdef USE_PWM_OUTPUT
+    if (motorDevice.enabled) {
+#ifdef USE_DSHOT_BITBANG
+        if (isDshotBitbangActive(&motorConfig()->dev)) {
+            // Initialise the output buffers
+            if (motorDevice.vTable->updateInit) {
+                motorDevice.vTable->updateInit();
+            }
+
+            // Update the motor data
+            for (int i = 0; i < motorDevice.count; i++) {
+                motorDevice.vTable->write(i, values[i]);
+            }
+
+            // Don't attempt to write commands to the motors if telemetry is still being received
+            if (motorDevice.vTable->telemetryWait) {
+                (void)motorDevice.vTable->telemetryWait();
+            }
+
+            // Trigger the transmission of the motor data
+            motorDevice.vTable->updateComplete();
+
+            // Perform the decode of the last data received
+            // New data will be received once the send of motor data, triggered above, completes
+#if defined(USE_DSHOT) && defined(USE_DSHOT_TELEMETRY)
+            if (motorDevice.vTable->decodeTelemetry) {
+                motorDevice.vTable->decodeTelemetry();
+            }
+#endif
+        } else
+#endif
+        {
+            // Perform the decode of the last data received
+            // New data will be received once the send of motor data, triggered above, completes
+#if defined(USE_DSHOT) && defined(USE_DSHOT_TELEMETRY)
+            if (motorDevice.vTable->decodeTelemetry) {
+                motorDevice.vTable->decodeTelemetry();
+            }
+#endif
+
+            // Update the motor data
+            for (int i = 0; i < motorDevice.count; i++) {
+                motorDevice.vTable->write(i, values[i]);
+            }
+
+            // Trigger the transmission of the motor data
+            motorDevice.vTable->updateComplete();
+        }
+    }
+#else
+    UNUSED(values);
+#endif
+}
+
+void motorRequestTelemetry(unsigned index)
+{
+    if (index >= motorDevice.count) {
+        return;
+    }
+
+    if (motorDevice.vTable->requestTelemetry) {
+        motorDevice.vTable->requestTelemetry(index);
+    }
+}
+
+unsigned motorDeviceCount(void)
+{
+    return motorDevice.count;
+}
+
+const motorVTable_t *motorGetVTable(void)
+{
+    return motorDevice.vTable;
+}
+
+bool checkMotorProtocolEnabled(const motorDevConfig_t *motorDevConfig, bool *isProtocolDshot)
+{
+    bool enabled = false;
+    bool isDshot = false;
+
+    switch (motorDevConfig->motorProtocol) {
+    case MOTOR_PROTOCOL_PWM :
+    case MOTOR_PROTOCOL_ONESHOT125:
+    case MOTOR_PROTOCOL_ONESHOT42:
+    case MOTOR_PROTOCOL_MULTISHOT:
+    case MOTOR_PROTOCOL_BRUSHED:
+        enabled = true;
+        break;
+
+#ifdef USE_DSHOT
+    case MOTOR_PROTOCOL_DSHOT150:
+    case MOTOR_PROTOCOL_DSHOT300:
+    case MOTOR_PROTOCOL_DSHOT600:
+    case MOTOR_PROTOCOL_PROSHOT1000:
+        enabled = true;
+        isDshot = true;
+        break;
+#endif
+#if ENABLE_DRONECAN_ESC
+    case MOTOR_PROTOCOL_DRONECAN:
+        enabled = true;
+        break;
+#endif
+    default:
+        break;
+    }
+
+    if (isProtocolDshot) {
+        *isProtocolDshot = isDshot;
+    }
+
+    return enabled;
+}
+
+motorProtocolFamily_e motorGetProtocolFamily(void)
+{
+    switch (motorConfig()->dev.motorProtocol) {
+#ifdef USE_PWM_OUTPUT
+    case MOTOR_PROTOCOL_PWM :
+    case MOTOR_PROTOCOL_ONESHOT125:
+    case MOTOR_PROTOCOL_ONESHOT42:
+    case MOTOR_PROTOCOL_MULTISHOT:
+    case MOTOR_PROTOCOL_BRUSHED:
+        return MOTOR_PROTOCOL_FAMILY_PWM;
+#endif
+#ifdef USE_DSHOT
+    case MOTOR_PROTOCOL_DSHOT150:
+    case MOTOR_PROTOCOL_DSHOT300:
+    case MOTOR_PROTOCOL_DSHOT600:
+    case MOTOR_PROTOCOL_PROSHOT1000:
+        return MOTOR_PROTOCOL_FAMILY_DSHOT;
+#endif
+#if ENABLE_DRONECAN_ESC
+    case MOTOR_PROTOCOL_DRONECAN:
+        return MOTOR_PROTOCOL_FAMILY_CAN;
+#endif
+    default:
+        return MOTOR_PROTOCOL_FAMILY_UNKNOWN;
+    }
+}
+
+bool isMotorProtocolDronecan(void)
+{
+#if ENABLE_DRONECAN_ESC
+    return motorConfig()->dev.motorProtocol == MOTOR_PROTOCOL_DRONECAN;
+#else
+    return false;
+#endif
+}
+
+static void checkMotorProtocol(const motorDevConfig_t *motorDevConfig)
+{
+    motorProtocolEnabled = checkMotorProtocolEnabled(motorDevConfig, &motorProtocolDshot);
+}
+
+// End point initialization is called from mixerInit before motorDevInit; can't use vtable...
+void motorInitEndpoints(const motorConfig_t *motorConfig, float outputLimit, float *outputLow, float *outputHigh, float *disarm, float *deadbandMotor3dHigh, float *deadbandMotor3dLow)
+{
+    checkMotorProtocol(&motorConfig->dev);
+
+    if (isMotorProtocolEnabled()) {
+        switch (motorGetProtocolFamily()) {
+#ifdef USE_PWM_OUTPUT
+        case MOTOR_PROTOCOL_FAMILY_PWM:
+            analogInitEndpoints(motorConfig, outputLimit, outputLow, outputHigh, disarm, deadbandMotor3dHigh, deadbandMotor3dLow);
+            break;
+#endif
+#ifdef USE_DSHOT
+        case MOTOR_PROTOCOL_FAMILY_DSHOT:
+            dshotInitEndpoints(motorConfig, outputLimit, outputLow, outputHigh, disarm, deadbandMotor3dHigh, deadbandMotor3dLow);
+            break;
+#endif
+#if ENABLE_DRONECAN_ESC
+        case MOTOR_PROTOCOL_FAMILY_CAN:
+            dronecanMotorInitEndpoints(motorConfig, outputLimit, outputLow, outputHigh, disarm, deadbandMotor3dHigh, deadbandMotor3dLow);
+            break;
+#endif
+        default:
+            // TODO: perhaps a failure mode here?
+            break;
+        }
+    }
+}
+
+float motorConvertFromExternal(uint16_t externalValue)
+{
+    return motorDevice.vTable->convertExternalToMotor(externalValue);
+}
+
+uint16_t motorConvertToExternal(float motorValue)
+{
+    return motorDevice.vTable->convertMotorToExternal(motorValue);
+}
+
+void motorPostInit(void)
+{
+    if (motorDevice.vTable->postInit) {
+        motorDevice.vTable->postInit();
+    }
+}
 
 bool isMotorProtocolEnabled(void)
 {
@@ -95,123 +294,85 @@ bool isMotorProtocolBidirDshot(void)
     return isMotorProtocolDshot() && useDshotTelemetry;
 }
 
-unsigned motorDeviceCount(void)
+void motorNullDevInit(motorDevice_t *device);
+
+void motorDevInit(unsigned motorCount)
 {
-    return motorDevice.count;
-}
+#if defined(USE_PWM_OUTPUT) || defined(USE_DSHOT)
+    const motorDevConfig_t *motorDevConfig = &motorConfig()->dev;
+#endif
 
-const motorVTable_t *motorGetVTable(void)
-{
-    return motorDevice.vTable;
-}
-
-void motorDevInit(void)
-{
-		bool success = false;
-
-    motorDevice.count = motorConfig.motorCount;
-    success = dshotPwmDevInit(&motorDevice, &motorConfig);
-
-    // if the VTable has been populated, the device is initialized.
-    if (success) {
-			motorDevice.initialized = true;
-			motorDevice.motorEnableTimeMs = 0;
-			motorDevice.enabled = false;
+#if defined(USE_PWM_OUTPUT)
+    uint16_t idlePulse = motorConfig()->mincommand;
+    if (featureIsEnabled(FEATURE_3D)) {
+        idlePulse = flight3DConfig()->neutral3d;
     }
-}
-
-void motorShutdown(void)
-{
-  motorDevice.vTable->shutdown();
-  motorDevice.enabled = false;
-  motorDevice.motorEnableTimeMs = 0;
-  motorDevice.initialized = false;
-}
-
-extern float applyCommand[4];
-
-FAST_CODE void motorWriteAll(void)
-{
-  if(ARMING_FLAG(ARMED))
-  {
-    if(true)//failsafeFlags == 0
-    {
-      if(rcData[THROTTLE] > 1030)
-      {
-        motor[R_R] = RR > 21000 ? 21000 : RR < 11000 ? 11000 : RR;
-        motor[R_F] = RF > 21000 ? 21000 : RF < 11000 ? 11000 : RF;
-        motor[L_R] = LR > 21000 ? 21000 : LR < 11000 ? 11000 : LR;
-        motor[L_F] = LF > 21000 ? 21000 : LF < 11000 ? 11000 : LF;
-      }
-      else
-      {
-        motor[R_R] = 11000;
-        motor[R_F] = 11000;
-        motor[L_R] = 11000;
-        motor[L_F] = 11000;
-      }
-    }
-    else
-    {
-      motor[R_R] = 10500;
-      motor[R_F] = 10500;
-      motor[L_R] = 10500;
-      motor[L_F] = 10500;
-    }
-  }
-  else
-  {
-    motor[R_R] = 10500;
-    motor[R_F] = 10500;
-    motor[L_R] = 10500;
-    motor[L_F] = 10500;
-  }
-
-    if (motorDevice.enabled) {
-    // Perform the decode of the last data received
-    // New data will be received once the send of motor data, triggered above, completes
-#if defined(USE_DSHOT) && defined(USE_DSHOT_TELEMETRY)
-    if (motorDevice.vTable->decodeTelemetry) {
-            motorDevice.vTable->decodeTelemetry();
+    if (motorConfig()->dev.motorProtocol == MOTOR_PROTOCOL_BRUSHED) {
+        idlePulse = 0; // brushed motors
     }
 #endif
 
-    // Update the motor data
-    for (int i = 0; i < motorDevice.count; i++) {
-    	motor[i] = 0;//(motor[i] == 10500) ? DSHOT_CMD_MOTOR_STOP : scaleRangef(motor[i], 10500 + 1, 21000, DSHOT_MIN_THROTTLE, DSHOT_MAX_THROTTLE);
-      motorDevice.vTable->write(i, motor[i]);
+    bool success = false;
+    motorDevice.count = motorCount;
+    if (isMotorProtocolEnabled()) {
+        do {
+#if ENABLE_DRONECAN_ESC
+            if (isMotorProtocolDronecan()) {
+                success = dronecanMotorDevInit(&motorDevice, motorCount);
+                break;
+            }
+#endif
+            if (!isMotorProtocolDshot()) {
+#ifdef USE_PWM_OUTPUT
+                success = motorPwmDevInit(&motorDevice, motorDevConfig, idlePulse);
+#endif
+                break;
+            }
+#ifdef USE_DSHOT
+#ifdef USE_DSHOT_BITBANG
+            if (isDshotBitbangActive(motorDevConfig)) {
+                success = dshotBitbangDevInit(&motorDevice, motorDevConfig);
+                break;
+            }
+#endif
+            success = dshotPwmDevInit(&motorDevice, motorDevConfig);
+#endif
+        } while(0);
     }
 
-    // Trigger the transmission of the motor data
-    motorDevice.vTable->updateComplete();
-  }
-}
-
-void motorRequestTelemetry(unsigned index)
-{
-    if (index >= motorDevice.count) {
-        return;
-    }
-
-    if (motorDevice.vTable->requestTelemetry) {
-        motorDevice.vTable->requestTelemetry(index);
+    // if the VTable has been populated, the device is initialized.
+    if (success) {
+        motorDevice.initialized = true;
+        motorDevice.motorEnableTimeMs = 0;
+        motorDevice.enabled = false;
+    } else {
+        motorNullDevInit(&motorDevice);
     }
 }
 
 void motorDisable(void)
 {
-  motorDevice.vTable->disable();
-  motorDevice.enabled = false;
-  motorDevice.motorEnableTimeMs = 0;
+    motorDevice.vTable->disable();
+    motorDevice.enabled = false;
+    motorDevice.motorEnableTimeMs = 0;
 }
 
 void motorEnable(void)
 {
-  if (motorDevice.initialized && motorDevice.vTable->enable())
-  {
-      motorDevice.enabled = true;
-      motorDevice.motorEnableTimeMs = millis();
-  }
+    if (motorDevice.initialized && motorDevice.vTable->enable()) {
+        motorDevice.enabled = true;
+        motorDevice.motorEnableTimeMs = millis();
+    }
+}
+
+float motorEstimateMaxRpm(void)
+{
+    // Empirical testing found this relationship between estimated max RPM without props attached
+    // (unloaded) and measured max RPM with props attached (loaded), independent from prop size
+    float unloadedMaxRpm = 0.01f * getBatteryVoltage() * motorConfig()->kv;
+    float loadDerating = -5.44e-6f * unloadedMaxRpm + 0.944f;
+
+    return unloadedMaxRpm * loadDerating;
 }
 
 bool motorIsEnabled(void)
@@ -222,11 +383,6 @@ bool motorIsEnabled(void)
 bool motorIsMotorEnabled(unsigned index)
 {
     return motorDevice.vTable->isMotorEnabled(index);
-}
-
-uint8_t getMotorCount(void)
-{
-    return motorConfig.motorCount;
 }
 
 bool motorIsMotorIdle(unsigned index)
@@ -240,6 +396,34 @@ timeMs_t motorGetMotorEnableTimeMs(void)
     return motorDevice.motorEnableTimeMs;
 }
 #endif
+
+IO_t motorGetIo(unsigned index)
+{
+    if (index >= motorDevice.count) {
+        return IO_NONE;
+    }
+    return motorDevice.vTable->getMotorIO ? motorDevice.vTable->getMotorIO(index) : IO_NONE;
+}
+
+void motorReleaseIo(unsigned index)
+{
+    if (index < motorDevice.count && motorDevice.vTable->releaseMotorIO) {
+        motorDevice.vTable->releaseMotorIO(index);
+    }
+}
+
+bool motorReinstateIo(unsigned index)
+{
+    if (index >= motorDevice.count) {
+        return false;
+    }
+
+    if (motorDevice.vTable->reinstateMotorIO) {
+        return motorDevice.vTable->reinstateMotorIO(index);
+    }
+
+    return true; // return "ok" if no reinstate function on this device.
+}
 
 /* functions below for empty methods and no active motors */
 void motorPostInitNull(void)
@@ -313,6 +497,8 @@ static const motorVTable_t motorNullVTable = {
     .requestTelemetry = NULL,
     .isMotorIdle = NULL,
     .getMotorIO = NULL,
+    .releaseMotorIO = NULL,
+    .reinstateMotorIO = NULL,
 };
 
 void motorNullDevInit(motorDevice_t *device)
@@ -320,3 +506,6 @@ void motorNullDevInit(motorDevice_t *device)
     device->vTable = &motorNullVTable;
     device->count = 0;
 }
+
+
+#endif // USE_MOTOR

@@ -21,7 +21,7 @@
  *
  */
 
-#include "hw.h"
+#include "platform.h"
 
 #ifdef USE_USB_CDC_HID
 

@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "hw.h"
+#include "platform.h"
 
 #include "build/build_config.h"
 #include "build/debug.h"
@@ -40,9 +40,8 @@
 #include "flight/position_filter.h"
 #include "flight/position.h"
 
-//#include "sensors/acceleration.h"
+#include "sensors/acceleration.h"
 #include "sensors/sensors.h"
-#include "drivers/accgyro/accgyro_spi_bmi270.h"
 
 #ifdef USE_BARO
 #include "sensors/barometer.h"
@@ -61,12 +60,10 @@
 #endif
 
 #if defined(USE_POSITION_HOLD)
-//#include "pg/autopilot.h"
-#include "flight/autopilot.h"
+#include "pg/autopilot.h"
 #endif
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-//#include "pg/pos_hold.h"
-#include "flight/pos_hold.h"
+#include "pg/pos_hold.h"
 #endif
 
 // Accelerometer process noise in (cm/s^2)^2.
@@ -136,7 +133,7 @@ static bool positionEstimatorWantXYFusion(void)
 #ifdef USE_GPS
     if (sensors(SENSOR_GPS) && STATE(GPS_FIX)) {
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-        if (posHoldConfig.positionSource != POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
+        if (posHoldConfig()->positionSource != POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
             return true;
         }
 #else
@@ -149,7 +146,7 @@ static bool positionEstimatorWantXYFusion(void)
     if (sensors(SENSOR_OPTICALFLOW) && sensors(SENSOR_RANGEFINDER) &&
         isOpticalflowHealthy() && rangefinderIsHealthy()) {
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-        if (posHoldConfig.positionSource != POSHOLD_SOURCE_GPS_ONLY) {
+        if (posHoldConfig()->positionSource != POSHOLD_SOURCE_GPS_ONLY) {
             return true;
         }
 #else
@@ -228,7 +225,7 @@ void positionEstimatorInit(void)
 {
 
 #if defined(USE_POSITION_HOLD)
-    qaccelXY = Q_ACCEL_XY * ((autopilotConfig.positionA > 1) ?  (30.0f / autopilotConfig.positionA ) : 15.0f);
+    qaccelXY = Q_ACCEL_XY * ((autopilotConfig()->positionA > 1) ?  (30.0f / autopilotConfig()->positionA ) : 15.0f);
     // when user reduces positionA, , they want more accelerometer influence (up to 15x more), and vice versa
 #endif
     kalmanInit(&kfEast, 0.0f, 0.0f, INITIAL_POS_VAR, INITIAL_VEL_VAR, qaccelXY);
@@ -293,10 +290,10 @@ void positionEstimatorEnableXY(bool enable)
 // Compute earth-frame linear acceleration from IMU (gravity removed), in cm/s^2 ENU
 STATIC_UNIT_TESTED void getLinearAccelENU(float *accelEast, float *accelNorth, float *accelUp)
 {
-    const float accScale = bmi270.acc.acc_1G_rec;
-    vector3_t accBF = {{ bmi270.acc.accADC.x * accScale,
-                         bmi270.acc.accADC.y * accScale,
-                         bmi270.acc.accADC.z * accScale }};
+    const float accScale = acc.dev.acc_1G_rec;
+    vector3_t accBF = {{ acc.accADC.x * accScale,
+                         acc.accADC.y * accScale,
+                         acc.accADC.z * accScale }};
 
     // rMat rotates body -> earth NWU (North-West-Up); this is the same convention
     // used throughout imu.c (imuComputeRotationMatrix, attitude extraction, mag fusion).
@@ -333,7 +330,7 @@ static uint16_t gpsDopOrFallback(uint16_t preferredDop, uint16_t fallbackDop)
 static float opticalFlowR(int16_t quality)
 {
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    const int minQuality = posHoldConfig.opticalflowQualityMin;
+    const int minQuality = posHoldConfig()->opticalflowQualityMin;
 #else
     const int minQuality = 30;
 #endif
@@ -359,12 +356,12 @@ static void feedGPSMeasurements(timeUs_t nowUs)
 
     // Determine which measurements are allowed by source settings
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    const uint8_t posSource = posHoldConfig.positionSource;
+    const uint8_t posSource = posHoldConfig()->positionSource;
     const bool gpsXYAllowed = (posSource != POSHOLD_SOURCE_OPTICALFLOW_ONLY);
 #else
     const bool gpsXYAllowed = true;
 #endif
-    const uint8_t altSource = positionConfig.altitude_source;
+    const uint8_t altSource = positionConfig()->altitude_source;
     const bool gpsAltAllowed = (altSource == ALTITUDE_SOURCE_DEFAULT ||
                                 altSource == ALTITUDE_SOURCE_GPS_ONLY ||
                                 altSource == ALTITUDE_SOURCE_RANGEFINDER_PREFER);
@@ -406,7 +403,7 @@ static void feedGPSMeasurements(timeUs_t nowUs)
 
         // Use altitude_prefer_baro to scale GPS altitude R:
         // altitude_prefer_baro=100 means strongly prefer baro, so GPS R should be higher
-        const float baroPreference = positionConfig.altitude_prefer_baro * 0.01f;
+        const float baroPreference = positionConfig()->altitude_prefer_baro * 0.01f;
         const uint16_t altDop = gpsDopOrFallback(gpsSol.dop.vdop, gpsSol.dop.pdop);
         const float gpsAltR = gpsR(R_GPS_ALT_BASE, altDop) * (1.0f + baroPreference * 2.0f);
 
@@ -429,7 +426,7 @@ static void feedBaroMeasurements(timeUs_t nowUs)
         return;
     }
 
-    const uint8_t altSource = positionConfig.altitude_source;
+    const uint8_t altSource = positionConfig()->altitude_source;
     if (altSource == ALTITUDE_SOURCE_GPS_ONLY ||
         altSource == ALTITUDE_SOURCE_RANGEFINDER_ONLY) {
         return;
@@ -445,7 +442,7 @@ static void feedBaroMeasurements(timeUs_t nowUs)
     }
 
     // Scale R based on altitude_prefer_baro: higher value = lower baro R = more trust
-    const float baroPreference = constrainf(positionConfig.altitude_prefer_baro * 0.01f, 0.01f, 1.0f);
+    const float baroPreference = constrainf(positionConfig()->altitude_prefer_baro * 0.01f, 0.01f, 1.0f);
     const float baroR = R_BARO_ALT / baroPreference;
 
     kalmanUpdatePosition(&kfUp, baroAltCm - baroAltOffsetCm, baroR);
@@ -461,14 +458,14 @@ static void feedBaroMeasurements(timeUs_t nowUs)
 static void feedRangefinderMeasurements(timeUs_t nowUs)
 {
 #ifdef USE_RANGEFINDER
-    const uint8_t altSource = positionConfig.altitude_source;
+    const uint8_t altSource = positionConfig()->altitude_source;
     if (altSource == ALTITUDE_SOURCE_GPS_ONLY ||
         altSource == ALTITUDE_SOURCE_BARO_ONLY) {
         return;
     }
 
     float altCm;
-    if (!rangefinderSampleAltitudeCm(&altCm, positionConfig.rangefinder_max_range_cm)) {
+    if (!rangefinderSampleAltitudeCm(&altCm, positionConfig()->rangefinder_max_range_cm)) {
         return;
     }
 
@@ -506,21 +503,21 @@ static void feedOpticalFlowMeasurements(timeUs_t nowUs)
     }
 
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    const uint8_t posSource = posHoldConfig.positionSource;
+    const uint8_t posSource = posHoldConfig()->positionSource;
     if (posSource == POSHOLD_SOURCE_GPS_ONLY) {
         return;
     }
 #endif
 
-    const uint8_t altSource = positionConfig.altitude_source;
+    const uint8_t altSource = positionConfig()->altitude_source;
     if (altSource == ALTITUDE_SOURCE_BARO_ONLY || altSource == ALTITUDE_SOURCE_GPS_ONLY) {
         return;
     }
 
 #ifdef USE_RANGEFINDER
-    float maxRangeCm = positionConfig.rangefinder_max_range_cm;
+    float maxRangeCm = positionConfig()->rangefinder_max_range_cm;
 #if defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    maxRangeCm = fminf(maxRangeCm, (float)posHoldConfig.opticalflowMaxRange);
+    maxRangeCm = fminf(maxRangeCm, (float)posHoldConfig()->opticalflowMaxRange);
 #endif
     float altitudeCmF;
     if (!rangefinderSampleAltitudeCm(&altitudeCmF, maxRangeCm)) {
@@ -683,7 +680,7 @@ bool positionEstimatorIsHeadingRequired(void)
 {
     // If configured for optical flow only, heading is not required
 #if defined(USE_GPS) && defined(USE_POSITION_HOLD) && !defined(USE_WING)
-    if (posHoldConfig.positionSource == POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
+    if (posHoldConfig()->positionSource == POSHOLD_SOURCE_OPTICALFLOW_ONLY) {
         return false;
     }
 #endif

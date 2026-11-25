@@ -20,12 +20,12 @@
 
 #pragma once
 
-//#include "drivers/io.h"
+#include "drivers/io.h"
 #include "drivers/io_types.h"
-//#include "drivers/resource.h"
+#include "drivers/resource.h"
 #include "drivers/serial_resource.h"
 
-//#include "pg/pg.h"
+#include "pg/pg.h"
 
 typedef enum {
     MODE_RX = 1 << 0,
@@ -101,14 +101,14 @@ typedef struct serialPort_s {
 } serialPort_t;
 
 typedef struct serialPinConfig_s {
-    ioTag_t ioTagTx[7];
-    ioTag_t ioTagRx[7];
+    ioTag_t ioTagTx[RESOURCE_SERIAL_COUNT];
+    ioTag_t ioTagRx[RESOURCE_SERIAL_COUNT];
 #ifdef USE_INVERTER
     ioTag_t ioTagInverter[RESOURCE_UART_COUNT]; // this array is only for UARTs.
 #endif
 } serialPinConfig_t;
 
-//PG_DECLARE(serialPinConfig_t, serialPinConfig);
+PG_DECLARE(serialPinConfig_t, serialPinConfig);
 
 struct serialPortVTable {
     void (*serialWrite)(serialPort_t *instance, uint8_t ch);

@@ -24,7 +24,8 @@
 #include "common/time.h"
 #include "common/maths.h"
 #include "common/vector.h"
-//#include "pg/pg.h"
+
+#include "pg/pg.h"
 
 // Exported symbols
 extern bool canUseGPSHeading;
@@ -66,7 +67,7 @@ typedef struct imuConfig_s {
     bool trust_mag;      // default to false, to indicate that the user has calibrated and validated their mag
 } imuConfig_t;
 
-extern imuConfig_t imuConfig;
+PG_DECLARE(imuConfig_t, imuConfig);
 
 typedef struct imuRuntimeConfig_s {
     float imuDcmKi;
@@ -75,14 +76,20 @@ typedef struct imuRuntimeConfig_s {
 
 void imuConfigure(uint16_t throttle_correction_angle, uint8_t throttle_correction_value);
 
-void imuConfig_Init(void);
-
 float getSinPitchAngle(void);
 float getCosTiltAngle(void);
 void getQuaternion(quaternion_t * q);
 void imuUpdateAttitude(timeUs_t currentTimeUs);
 
 void imuInit(void);
+
+#if ENABLE_SIMULATOR
+void imuSetAttitudeRPY(float roll, float pitch, float yaw);  // in deg
+void imuSetAttitudeQuat(float w, float x, float y, float z);
+#if ENABLE_SIMULATOR_IMU_SYNC
+void imuSetHasNewData(uint32_t dt);
+#endif
+#endif
 
 bool imuQuaternionHeadfreeOffsetSet(void);
 void imuQuaternionHeadfreeTransformVectorEarthToBody(vector3_t *v);
