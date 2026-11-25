@@ -22,9 +22,9 @@
 
 #ifdef USE_VCP
 
-#include "drivers/io.h"
+//#include "drivers/io.h"
 
-#include "pg/pg_ids.h"
+//#include "pg/pg_ids.h"
 
 #include "usb.h"
 
@@ -33,8 +33,8 @@ usbDev_t usbDevConfig;
 void usbDevConfig_Init(void)
 {
 	usbDevConfig.type = DEFAULT,
-		usbDevConfig.mscButtonPin = IO_TAG(USB_MSC_BUTTON_PIN),
-		usbDevConfig.mscButtonUsePullup = MSC_BUTTON_IPU,
-		usbDevConfig.detectPin = IO_TAG(USB_DETECT_PIN),
+	usbDevConfig.mscButtonPin = 0;//IO_TAG(USB_MSC_BUTTON_PIN),
+	usbDevConfig.mscButtonUsePullup = 0;//MSC_BUTTON_IPU,
+	usbDevConfig.detectPin = 0;//IO_TAG(USB_DETECT_PIN),
 }
 #endif

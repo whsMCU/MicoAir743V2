@@ -57,7 +57,7 @@ USBD_HandleTypeDef USBD_Device;
 
 #include "drivers/time.h"
 
-//#include "drivers/serial.h"
+#include "drivers/serial.h"
 #include "drivers/serial_usb_vcp.h"
 
 #include "scheduler/scheduler.h"
