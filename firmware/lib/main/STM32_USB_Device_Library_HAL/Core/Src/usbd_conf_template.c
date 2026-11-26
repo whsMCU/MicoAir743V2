@@ -175,7 +175,7 @@ USBD_StatusTypeDef USBD_LL_SetUSBAddress(USBD_HandleTypeDef *pdev,
                                          uint8_t dev_addr)
 {
   UNUSED(pdev);
-  UNUSED(ep_addr);
+  UNUSED(dev_addr);
 
   return USBD_OK;
 }
